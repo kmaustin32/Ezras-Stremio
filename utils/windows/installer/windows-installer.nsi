@@ -604,6 +604,13 @@ Section ; App Files
     ;Set output path to InstallDir
     SetOutPath "$INSTDIR"
 
+    ; This script is fork implementation, not user configuration. Refresh it
+    ; even when preserving existing mpv.conf, input.conf, and custom scripts.
+    SetOverwrite on
+    SetOutPath "$INSTDIR\portable_config\scripts"
+    File "..\..\..\dist\win-${ARCH}\portable_config\scripts\fork_bar_detection.lua"
+    SetOutPath "$INSTDIR"
+
     ; Prevent overwriting existing files
     SetOverwrite off
 

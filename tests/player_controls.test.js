@@ -152,6 +152,10 @@ test('Player control uses native acknowledgments, survives UI updates, and prese
         await page.keyboard.press('Space');
         await page.keyboard.press('Control+Shift+F');
         assert.equal(await page.evaluate(() => window.messages.filter(message => message.args[0] === 'cycle-display-mode').length), 4);
+        await page.keyboard.press('Control+Shift+C');
+        assert.equal(await page.evaluate(() => window.messages.filter(message => message.args[0] === 'detect-encoded-bars').length), 1);
+        assert.equal(await page.evaluate(() => window.messages.filter(message => message.args[0] === 'toggle-border-blur').length), 0,
+            'Detecting encoded bars must not toggle ambient blur');
         await page.addScriptTag({content: script});
         assert.equal(await button.count(), 1, 'Repeated injection must not duplicate controls');
         await page.evaluate(() => {

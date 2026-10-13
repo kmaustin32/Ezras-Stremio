@@ -89,6 +89,11 @@ def main():
         installed = Path(folder) / 'stremio.exe'
         assert digest(installed) == digest(args.exe), 'Installer embeds a different executable'
         verify(installed)
+        subprocess.run([seven_zip, 'x', str(args.installer), '*fork_bar_detection.lua', '-r', f'-o{folder}', '-y'],
+                       check=True, capture_output=True)
+        scripts = list(Path(folder).rglob('fork_bar_detection.lua'))
+        source_script = Path(__file__).resolve().parents[1] / 'utils/mpv/anime4k/portable_config/scripts/fork_bar_detection.lua'
+        assert scripts and all(digest(file) == digest(source_script) for file in scripts), 'Installer must contain the tested black-bar detector'
     print('PASS: installer contains the fork executable, exact branding resources, and all Windows icon sizes')
 
 

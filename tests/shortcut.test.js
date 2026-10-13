@@ -41,3 +41,14 @@ test('Ctrl+Shift+F cycles display mode once, independently of blur', () => {
         {repeat: true}, {target: {tagName: 'INPUT'}}, {target: {isContentEditable: true}}])
         assert.equal(run({code: 'KeyF', shiftKey: true, ...overrides}).messages.length, 0);
 });
+
+test('Ctrl+Shift+C requests manual black-bar detection without affecting blur', () => {
+    const result = run({code: 'KeyC', shiftKey: true});
+    assert.equal(result.messages.length, 1);
+    assert.equal(result.messages[0].args[0], 'detect-encoded-bars');
+    assert.equal(result.event.prevented, true);
+    for (const overrides of [{ctrlKey: false}, {shiftKey: false}, {altKey: true}, {metaKey: true},
+        {repeat: true}, {target: {tagName: 'INPUT'}}, {target: {tagName: 'TEXTAREA'}},
+        {target: {tagName: 'SELECT'}}, {target: {isContentEditable: true}}])
+        assert.equal(run({code: 'KeyC', shiftKey: true, ...overrides}).messages.length, 0);
+});

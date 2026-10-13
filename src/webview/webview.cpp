@@ -118,6 +118,16 @@ static const wchar_t* INJECTED_KEYDOWN_SCRIPT = LR"JS(
             }));
             return;
         }
+        if (event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey &&
+            event.code === 'KeyC' && !editable) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            if (!event.repeat) window.chrome.webview.postMessage(JSON.stringify({
+                type: 6, object: 'transport', method: 'handleInboundJSON', id: 1003,
+                args: ['detect-encoded-bars', []]
+            }));
+            return;
+        }
         if (event.code === 'F5') {
             event.preventDefault();
             const ctrlPressed = event.ctrlKey || event.metaKey;

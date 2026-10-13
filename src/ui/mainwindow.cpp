@@ -171,6 +171,12 @@ void HandleEvent(const std::string &ev, std::vector<std::string> &args)
         TogglePictureInPicture(g_hWnd, !g_isPipMode);
     } else if (ev == "toggle-border-blur") {
         ToggleAmbientBorders();
+    } else if (ev == "detect-encoded-bars") {
+        if (HasNativeVideo()) {
+            const char* command[] = {"script-message-to", "fork_bar_detection", "detect", nullptr};
+            if (mpv_command_async(g_mpv, 0, command) < 0)
+                AppendToCrashLog("[MPV]: Could not request encoded black-bar detection");
+        }
     } else if (ev == "get-display-mode") {
         NotifyDisplayModeState(HasNativeVideo());
     } else if (ev == "cycle-display-mode") {

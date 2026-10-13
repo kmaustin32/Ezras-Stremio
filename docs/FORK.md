@@ -8,10 +8,10 @@ D3D11 playback. Use Windows 10/11 x64.
 
 ## Install and use
 
-Download `Stremio-5.0.22-mpv.7-x64.exe` from this fork's release. The installer
+Download `Stremio-5.0.22-mpv.8-x64.exe` from this fork's release. The installer
 installs WebView2 when needed. The `.zip` is portable but requires the system
 WebView2 runtime. Extract the ZIP into its own directory and run `stremio.exe`.
-Use the installer whose filename contains `mpv.7`; **BUILD-ONLY** downloads are
+Use the installer whose filename contains `mpv.8`; **BUILD-ONLY** downloads are
 archived build dependencies. The original upstream installer is one such dependency
 and installs the original green-icon application, not this fork.
 
@@ -37,6 +37,28 @@ In `portable_config/stremio-settings.ini`, `[MPV] BorderBlurEnabled=-1`
 follows mpv.conf. `0` overrides it with solid borders and `1` enables blur.
 The toggle writes only this preference and preserves the configured radius.
 Set it back to `-1` to resume following mpv.conf. Enabling blur selects gpu-next.
+
+### Encoded black bars
+
+While a video is playing, press **Ctrl+Shift+C** during a clear, bright scene
+to detect black bars encoded into the picture. The detector samples briefly,
+then removes its analysis filter and locks the detected crop for this video,
+including through pause, seek, resize, and Fit/Crop/Stretch changes. There is no
+automatic or continuous detection. Press the same hotkey again to restore the
+previous framing; each new video starts without the detected crop.
+
+Press **Ctrl+B** separately to enable ambient blur in the remaining borders.
+Detection does not change the blur setting. No clear bars, insufficient data,
+dark/uncertain or unbalanced edges leave the picture unchanged. Detection requires
+playback to be running; pausing during sampling cancels it. Existing video filters,
+shaders, subtitles, and streaming connections are retained. Filters that change
+decoded picture dimensions are conservatively rejected. Direct hardware decoding
+may briefly switch to copy-back decoding for analysis, then restore its setting.
+For changing-aspect-ratio videos, the manual crop stays locked until you reset it.
+
+The installer updates `scripts/fork_bar_detection.lua` as fork implementation
+while preserving existing mpv.conf, input.conf and other custom scripts when
+you choose to retain your configuration.
 
 New installations enable blur with radius 25, use `ewa_lanczos` scaling, and
 force white subtitles. Existing saved blur preferences continue to take priority.
