@@ -1,4 +1,4 @@
-# mpv ambient blur fork
+# Ezra's Stremio
 
 This fork bundles mpv **0.41.0-1101-g5d85ba5fb**, libplacebo **7.374.0** and
 FFmpeg **N-127213-g2da55bf59** from zhongfly's 2026-10-05 build. The standard
@@ -8,7 +8,7 @@ D3D11 playback. Use Windows 10/11 x64.
 
 ## Install and use
 
-Download `Stremio-5.0.22-mpv.8-x64.exe` from this fork's release. The installer
+Download `Ezras-Stremio-1.0.1-x64.exe` from this fork's release. The installer
 installs WebView2 when needed. The `.zip` is portable but requires the system
 WebView2 runtime. Extract the ZIP into its own directory and run `stremio.exe`.
 Use the installer whose filename contains `mpv.8`; **BUILD-ONLY** downloads are
@@ -133,6 +133,15 @@ play symbols, transparency and wordmark lettering are retained. Movie artwork,
 add-on logos and unrelated interface icons retain their own colors. Web branding
 and the display button are embedded in the executable and work with the existing
 hosted community UI without replacing that upstream project.
+
+## Player shortcuts
+
+Settings → Player Shortcuts lists every binding from the shipped input.conf,
+including each Anime4K mode and Ctrl+8 for shader clearing. It also documents
+Ctrl+B, Ctrl+Shift+C, Ctrl+Shift+F and the bundled Tab intro script. The list
+describes shipped defaults; custom input.conf bindings may differ. The general
+community keyboard shortcut section is retained. Browser tests compare the
+catalog with input.conf and check readability and settings navigation.
 
 ## Keep upstream updates and fork changes
 

@@ -2,7 +2,7 @@ name: Windows build and release
 on:
   push:
     branches: ['webview-windows', 'codex/**']
-    tags: ['v*-mpv.*']
+    tags: ['v*-mpv.*', 'v1.*']
   pull_request:
   workflow_dispatch:
 
@@ -69,7 +69,7 @@ jobs:
           npm install --prefix .build-cache/ui-test --no-save --ignore-scripts playwright@1.62.1
           if ($LASTEXITCODE) { throw 'UI test dependency install failed' }
           $env:NODE_PATH = "$pwd/.build-cache/ui-test/node_modules"
-          node --test tests/player_controls.test.js tests/player_layout.test.js tests/episode_blur.test.js
+          node --test tests/player_controls.test.js tests/player_layout.test.js tests/episode_blur.test.js tests/player_shortcuts.test.js
           if ($LASTEXITCODE) { throw 'Player UI tests failed' }
       - name: Test native WebView2 bootstrap and cached reload
         shell: pwsh
@@ -95,8 +95,8 @@ jobs:
           python tests/branding_package.py --exe dist/win-x64/stremio.exe --original .build-cache/upstream/stremio.exe --installer 'utils/Stremio 5.0.22-x64.exe'
           if ($LASTEXITCODE) { throw 'Packaged application branding verification failed' }
           New-Item -ItemType Directory -Force out | Out-Null
-          Copy-Item 'utils/Stremio 5.0.22-x64.exe' out/Stremio-5.0.22-mpv.8-x64.exe
-          Compress-Archive -Path dist/win-x64/* -DestinationPath out/Stremio-5.0.22-mpv.8-x64.zip
+          Copy-Item 'utils/Stremio 5.0.22-x64.exe' out/Ezras-Stremio-1.0.1-x64.exe
+          Compress-Archive -Path dist/win-x64/* -DestinationPath out/Ezras-Stremio-1.0.1-x64.zip
           Copy-Item images/stremio2.png out/stremio-icon.png
           Get-ChildItem out -File | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)" } | Set-Content out/SHA256SUMS.txt
       - uses: actions/upload-artifact@v7
@@ -161,4 +161,4 @@ jobs:
           for file in dependency-files/*.exe; do
             mv -- "$file" "${file%/*}/BUILD-ONLY-${file##*/}"
           done
-          gh release create "$GITHUB_REF_NAME" --title "Stremio 5.0.22 - manual black-bar detection" --notes-file docs/RELEASE-mpv.md release-files/* dependency-files/*
+          gh release create "$GITHUB_REF_NAME" --title "Ezra's Stremio 1.0.1" --notes-file docs/RELEASE-mpv.md release-files/* dependency-files/*

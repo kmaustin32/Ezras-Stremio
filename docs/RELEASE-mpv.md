@@ -1,5 +1,12 @@
-**Install this fork:** [Stremio-5.0.22-mpv.8-x64.exe](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v5.0.22-mpv.8/Stremio-5.0.22-mpv.8-x64.exe),
-or use the [portable ZIP](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v5.0.22-mpv.8/Stremio-5.0.22-mpv.8-x64.zip).
+## Ezra's Stremio 1.0.1
+
+- Updated Settings → Player Shortcuts with all default input.conf bindings and the fork controls: Ctrl+B for blur, Ctrl+Shift+C for manual black-bar detection/reset, and Ctrl+Shift+F for Fit/Crop/Stretch.
+- Listed each Anime4K mode individually and corrected shader clearing to Ctrl+8. Playback, seeking, speed, audio normalization, subtitle overrides, and the bundled Tab intro shortcut are included.
+- Shortcut descriptions and key badges stay readable in narrow windows. General community shortcuts and custom player configuration are preserved.
+- Release and download names now use Ezra's Stremio 1.0.1. The upstream shell version and existing installation/profile paths are retained for upgrade compatibility.
+
+**Install this fork:** [Ezras-Stremio-1.0.1-x64.exe](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.0.1/Ezras-Stremio-1.0.1-x64.exe),
+or use the [portable ZIP](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.0.1/Ezras-Stremio-1.0.1-x64.zip).
 Files beginning **BUILD-ONLY** are source build dependencies, not this fork's installer.
 Installing the original community dependency gives the original green icon and omits the fork features.
 
@@ -39,7 +46,7 @@ an existing system Vulkan runtime.
 - Automatic upstream binary updates are disabled to preserve fork features.
 - Upstream source updates can be merged into the fork; see the included README-fork.md.
 
-Download **Stremio-5.0.22-mpv.8-x64.exe** for installation, or the **.zip** for
+Download **Ezras-Stremio-1.0.1-x64.exe** for installation, or the **.zip** for
 portable use with an installed WebView2 runtime. SHA256SUMS.txt verifies these
 downloads. The remaining archives preserve build dependencies and are not
 needed to run the application. `stremio-icon.png` is the public Discord branding asset.

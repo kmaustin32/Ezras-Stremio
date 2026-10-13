@@ -20,6 +20,91 @@
     let compatibility = null;
     let compatibilityStatus;
     const appliedStyles = new WeakMap();
+    const playerShortcuts = [
+        {key: 'CTRL+b', keys: ['Ctrl', 'B'], label: 'Toggle ambient border blur'},
+        {key: 'CTRL+SHIFT+c', keys: ['Ctrl', 'Shift', 'C'], label: 'Detect baked-in black bars / restore framing', detail: 'Use during a clear, playing scene. The detected crop stays for this video; press again to restore. Blur is a separate toggle.'},
+        {key: 'CTRL+SHIFT+f', keys: ['Ctrl', 'Shift', 'F'], label: 'Cycle Fit → Crop → Stretch', detail: 'Each new video starts in Fit.'},
+        {key: 'CTRL+1', keys: ['Ctrl', '1'], label: 'Anime4K: Mode A (HQ)'},
+        {key: 'CTRL+2', keys: ['Ctrl', '2'], label: 'Anime4K: Mode B (HQ)'},
+        {key: 'CTRL+3', keys: ['Ctrl', '3'], label: 'Anime4K: Mode C (HQ)'},
+        {key: 'CTRL+4', keys: ['Ctrl', '4'], label: 'Anime4K: Mode A+A (HQ)'},
+        {key: 'CTRL+5', keys: ['Ctrl', '5'], label: 'Anime4K: Mode B+B (HQ)'},
+        {key: 'CTRL+6', keys: ['Ctrl', '6'], label: 'Anime4K: Mode C+A (HQ)'},
+        {key: 'CTRL+7', keys: ['Ctrl', '7'], label: 'FSR shader'},
+        {key: 'CTRL+8', keys: ['Ctrl', '8'], label: 'Clear GLSL shaders'},
+        {key: 'F1', keys: ['F1'], label: 'Toggle audio normalization'},
+        {key: 'F2', keys: ['F2'], label: 'Cycle subtitle overrides: Force → Strip → No'},
+        {key: 'k', keys: ['K'], label: 'Play / pause'},
+        {key: 'MBTN_LEFT', keys: ['Left click'], label: 'Play / pause'},
+        {key: 'j', keys: ['J'], label: 'Seek backward 10 seconds'},
+        {key: 'l', keys: ['L'], label: 'Seek forward 10 seconds'},
+        {key: '[', keys: ['['], label: 'Decrease playback speed by 0.25'},
+        {key: ']', keys: [']'], label: 'Increase playback speed by 0.25'},
+        {key: 'Tab', keys: ['Tab'], label: 'Skip anime intro', detail: 'Use after the intro starts.'}
+    ];
+
+    function updatePlayerShortcuts() {
+        const sections = document.querySelectorAll('[class*="settings-container"] [class*="section-container"]');
+        for (const section of sections) {
+            const title = section.querySelector(':scope > [class*="section-title"]');
+            const isPlayerShortcuts = title && Array.from(title.childNodes).some(node =>
+                node.nodeType === Node.TEXT_NODE && node.textContent.trim() === 'Player Shortcuts');
+            const existing = section.querySelector(':scope > .stremio-fork-shortcuts');
+            if (!isPlayerShortcuts) {
+                if (section.hasAttribute('data-stremio-fork-shortcuts')) section.removeAttribute('data-stremio-fork-shortcuts');
+                existing?.remove();
+                continue;
+            }
+            if (existing) continue;
+            // Keep React-owned upstream rows intact. Hide them only in this section
+            // and append our catalog, so later React updates and navigation remain safe.
+            const row = section.querySelector(':scope > [class*="option-container"]');
+            const name = row?.querySelector('[class*="option-name-container"]');
+            const input = row?.querySelector('[class*="option-input-container"]');
+            const label = name?.querySelector('[class*="label"]');
+            if (!row || !name || !input || !label) continue;
+            const catalog = document.createElement('div');
+            catalog.className = 'stremio-fork-shortcuts';
+            const note = document.createElement('p');
+            note.className = 'stremio-fork-shortcuts-note';
+            note.textContent = 'Defaults for the built-in mpv player. Your custom input.conf may change the mpv bindings. Picture-in-Picture is available beside fullscreen in the player.';
+            catalog.append(note);
+            for (const shortcut of playerShortcuts) {
+                const entry = document.createElement('div');
+                entry.className = row.className;
+                entry.dataset.shortcut = shortcut.key;
+                const description = document.createElement('div');
+                description.className = name.className;
+                const text = document.createElement('div');
+                text.className = label.className;
+                text.textContent = shortcut.label;
+                description.append(text);
+                if (shortcut.detail) {
+                    const detail = document.createElement('p');
+                    detail.className = 'stremio-fork-shortcuts-note';
+                    detail.textContent = shortcut.detail;
+                    description.append(detail);
+                }
+                const binding = document.createElement('div');
+                binding.className = input.className;
+                binding.setAttribute('aria-label', shortcut.keys.join(' + '));
+                shortcut.keys.forEach((key, index) => {
+                    if (index) {
+                        const plus = document.createElement('span');
+                        plus.textContent = '+';
+                        binding.append(plus);
+                    }
+                    const kbd = document.createElement('kbd');
+                    kbd.textContent = key;
+                    binding.append(kbd);
+                });
+                entry.append(description, binding);
+                catalog.append(entry);
+            }
+            section.setAttribute('data-stremio-fork-shortcuts', '');
+            section.append(catalog);
+        }
+    }
 
     function setStyle(element, name, value) {
         if (!element) return;
@@ -143,6 +228,20 @@
         const style = document.createElement('style');
         style.id = 'stremio-fork-settings-layout';
         style.textContent = `
+            [data-stremio-fork-shortcuts] > [class*="option-container"],
+            [data-stremio-fork-shortcuts] > [class*="section-title"] [class*="link-container"] {
+                display: none !important;
+            }
+            .stremio-fork-shortcuts-note {
+                color: var(--primary-foreground-color, #fff); opacity: .65; font-size: 1rem;
+                line-height: 1.5; margin: .5rem 0 1rem; max-width: 46rem;
+            }
+            .stremio-fork-shortcuts [class*="option-input-container"] {
+                flex-wrap: wrap; gap: .5rem; color: var(--primary-foreground-color, #fff);
+            }
+            .stremio-fork-shortcuts [class*="option-name-container"] {
+                flex-direction: column !important; align-items: stretch !important;
+            }
             [class*="settings-container"] [class*="option-container"]:has(> [class*="option-name-container"]) {
                 max-width: 46rem !important;
             }
@@ -194,6 +293,7 @@
     function update() {
         scheduled = false;
         recolorLogos();
+        updatePlayerShortcuts();
         const player = document.querySelector('[class*="player-container"]');
         updateVolume(player);
         updatePip(player);
