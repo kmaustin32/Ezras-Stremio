@@ -14,9 +14,9 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     env:
-      TESTED_RUN: '38448706032'
-      TESTED_SHA: '69a12ae7569fc49026c30af59fdb34b1bf3804ca'
-      RELEASE_TAG: 'v5.0.22-mpv.8'
+      TESTED_RUN: '38452401008'
+      TESTED_SHA: '6633fdc1a7cfce6337727d8342aa4f02727dd2ba'
+      RELEASE_TAG: 'v1.0.1'
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Verify successful source build
@@ -26,11 +26,11 @@ jobs:
             '.conclusion == "success" and .status == "completed" and .head_sha == $sha and .head_repository.full_name == $repo and .name == "Windows build and release"' run.json
       - uses: actions/checkout@v7
         with:
-          ref: '69a12ae7569fc49026c30af59fdb34b1bf3804ca'
+          ref: ${{ env.TESTED_SHA }}
       - uses: actions/download-artifact@v8
         with:
           name: Windows-x64
-          run-id: '38448706032'
+          run-id: ${{ env.TESTED_RUN }}
           github-token: ${{ github.token }}
           path: release-files
       - name: Verify existing release tag
@@ -43,14 +43,14 @@ jobs:
         run: |
           cd release-files
           sha256sum --strict -c SHA256SUMS.txt
-          test -f Stremio-5.0.22-mpv.8-x64.exe
-          test -f Stremio-5.0.22-mpv.8-x64.zip
+          test -f Ezras-Stremio-1.0.1-x64.exe
+          test -f Ezras-Stremio-1.0.1-x64.zip
           test -f stremio-icon.png
           cd ..
           cp docs/RELEASE-mpv.md release-notes.md
           printf '\n\nBuilt and tested by [GitHub Actions](https://github.com/%s/actions/runs/%s) from commit %s. These downloads are the exact verified artifacts from that run.\n' "$GITHUB_REPOSITORY" "$TESTED_RUN" "$TESTED_SHA" >> release-notes.md
           gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --latest \
-            --title 'Stremio 5.0.22 - manual black-bar detection' --notes-file release-notes.md \
-            'release-files/Stremio-5.0.22-mpv.8-x64.exe#Windows installer - download this' \
-            'release-files/Stremio-5.0.22-mpv.8-x64.zip#Portable Windows application' \
+            --title "Ezra's Stremio 1.0.1" --notes-file release-notes.md \
+            'release-files/Ezras-Stremio-1.0.1-x64.exe#Windows installer - download this' \
+            'release-files/Ezras-Stremio-1.0.1-x64.zip#Portable Windows application' \
             release-files/stremio-icon.png release-files/SHA256SUMS.txt
