@@ -20,13 +20,14 @@ int main()
         require(!IsCommunityPlayerScript("https://evil.example/" + url), "Reject external URLs");
         require(!IsCommunityPlayerScript(url + "/other.js"), "Reject non-bootstrap paths");
         require(!IsCommunityPlayerScript("https://stremio.zarg.me/../scripts/main.js"), "Reject unversioned paths");
-        std::string script = "pt=l.useCallback(function(){te.nextVideo=Ot.current,Lt.current||(re(),null!==te.nextVideo?Qt():window.history.back())},[te.nextVideo,Qt]);"
-            "l.useEffect(function(){Te.bingeWatching&&null!==te.nextVideo&&!ut.current&&(null!==Oe.state.time&&null!==Oe.state.duration&&Oe.state.time<Oe.state.duration&&Oe.state.duration-Oe.state.time<=Te.nextVideoNotificationDuration?it():ot())},[te.nextVideo,Oe.state.time,Oe.state.duration]);"
-            "bt=l.useCallback(function(e){Oe.setProp(\"volume\",Math.min(e,Number(le.maxVolume)))},[]);"
+        const std::string autoplay = "pt=l.useCallback(function(){te.nextVideo=Ot.current,Lt.current||(re(),null!==te.nextVideo?Qt():window.history.back())},[te.nextVideo,Qt]);"
+            "l.useEffect(function(){Te.bingeWatching&&null!==te.nextVideo&&!ut.current&&(null!==Oe.state.time&&null!==Oe.state.duration&&Oe.state.time<Oe.state.duration&&Oe.state.duration-Oe.state.time<=Te.nextVideoNotificationDuration?it():ot())},[te.nextVideo,Oe.state.time,Oe.state.duration]);";
+        const std::string volume = "bt=l.useCallback(function(e){Oe.setProp(\"volume\",Math.min(e,Number(le.maxVolume)))},[]);"
             "localStorage.setItem(\"localProfile\",JSON.stringify(i));"
-            "l.useLayoutEffect(function(){return function(){window.removeEventListener(\"wheel\",onWheel)}},[Oe.state.volume]);" + episodes;
+            "l.useLayoutEffect(function(){return function(){window.removeEventListener(\"wheel\",onWheel)}},[Oe.state.volume]);";
+        std::string script = autoplay + volume + episodes;
         std::string error;
-        require(PatchPlayerAutoplay(script, error), "Patch known end callback");
+        require(PatchCommunityPlayer(script).AllApplied(), "Apply all known fixes");
         require(script.find("re(),Te.bingeWatching&&null!==te.nextVideo?Qt():window.history.back()") != std::string::npos,
             "Keep completion and back navigation, gate autoplay");
         require(script.find("[te.nextVideo,Qt,Te.bingeWatching]") != std::string::npos,
@@ -47,18 +48,43 @@ int main()
         require(script.find("}},[b.settings.hideSpoilers,D]),ee=") != std::string::npos,
             "Changing setting or season refreshes the episode label");
         const auto patched = script;
-        require(PatchPlayerAutoplay(script, error) && script == patched, "Patch is idempotent");
+        require(PatchCommunityPlayer(script).AllApplied() && script == patched, "Patch is idempotent");
         std::string unknown = "new unknown upstream implementation";
-        require(!PatchPlayerAutoplay(unknown, error) && unknown == "new unknown upstream implementation", "Unknown shape stays intact");
+        const auto unknownReport = PatchCommunityPlayer(unknown);
+        require(!unknownReport.autoplay && !unknownReport.volume && !unknownReport.episodeBlur &&
+            unknown.starts_with("new unknown upstream implementation\n;"), "Unknown code stays intact with honest status metadata");
         std::string partial = "pt=l.useCallback(function(){te.nextVideo=Ot.current,Lt.current||(re(),null!==te.nextVideo?Qt():window.history.back())},[te.nextVideo,Qt]);"
             "l.useEffect(function(){Te.bingeWatching&&null!==te.nextVideo&&!ut.current&&(time?it():ot())},[te.nextVideo]);";
         const auto unchanged = partial;
-        require(!PatchPlayerAutoplay(partial, error) && partial == unchanged,
-            "Missing volume shape leaves the whole bundle intact");
+        const auto partialReport = PatchCommunityPlayer(partial);
+        require(partialReport.autoplay && !partialReport.volume && !partialReport.episodeBlur && partial != unchanged,
+            "Autoplay works independently of missing volume and blur");
+        for (unsigned mask = 0; mask < 8; ++mask) {
+            std::string candidate = (mask & 1 ? autoplay : "/* unknown autoplay */") +
+                (mask & 2 ? volume : "/* unknown volume */") +
+                (mask & 4 ? episodes : "/* unknown episode images */");
+            const auto report = PatchCommunityPlayer(candidate);
+            require(report.autoplay == bool(mask & 1) && report.volume == bool(mask & 2) &&
+                report.episodeBlur == bool(mask & 4), "Every compatibility combination is independent");
+            require(report.warning.empty() == (mask == 7), "Report unavailable fixes");
+            const auto once = candidate;
+            const auto again = PatchCommunityPlayer(candidate);
+            require(candidate == once && again.autoplay == report.autoplay && again.volume == report.volume &&
+                again.episodeBlur == report.episodeBlur, "Partial patches are idempotent too");
+        }
+        // A failure after finding some edits must not commit a half-working feature.
+        auto brokenVolume = volume;
+        brokenVolume.replace(brokenVolume.find("localStorage.setItem"), 12, "otherStorage");
+        auto brokenAutoplay = autoplay;
+        brokenAutoplay.replace(brokenAutoplay.find(".useEffect"), 10, ".otherHook");
+        auto isolated = brokenAutoplay + brokenVolume + episodes;
+        const auto isolatedReport = PatchCommunityPlayer(isolated);
+        require(!isolatedReport.autoplay && !isolatedReport.volume && isolatedReport.episodeBlur &&
+            isolated.starts_with(brokenAutoplay + brokenVolume), "Failed feature edits are atomic");
         std::string missingFallback = episodes.substr(0, episodes.find("s.createElement(N,{className:A(p[\"poster-image\"]"));
         const auto before = missingFallback;
         require(!PatchEpisodeSpoilerBlur(missingFallback, error) && missingFallback == before,
             "Unknown image shapes leave all episode code intact");
-        std::cout << "PASS: scoped autoplay guard preserves completion and upstream code\n";
+        std::cout << "PASS: independent, atomic player fixes preserve upstream code and report compatibility\n";
     } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }

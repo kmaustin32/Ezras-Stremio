@@ -53,6 +53,8 @@ jobs:
           if ($LASTEXITCODE) { throw 'C++ tests failed' }
           node --test tests/player_autoplay.test.js
           if ($LASTEXITCODE) { throw 'Live autoplay compatibility test failed' }
+          node --test tests/player_compatibility.test.js
+          if ($LASTEXITCODE) { throw 'Independent player compatibility tests failed' }
           python tests/media_tools.py --tools .build-cache/media-tools --runtime utils/windows/stremio-runtime.exe --server utils/windows/server.js --output .build-cache/media-test
           if ($LASTEXITCODE) { throw 'Streaming dependency tests failed' }
           python tests/mpv_smoke.py --dll .build-cache/libmpv/libmpv-2.dll --output .build-cache/render-test --video .build-cache/media-test/sample.avi --display-bridge cmake-build-release-x64/display-bridge/display-test-bridge.dll
@@ -91,8 +93,8 @@ jobs:
           python tests/branding_package.py --exe dist/win-x64/stremio.exe --original .build-cache/upstream/stremio.exe --installer 'utils/Stremio 5.0.22-x64.exe'
           if ($LASTEXITCODE) { throw 'Packaged application branding verification failed' }
           New-Item -ItemType Directory -Force out | Out-Null
-          Copy-Item 'utils/Stremio 5.0.22-x64.exe' out/Stremio-5.0.22-mpv.6-x64.exe
-          Compress-Archive -Path dist/win-x64/* -DestinationPath out/Stremio-5.0.22-mpv.6-x64.zip
+          Copy-Item 'utils/Stremio 5.0.22-x64.exe' out/Stremio-5.0.22-mpv.7-x64.exe
+          Compress-Archive -Path dist/win-x64/* -DestinationPath out/Stremio-5.0.22-mpv.7-x64.zip
           Copy-Item images/stremio2.png out/stremio-icon.png
           Get-ChildItem out -File | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)" } | Set-Content out/SHA256SUMS.txt
       - uses: actions/upload-artifact@v7
@@ -156,4 +158,4 @@ jobs:
           for file in dependency-files/*.exe; do
             mv -- "$file" "${file%/*}/BUILD-ONLY-${file##*/}"
           done
-          gh release create "$GITHUB_REF_NAME" --title "Stremio 5.0.22 - reliable unwatched episode blur" --notes-file docs/RELEASE-mpv.md release-files/* dependency-files/*
+          gh release create "$GITHUB_REF_NAME" --title "Stremio 5.0.22 - independent player compatibility fixes" --notes-file docs/RELEASE-mpv.md release-files/* dependency-files/*

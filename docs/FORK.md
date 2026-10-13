@@ -8,10 +8,10 @@ D3D11 playback. Use Windows 10/11 x64.
 
 ## Install and use
 
-Download `Stremio-5.0.22-mpv.4-x64.exe` from this fork's release. The installer
+Download `Stremio-5.0.22-mpv.7-x64.exe` from this fork's release. The installer
 installs WebView2 when needed. The `.zip` is portable but requires the system
 WebView2 runtime. Extract the ZIP into its own directory and run `stremio.exe`.
-Use the installer whose filename contains `mpv.4`; **BUILD-ONLY** downloads are
+Use the installer whose filename contains `mpv.7`; **BUILD-ONLY** downloads are
 archived build dependencies. The original upstream installer is one such dependency
 and installs the original green-icon application, not this fork.
 
@@ -81,8 +81,14 @@ video ends and cancels an open next-episode countdown. Manual Next still works, 
 remains intact. A scoped compatibility patch applies this setting check to the
 hosted community player's end handler and refreshes it when the setting changes.
 The original community UI and its other features remain hosted upstream. The
-patch validates autoplay, live maximum-volume storage, and keyboard handler shapes; unknown upstream changes are left untouched
-and logged. CI tests the live upstream bundle before publishing, so source
+patch validates and applies autoplay, maximum-volume, and episode-blur fixes
+independently. If upstream changes one feature, its code stays intact while the
+other compatible fixes still apply. Every feature validates all of its edits
+before committing them. A small amber indicator in the player lists unavailable
+fixes, and the log records the compatibility failure. This is a compatibility
+fallback, not a guarantee that future upstream implementations retain those fixes.
+CI requires all three fixes to work against the live upstream bundle and checks
+every combination of changed feature code before publishing, so source
 updates that change this integration require review.
 On the first launch of a changed compatibility patch, the app refreshes the
 web player's CacheStorage before loading the UI. A patch fingerprint records

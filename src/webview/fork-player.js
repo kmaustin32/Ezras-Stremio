@@ -17,6 +17,8 @@
     let scheduled = false;
     let button;
     let pipButton;
+    let compatibility = null;
+    let compatibilityStatus;
     const appliedStyles = new WeakMap();
 
     function setStyle(element, name, value) {
@@ -60,7 +62,7 @@
 
     function updatePip(player) {
         // The top navbar's titled button is fullscreen in every UI language.
-        const fullscreen = player?.querySelector('[class*="horizontal-nav-bar-container"] [class*="buttons-container"] > [class*="button-container"][title]:not([class*="menu-button-container"]):not(#stremio-fork-pip)');
+        const fullscreen = player?.querySelector('[class*="horizontal-nav-bar-container"] [class*="buttons-container"] > [class*="button-container"][title]:not([class*="menu-button-container"]):not(#stremio-fork-pip):not(#stremio-fork-compatibility)');
         if (!fullscreen || !state.active) {
             pipButton?.remove();
             return;
@@ -101,6 +103,39 @@
         if (pipButton.getAttribute('aria-pressed') !== pressed) pipButton.setAttribute('aria-pressed', pressed);
         if (pipButton.parentElement !== fullscreen.parentElement || pipButton.nextElementSibling !== fullscreen)
             fullscreen.before(pipButton);
+    }
+
+    function receiveCompatibility(value) {
+        if (!value || !['autoplay', 'volume', 'episodeBlur'].every(key => typeof value[key] === 'boolean')) return;
+        compatibility = {autoplay: value.autoplay, volume: value.volume, episodeBlur: value.episodeBlur};
+        schedule();
+    }
+
+    function updateCompatibility(player) {
+        const names = {autoplay: 'Autoplay setting fix', volume: 'Maximum volume fix', episodeBlur: 'Unwatched thumbnail blur fix'};
+        const missing = compatibility && Object.keys(names).filter(key => !compatibility[key]);
+        const fullscreen = player?.querySelector('[class*="horizontal-nav-bar-container"] #stremio-fork-pip') ||
+            player?.querySelector('[class*="horizontal-nav-bar-container"] [class*="buttons-container"] > [class*="button-container"][title]:not([class*="menu-button-container"]):not(#stremio-fork-compatibility)');
+        if (!missing?.length || !fullscreen || !state.active) {
+            compatibilityStatus?.remove();
+            return;
+        }
+        if (!compatibilityStatus) {
+            compatibilityStatus = document.createElement('span');
+            compatibilityStatus.id = 'stremio-fork-compatibility';
+            compatibilityStatus.tabIndex = 0;
+            compatibilityStatus.setAttribute('role', 'status');
+            compatibilityStatus.style.cssText = 'display:flex;align-items:center;justify-content:center;color:#ffa500;';
+            compatibilityStatus.innerHTML = '<svg viewBox="0 0 512 512" aria-hidden="true" style="width:2.5rem;height:2.5rem"><path d="M256 60L480 440H32Z" fill="none" stroke="currentColor" stroke-width="32" stroke-linejoin="round"/><path d="M256 185v120" stroke="currentColor" stroke-width="36" stroke-linecap="round"/><circle cx="256" cy="370" r="20" fill="currentColor"/></svg>';
+        }
+        if (compatibilityStatus.className !== fullscreen.className) compatibilityStatus.className = fullscreen.className;
+        const title = `The web interface changed. Unavailable: ${missing.map(key => names[key]).join(', ')}. ${missing.length === 3 ? 'Upstream player behavior is in use.' : 'Other compatible fixes remain active.'}`;
+        if (compatibilityStatus.title !== title) {
+            compatibilityStatus.title = title;
+            compatibilityStatus.setAttribute('aria-label', title);
+        }
+        if (compatibilityStatus.parentElement !== fullscreen.parentElement || compatibilityStatus.nextElementSibling !== fullscreen)
+            fullscreen.before(compatibilityStatus);
     }
 
     function adjustSettingsLayout() {
@@ -162,6 +197,7 @@
         const player = document.querySelector('[class*="player-container"]');
         updateVolume(player);
         updatePip(player);
+        updateCompatibility(player);
         const controls = player?.querySelector('[class*="control-bar-buttons-menu-container"]');
         if (!controls || !state.active) {
             button?.remove();
@@ -235,6 +271,7 @@
     });
 
     function start() {
+        receiveCompatibility(window.__stremioForkCompatibility);
         adjustSettingsLayout();
         try { applyVolumeLimit(JSON.parse(localStorage.getItem('localProfile') || '{}').maxVolume ?? 130); }
         catch { applyVolumeLimit(130); }
@@ -246,6 +283,7 @@
         send('get-picture-in-picture');
     }
     window.addEventListener('stremio-fork-volume-limit', event => applyVolumeLimit(event.detail));
+    window.addEventListener('stremio-fork-compatibility', event => receiveCompatibility(event.detail));
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, {once: true});
     else start();
 })();

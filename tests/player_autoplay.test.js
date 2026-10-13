@@ -108,7 +108,8 @@ test('Live community player respects autoplay without losing completion or manua
         const context = {window: {}};
         const anchor = '(()=>{var e;o.g.importScripts';
         assert.ok(bundle.includes(anchor));
-        vm.runInNewContext(bundle.replace(anchor, 'window.episodeModules=a;return;' + anchor), context);
+        const body = bundle.split('\n;window.__stremioForkAutoplayPatched=')[0];
+        vm.runInNewContext(body.replace(anchor, 'window.episodeModules=a;return;' + anchor), context);
         const sources = Object.values(context.window.episodeModules).map(factory => factory.toString());
         return sources.filter(source => source.includes('.blurred') && source.includes('renderFallback'));
     }
@@ -128,5 +129,5 @@ test('Live community player respects autoplay without losing completion or manua
     assert.equal(restored.replace(target[0], originalTarget[0]).replace(popup[0], originalPopup[0])
         .replace(volume[0], originalVolume[0]).replace(storagePatched, storageOriginal[0])
         .replace(patchedKeyboard[0], original.match(keyboardPattern)[0])
-        .replace('\n;window.__stremioForkAutoplayPatched=true;window.__stremioForkVolumePatched=true;window.__stremioForkEpisodeBlurPatched=true;/* StremioForkPlayerCompatibilityV2 */', ''), original);
+        .replace(/\n;window\.__stremioForkAutoplayPatched=[\s\S]*\/\* StremioForkPlayerCompatibilityV3 \*\/$/, ''), original);
 });

@@ -78,10 +78,8 @@ bool PatchEpisodeSpoilerBlur(std::string& script, std::string& error)
     return true;
 }
 
-bool PatchPlayerAutoplay(std::string& script, std::string& error)
+static bool PatchAutoplay(std::string& script, std::string& error)
 {
-    constexpr const char* marker = "/* StremioForkPlayerCompatibilityV2 */";
-    if (script.ends_with(marker)) return true;
     // Limit regex matching to the callback: std::regex on a whole webpack bundle
     // can overflow its stack. Identifier captures support upstream minifier changes.
     const std::regex callback(R"(\.useCallback\(function\(\)\{([\w$]+)\.nextVideo=([\w$]+)\.current,([\w$]+)\.current\|\|\(([\w$]+)\(\),null!==\1\.nextVideo\?([\w$]+)\(\):window\.history\.back\(\)\)\},\[\1\.nextVideo,\5\]\))");
@@ -143,12 +141,21 @@ bool PatchPlayerAutoplay(std::string& script, std::string& error)
     struct Edit { size_t pos, length; std::string text; };
     std::vector<Edit> edits = {{position, length, replacement},
         {effectStart + static_cast<size_t>(effect.position()), static_cast<size_t>(effect.length()), effectReplacement}};
+    std::sort(edits.begin(), edits.end(), [](const Edit& a, const Edit& b) { return a.pos > b.pos; });
+    for (const auto& edit : edits) script.replace(edit.pos, edit.length, edit.text);
+    return true;
+}
+
+static bool PatchVolume(std::string& script, std::string& error)
+{
+    struct Edit { size_t pos, length; std::string text; };
+    std::vector<Edit> edits;
     // The upstream callback captures the first storage object forever. Recreate
     // it when maxVolume changes, so dragging and keyboard volume use the same cap.
     const std::regex volumeCallback(R"(\.useCallback\(function\(([\w$]+)\)\{([\w$]+)\.setProp\("volume",Math\.min\(\1,Number\(([\w$]+)\.maxVolume\)\)\)\},\[\]\))");
     size_t volumeMatches = 0;
     std::string volumeHandler;
-    cursor = 0;
+    size_t cursor = 0;
     while ((cursor = script.find(".maxVolume", cursor)) != std::string::npos) {
         const auto start = script.rfind(".useCallback(function(", cursor);
         if (start != std::string::npos && cursor - start < 256) {
@@ -205,12 +212,45 @@ bool PatchPlayerAutoplay(std::string& script, std::string& error)
         return false;
     }
     std::sort(edits.begin(), edits.end(), [](const Edit& a, const Edit& b) { return a.pos > b.pos; });
-    // Preserve ended() and history.back(), and leave manual Next unchanged.
-    auto result = script;
-    for (const auto& edit : edits) result.replace(edit.pos, edit.length, edit.text);
-    if (!PatchEpisodeSpoilerBlur(result, error)) return false;
-    result += "\n;window.__stremioForkAutoplayPatched=true;window.__stremioForkVolumePatched=true;window.__stremioForkEpisodeBlurPatched=true;";
-    result += marker;
-    script = std::move(result);
+    for (const auto& edit : edits) script.replace(edit.pos, edit.length, edit.text);
     return true;
+}
+
+PlayerPatchReport PatchCommunityPlayer(std::string& script)
+{
+    constexpr const char* marker = "/* StremioForkPlayerCompatibilityV3 */";
+    PlayerPatchReport report;
+    const auto statusStart = script.rfind("\n;window.__stremioForkAutoplayPatched=");
+    if (script.ends_with(marker) && statusStart != std::string::npos) {
+        const auto status = script.substr(statusStart);
+        report.autoplay = status.find("__stremioForkAutoplayPatched=true;") != std::string::npos;
+        report.volume = status.find("__stremioForkVolumePatched=true;") != std::string::npos;
+        report.episodeBlur = status.find("__stremioForkEpisodeBlurPatched=true;") != std::string::npos;
+        if (!report.AllApplied()) report.warning = "Some community player fixes are unavailable";
+        return report;
+    }
+    const auto apply = [&](const char* name, auto patch) {
+        std::string error;
+        try {
+            auto candidate = script;
+            if (patch(candidate, error)) {
+                script = std::move(candidate);
+                return true;
+            }
+        } catch (...) { error = "Compatibility validation failed"; }
+        if (!report.warning.empty()) report.warning += "; ";
+        report.warning += std::string(name) + ": " + error;
+        return false;
+    };
+    report.autoplay = apply("Autoplay", PatchAutoplay);
+    report.volume = apply("Maximum volume", PatchVolume);
+    report.episodeBlur = apply("Episode blur", PatchEpisodeSpoilerBlur);
+    const auto boolean = [](bool value) { return value ? "true" : "false"; };
+    script += std::string("\n;window.__stremioForkAutoplayPatched=") + boolean(report.autoplay) +
+        ";window.__stremioForkVolumePatched=" + boolean(report.volume) +
+        ";window.__stremioForkEpisodeBlurPatched=" + boolean(report.episodeBlur) + ";";
+    script += "window.__stremioForkCompatibility={autoplay:window.__stremioForkAutoplayPatched,volume:window.__stremioForkVolumePatched,episodeBlur:window.__stremioForkEpisodeBlurPatched};";
+    script += "window.dispatchEvent(new CustomEvent('stremio-fork-compatibility',{detail:window.__stremioForkCompatibility}));";
+    script += marker;
+    return report;
 }

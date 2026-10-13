@@ -105,9 +105,10 @@ void SetupPlayerResources(ICoreWebView2Environment* env, ICoreWebView2* webview,
                     if (!Download(url, result->body)) {
                         result->body.clear();
                         result->error = "Could not download community player script";
-                    } else if (!PatchPlayerAutoplay(result->body, result->error)) {
-                        // Never guess at an unknown upstream shape or damage its bundle.
-                        result->body.clear();
+                    } else {
+                        // Serve compatible fixes even when another upstream feature
+                        // changed. Unrecognized feature code stays byte-for-byte intact.
+                        result->error = PatchCommunityPlayer(result->body).warning;
                     }
                 } catch (...) { result->body.clear(); result->error = "Player compatibility patch failed"; }
                 if (PostMessage(window, WM_FORK_PLAYER_RESOURCE, 0, reinterpret_cast<LPARAM>(result.get())))
@@ -122,11 +123,10 @@ void CompletePlayerResource(LPARAM data)
     const std::unique_ptr<Result> result(reinterpret_cast<Result*>(data));
     const auto found = pending.find(result->id);
     if (found == pending.end()) return;
+    if (!result->error.empty()) AppendToCrashLog("[WEBVIEW]: " + result->error);
     if (!result->body.empty() && environment) {
         Respond(found->second.args.get(), result->body);
         cache[result->uri] = result->body;
-    } else {
-        AppendToCrashLog("[WEBVIEW]: " + result->error);
     }
     found->second.deferral->Complete();
     pending.erase(found);
