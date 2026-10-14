@@ -61,6 +61,10 @@ residue that can leave a thin dark seam against the ambient blur. Refinement is
 limited to two source pixels per edge of already confirmed black bars. Larger
 disagreements retain the conservative crop; videos without confirmed bars remain
 uncropped. Both sampling passes stop when detection finishes.
+Confirmed bar edges also receive a one-source-pixel guard inside the picture:
+shader upscalers can otherwise sample the encoded black pixels outside the VO
+crop and leave a seam. The guard stays fixed when shaders change; unbarred axes
+remain intact. Ctrl+Shift+C restores the full original framing.
 
 The installer updates `scripts/fork_bar_detection.lua` as fork implementation
 while preserving existing mpv.conf, input.conf and other custom scripts when

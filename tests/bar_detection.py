@@ -130,10 +130,19 @@ def main():
         checked(dll.mpv_initialize(player))
         command('load-script', script)
         wait(lambda: state() == 'idle', 'Script must initialize')
-        for clip in ['letterbox', 'odd-letterbox', 'ten-bit', 'faint-seam', 'faint-bottom', 'faint-pillarbox', 'faint-ten-bit']:
+        shader_root = script.parent.parent / 'shaders'
+        import re
+        mode_a = re.findall(r'~~/shaders/([^;\"]+)', (script.parent.parent / 'input.conf').read_text().splitlines()[1])
+        shader_sets = [[], ['FSR.glsl'], mode_a]
+        clips = ['letterbox', 'odd-letterbox', 'ten-bit', 'faint-seam', 'faint-bottom', 'faint-pillarbox', 'faint-ten-bit']
+        # Enable shaders after detecting too: the locked crop must remain safe.
+        for index, clip in enumerate(clips):
             load(clip)
             detect()
             assert state() == 'locked', prop('user-data/stremio-bar-detection')
+            locked = prop('video-crop')
+            setprop('glsl-shaders', ';'.join(str(shader_root / name) for name in shader_sets[index % 3]))
+            assert prop('video-crop') == locked, 'Shader changes cannot change locked framing'
             setprop('border-background', 'blur')
             setprop('scale', 'ewa_lanczos')
             setprop('cscale', 'ewa_lanczos')
@@ -154,23 +163,24 @@ def main():
                 print('PASS: seam-free boundary', clip, prop('video-crop'), size, 'minimum green:', minimum)
         user32.SetWindowPos(hwnd, None, -32000, -32000, 800, 450, 0)
         setprop('border-background', 'color')
+        setprop('glsl-shaders', '')
         load('dark-content-edge')
         detect()
-        assert prop('video-crop') == '320x180+0+30', 'A larger dark picture band cannot be removed by edge refinement'
+        assert prop('video-crop') == '320x178+0+31', 'A larger dark picture band cannot be removed by edge refinement'
         load('changing')
         detect()
-        assert state() == 'locked' and prop('video-crop') == '320x180+0+30', prop('video-crop')
+        assert state() == 'locked' and prop('video-crop') == '320x178+0+31', prop('video-crop')
         assert prop('border-background') == 'color', 'Detection cannot toggle blur'
         # Geometry, pause, seeking, and stream replacement must respect the lock.
         for property_name, value in [('panscan', '1'), ('keepaspect', 'no'), ('keepaspect', 'yes'), ('panscan', '0')]:
             setprop(property_name, value)
-            assert prop('video-crop') == '320x180+0+30'
+            assert prop('video-crop') == '320x178+0+31'
         command('seek', '5', 'absolute+exact')
         pump(0.3)
-        assert prop('video-crop') == '320x180+0+30'
+        assert prop('video-crop') == '320x178+0+31'
         setprop('pause', 'yes')
         pump(1)
-        assert prop('video-crop') == '320x180+0+30'
+        assert prop('video-crop') == '320x178+0+31'
         command('keypress', 'Ctrl+Shift+c')
         wait(lambda: state() == 'idle', 'Second hotkey must restore framing')
         assert not prop('video-crop')
@@ -185,7 +195,7 @@ def main():
         setprop('glsl-shaders', shader)
         command('vf', 'add', '@unrelated:lavfi=[null]')
         detect()
-        assert state() == 'locked' and prop('video-crop') == '240x240+40+0', prop('video-crop')
+        assert state() == 'locked' and prop('video-crop') == '238x240+41+0', prop('video-crop')
         assert 'unrelated' in prop('vf'), 'Preserve unrelated video filters'
         assert str(shader) in prop('glsl-shaders'), 'Preserve active shaders'
         command('vf', 'remove', '@unrelated')
@@ -196,7 +206,7 @@ def main():
         assert max(read_png(picture)[2](25, 225)) > 30, 'Blur must fill the newly exposed border'
         load('ten-bit')
         detect()
-        assert state() == 'locked' and prop('video-crop') == '320x180+0+30', prop('video-crop')
+        assert state() == 'locked' and prop('video-crop') == '320x178+0+31', prop('video-crop')
         for name in ['no-bars', 'no-bars-faint-edges', 'dark', 'uneven', 'bar-text']:
             load(name)
             detect()

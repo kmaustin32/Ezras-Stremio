@@ -97,6 +97,12 @@ local function finish(r)
             r.y, r.h = refined_axis(r.y, r.h, r.refined.y, r.refined.h, height * 0.5)
         end
     end
+    -- Shader upscalers run before the VO crop and can sample the encoded black
+    -- pixels immediately outside it. Exclude one source pixel at confirmed bar
+    -- boundaries, including when shaders are enabled later in the video. This
+    -- keeps framing locked and retains unbarred axes completely intact.
+    if horizontal and r.w - 2 >= width * 0.5 then r.x = r.x + 1; r.w = r.w - 2 end
+    if vertical and r.h - 2 >= height * 0.5 then r.y = r.y + 1; r.h = r.h - 2 end
     local crop = string.format('%dx%d+%d+%d', r.w, r.h, r.x, r.y)
     local ok = mp.set_property('file-local-options/video-crop', crop)
     if not ok then

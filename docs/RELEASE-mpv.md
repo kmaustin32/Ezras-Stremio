@@ -1,6 +1,7 @@
 ## Ezra's Stremio 1.0.2
 
 - Fixed a thin dark seam caused by faint encoded edge residue surviving manual black-bar detection. Detection now compares two stable measurements and refines only edges of confirmed bars, by at most two source pixels per edge.
+- Added a one-source-pixel guard inside confirmed bar edges to prevent FSR/Anime4K scaling from sampling the black pixels outside the crop. Framing remains locked even when shaders are enabled later; unbarred axes and no-bar videos remain intact.
 - Videos without clear bars remain uncropped. Larger dark picture edges are preserved, and each video still resets the detected crop. The detector stops after sampling; Ctrl+B remains the separate blur toggle.
 - Added actual rendered-pixel checks for top/bottom/side seams, 8/10-bit sources, odd bar positions and fractional window scaling, plus preservation checks for no-bar videos and larger dark edges.
 
