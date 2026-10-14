@@ -28,6 +28,13 @@ def main():
         'dark': 'color=c=black:s=320x240:r=24:d=12',
         'uneven': 'color=c=0x80A0C0:s=280x240:r=24:d=12,pad=320:240:40:0:black',
         'ten-bit': 'color=c=0x80A0C0:s=320x180:r=24:d=12,pad=320:240:0:30:black,format=yuv420p10le',
+        'odd-letterbox': 'color=c=0x80A0C0:s=320x178:r=24:d=12,format=yuv444p,pad=320:240:0:31:black',
+        'faint-seam': 'color=c=0x80A0C0:s=320x180:r=24:d=12,pad=320:240:0:30:black,drawbox=x=0:y=28:w=320:h=2:color=0x080808:t=fill',
+        'faint-bottom': 'color=c=0x80A0C0:s=320x180:r=24:d=12,pad=320:240:0:30:black,drawbox=x=0:y=210:w=320:h=2:color=0x080808:t=fill',
+        'faint-pillarbox': 'color=c=0x80A0C0:s=240x240:r=24:d=12,pad=320:240:40:0:black,drawbox=x=38:y=0:w=2:h=240:color=0x080808:t=fill',
+        'faint-ten-bit': 'color=c=0x80A0C0:s=320x180:r=24:d=12,pad=320:240:0:30:black,drawbox=x=0:y=28:w=320:h=2:color=0x080808:t=fill,format=yuv420p10le',
+        'no-bars-faint-edges': 'color=c=0x80A0C0:s=320x240:r=24:d=12,drawbox=x=0:y=0:w=320:h=2:color=0x080808:t=fill,drawbox=x=0:y=238:w=320:h=2:color=0x080808:t=fill',
+        'dark-content-edge': 'color=c=0x80A0C0:s=320x180:r=24:d=12,pad=320:240:0:30:black,drawbox=x=0:y=30:w=320:h=4:color=0x080808:t=fill',
         'bar-text': 'color=c=0x80A0C0:s=320x180:r=24:d=12,pad=320:240:0:30:black,drawbox=x=80:y=225:w=160:h=8:color=white:t=fill',
     }.items():
         subprocess.run([str(Path(args.ffmpeg).resolve()), '-hide_banner', '-loglevel', 'error', '-y',
@@ -55,6 +62,7 @@ def main():
                                      w.HWND, w.HMENU, w.HINSTANCE, c.c_void_p]
     user32.CreateWindowExW.restype = w.HWND
     user32.DestroyWindow.argtypes = [w.HWND]
+    user32.SetWindowPos.argtypes = [w.HWND, w.HWND, c.c_int, c.c_int, c.c_int, c.c_int, w.UINT]
     user32.PeekMessageW.argtypes = [c.POINTER(w.MSG), w.HWND, w.UINT, w.UINT, w.UINT]
     user32.DispatchMessageW.argtypes = [c.POINTER(w.MSG)]
     hwnd = user32.CreateWindowExW(0, 'STATIC', 'Manual bar detection test', 0x90000000,
@@ -122,6 +130,33 @@ def main():
         checked(dll.mpv_initialize(player))
         command('load-script', script)
         wait(lambda: state() == 'idle', 'Script must initialize')
+        for clip in ['letterbox', 'odd-letterbox', 'ten-bit', 'faint-seam', 'faint-bottom', 'faint-pillarbox', 'faint-ten-bit']:
+            load(clip)
+            detect()
+            assert state() == 'locked', prop('user-data/stremio-bar-detection')
+            setprop('border-background', 'blur')
+            setprop('scale', 'ewa_lanczos')
+            setprop('cscale', 'ewa_lanczos')
+            setprop('osd-level', '0')
+            command('show-text', '')
+            # Check both boundaries across resizes and fractional scaling.
+            for size in [(800, 600), (801, 601)]:
+                user32.SetWindowPos(hwnd, None, -32000, -32000, *size, 0)
+                pump(1)
+                picture = output / f'seam-{clip}-{size[0]}.png'
+                command('screenshot-to-file', picture, 'window')
+                width, height, pixel = read_png(picture)
+                assert (width, height) == size, 'Screenshot must reflect the resized host'
+                minimum = min(
+                    [pixel(x, y)[1] for x in [width // 4, width // 2, 3 * width // 4] for y in range(10, height - 10)] +
+                    [pixel(x, y)[1] for y in [height // 4, height // 2, 3 * height // 4] for x in range(10, width - 10)])
+                assert minimum >= 135, f'{clip}: a dark seam remains between the flat-colored picture and blur ({minimum})'
+                print('PASS: seam-free boundary', clip, prop('video-crop'), size, 'minimum green:', minimum)
+        user32.SetWindowPos(hwnd, None, -32000, -32000, 800, 450, 0)
+        setprop('border-background', 'color')
+        load('dark-content-edge')
+        detect()
+        assert prop('video-crop') == '320x180+0+30', 'A larger dark picture band cannot be removed by edge refinement'
         load('changing')
         detect()
         assert state() == 'locked' and prop('video-crop') == '320x180+0+30', prop('video-crop')
@@ -162,7 +197,7 @@ def main():
         load('ten-bit')
         detect()
         assert state() == 'locked' and prop('video-crop') == '320x180+0+30', prop('video-crop')
-        for name in ['no-bars', 'dark', 'uneven', 'bar-text']:
+        for name in ['no-bars', 'no-bars-faint-edges', 'dark', 'uneven', 'bar-text']:
             load(name)
             detect()
             assert state() in ('no-bars', 'uncertain') and not prop('video-crop'), name

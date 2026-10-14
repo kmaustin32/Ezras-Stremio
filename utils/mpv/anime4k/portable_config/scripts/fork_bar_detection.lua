@@ -5,6 +5,7 @@ local mp = require 'mp'
 local label = 'stremio-fork-black-bars'
 local timer, started, saved_hwdec, baseline_crop, locked_crop
 local last_time, stable_since, previous, samples
+local edge_candidate
 
 local function status(state, message)
     mp.set_property_native('user-data/stremio-bar-detection', {
@@ -48,6 +49,17 @@ local function rectangle(meta)
     return r
 end
 
+local function refined_axis(start, size, candidate_start, candidate_size, minimum)
+    local before = candidate_start - start
+    local after = start + size - candidate_start - candidate_size
+    -- Remove only a measured near-black residue, never an unconditional inset.
+    -- Larger disagreements could be actual dark picture content: keep the baseline.
+    if before >= 0 and before <= 2 and after >= 0 and after <= 2 and candidate_size >= minimum then
+        return candidate_start, candidate_size
+    end
+    return start, size
+end
+
 local function finish(r)
     local width = mp.get_property_number('width', 0)
     local height = mp.get_property_number('height', 0)
@@ -77,6 +89,14 @@ local function finish(r)
     -- Crop only confidently detected axes. Preserve the other axis completely.
     if not horizontal then r.x = 0; r.w = width end
     if not vertical then r.y = 0; r.h = height end
+    if r.refined then
+        if horizontal then
+            r.x, r.w = refined_axis(r.x, r.w, r.refined.x, r.refined.w, width * 0.5)
+        end
+        if vertical then
+            r.y, r.h = refined_axis(r.y, r.h, r.refined.y, r.refined.h, height * 0.5)
+        end
+    end
     local crop = string.format('%dx%d+%d+%d', r.w, r.h, r.x, r.y)
     local ok = mp.set_property('file-local-options/video-crop', crop)
     if not ok then
@@ -107,7 +127,23 @@ local function sample()
             samples = key and 1 or 0
         end
         last_time = position
-        if samples >= 6 and now - stable_since >= 0.5 then finish(r); return end
+        if samples >= 6 and now - stable_since >= 0.5 then
+            if not edge_candidate then
+                edge_candidate = r
+                -- Measure the conservative baseline independently. Replacing our
+                -- labelled filter retains unrelated filters and resets metadata.
+                if not mp.commandv('no-osd', 'vf', 'add', '@' .. label .. ':cropdetect=limit=20/255:round=2:reset=0') then
+                    stop_sampling()
+                    status('error', 'Black-bar detection unavailable: picture unchanged.')
+                    return
+                end
+                previous, samples, stable_since = nil, 0, now
+            else
+                r.refined = edge_candidate
+                finish(r)
+            end
+            return
+        end
     end
     if now - started >= 3 then
         stop_sampling()
@@ -146,7 +182,7 @@ local function detect()
     end
     -- Accumulate the largest bright picture across frames, rather than crop to
     -- a single dark frame. Remove this labelled filter when sampling finishes.
-    local ok = mp.commandv('no-osd', 'vf', 'pre', '@' .. label .. ':cropdetect=limit=20/255:round=2:reset=0')
+    local ok = mp.commandv('no-osd', 'vf', 'pre', '@' .. label .. ':cropdetect=limit=32/255:round=2:reset=0')
     if not ok then
         stop_sampling()
         status('error', 'Black-bar detection unavailable: picture unchanged.')
@@ -154,6 +190,7 @@ local function detect()
     end
     started = mp.get_time()
     last_time, previous, samples = nil, nil, 0
+    edge_candidate = nil
     stable_since = started
     status('detecting', 'Detecting black bars...')
     timer = mp.add_periodic_timer(0.1, sample)

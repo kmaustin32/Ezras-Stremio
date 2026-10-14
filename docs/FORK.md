@@ -8,7 +8,7 @@ D3D11 playback. Use Windows 10/11 x64.
 
 ## Install and use
 
-Download `Ezras-Stremio-1.0.1-x64.exe` from this fork's release. The installer
+Download `Ezras-Stremio-1.0.2-x64.exe` from this fork's release. The installer
 installs WebView2 when needed. The `.zip` is portable but requires the system
 WebView2 runtime. Extract the ZIP into its own directory and run `stremio.exe`.
 Use the installer whose filename contains `mpv.8`; **BUILD-ONLY** downloads are
@@ -55,6 +55,12 @@ shaders, subtitles, and streaming connections are retained. Filters that change
 decoded picture dimensions are conservatively rejected. Direct hardware decoding
 may briefly switch to copy-back decoding for analysis, then restore its setting.
 For changing-aspect-ratio videos, the manual crop stays locked until you reset it.
+
+Detection compares two stable edge measurements to remove faint compression
+residue that can leave a thin dark seam against the ambient blur. Refinement is
+limited to two source pixels per edge of already confirmed black bars. Larger
+disagreements retain the conservative crop; videos without confirmed bars remain
+uncropped. Both sampling passes stop when detection finishes.
 
 The installer updates `scripts/fork_bar_detection.lua` as fork implementation
 while preserving existing mpv.conf, input.conf and other custom scripts when
