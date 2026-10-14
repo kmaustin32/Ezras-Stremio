@@ -137,6 +137,9 @@ def main():
         clips = ['letterbox', 'odd-letterbox', 'ten-bit', 'faint-seam', 'faint-bottom', 'faint-pillarbox', 'faint-ten-bit']
         # Enable shaders after detecting too: the locked crop must remain safe.
         for index, clip in enumerate(clips):
+            # WARP compiles and renders the VL networks in software. Do not carry
+            # the previous case's expensive shader into the next timed sample.
+            setprop('glsl-shaders', '')
             load(clip)
             detect()
             assert state() == 'locked', prop('user-data/stremio-bar-detection')
