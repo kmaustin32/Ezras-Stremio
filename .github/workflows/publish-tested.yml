@@ -14,9 +14,9 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     env:
-      TESTED_RUN: '38452401008'
-      TESTED_SHA: '6633fdc1a7cfce6337727d8342aa4f02727dd2ba'
-      RELEASE_TAG: 'v1.0.1'
+      TESTED_RUN: '38539625258'
+      TESTED_SHA: '1d9657f1e0e4d3af47f4950ed22357a6df4e38ad'
+      RELEASE_TAG: 'v1.0.2'
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Verify successful source build
@@ -43,14 +43,14 @@ jobs:
         run: |
           cd release-files
           sha256sum --strict -c SHA256SUMS.txt
-          test -f Ezras-Stremio-1.0.1-x64.exe
-          test -f Ezras-Stremio-1.0.1-x64.zip
+          test -f Ezras-Stremio-1.0.2-x64.exe
+          test -f Ezras-Stremio-1.0.2-x64.zip
           test -f stremio-icon.png
           cd ..
           cp docs/RELEASE-mpv.md release-notes.md
           printf '\n\nBuilt and tested by [GitHub Actions](https://github.com/%s/actions/runs/%s) from commit %s. These downloads are the exact verified artifacts from that run.\n' "$GITHUB_REPOSITORY" "$TESTED_RUN" "$TESTED_SHA" >> release-notes.md
           gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --latest \
-            --title "Ezra's Stremio 1.0.1" --notes-file release-notes.md \
-            'release-files/Ezras-Stremio-1.0.1-x64.exe#Windows installer - download this' \
-            'release-files/Ezras-Stremio-1.0.1-x64.zip#Portable Windows application' \
+            --title "Ezra's Stremio 1.0.2" --notes-file release-notes.md \
+            'release-files/Ezras-Stremio-1.0.2-x64.exe#Windows installer - download this' \
+            'release-files/Ezras-Stremio-1.0.2-x64.zip#Portable Windows application' \
             release-files/stremio-icon.png release-files/SHA256SUMS.txt
