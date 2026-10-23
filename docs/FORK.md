@@ -11,7 +11,7 @@ D3D11 playback. Use Windows 10/11 x64.
 Download `Ezras-Stremio-1.0.2-x64.exe` from this fork's release. The installer
 installs WebView2 when needed. The `.zip` is portable but requires the system
 WebView2 runtime. Extract the ZIP into its own directory and run `stremio.exe`.
-Use the installer whose filename contains `mpv.8`; **BUILD-ONLY** downloads are
+Use the installer whose filename starts with `Ezras-Stremio`; **BUILD-ONLY** downloads are
 archived build dependencies. The original upstream installer is one such dependency
 and installs the original green-icon application, not this fork.
 
@@ -155,6 +155,10 @@ catalog with input.conf and check readability and settings navigation.
 
 ## Keep upstream updates and fork changes
 
+The fork's default development branch is `webview-windows`. A normal clone of
+this fork includes the complete source. Create feature branches from that branch
+and merge pull requests back after the build and test checks pass.
+
 The original repository remains the upstream source. Fork features and build
 policy live in separate files where practical. Merge upstream history into
 the fork branch; Git preserves both sides and reports overlapping edits as
@@ -164,7 +168,7 @@ reset, force push, or GitHub's discard-changes synchronization option.
 ```powershell
 git remote add upstream https://github.com/Zaarrg/stremio-community-v5.git
 git fetch upstream
-git switch codex/mpv-ambient-blur
+git switch webview-windows
 git merge upstream/webview-windows
 ```
 
