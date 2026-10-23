@@ -89,6 +89,8 @@ extern wil::com_ptr<ICoreWebView2_21>         g_webview;
 #define ID_TRAY_PAUSE_FOCUS_LOST  1006
 #define ID_TRAY_PICTURE_IN_PICTURE 1007
 #define ID_TRAY_QUIT             1008
+#define ID_TRAY_BORDER_BLUR      1009
+#define ID_TRAY_DISPLAY_MODE     1010
 
 struct MenuItem
 {

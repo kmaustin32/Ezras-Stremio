@@ -1,4 +1,6 @@
 #include "tray.h"
+#include "../mpv/ambient.h"
+#include "../mpv/display_mode.h"
 
 #include <iostream>
 #include <windows.h>
@@ -121,6 +123,11 @@ static void ShowDarkTrayMenu()
     g_menuItems.push_back({ ID_TRAY_SHOWWINDOW,   g_showWindow,   false, L"Show Window" });
     g_menuItems.push_back({ ID_TRAY_ALWAYSONTOP,  g_alwaysOnTop,  false, L"Always on Top" });
     g_menuItems.push_back({ ID_TRAY_PICTURE_IN_PICTURE, g_isPipMode, false, L"Picture in Picture" });
+    g_menuItems.push_back({ ID_TRAY_BORDER_BLUR, IsBorderBlurEnabled(g_mpv), false, L"Ambient Border Blur" });
+    const auto displayMode = CurrentDisplayMode();
+    g_menuItems.push_back({ ID_TRAY_DISPLAY_MODE, false, false,
+        displayMode == DisplayMode::Crop ? L"Display: Crop" :
+        displayMode == DisplayMode::Stretch ? L"Display: Stretch" : L"Display: Fit" });
     g_menuItems.push_back({ ID_TRAY_PAUSE_MINIMIZED, g_pauseOnMinimize, false, L"Pause Minimized" });
     g_menuItems.push_back({ ID_TRAY_PAUSE_FOCUS_LOST, g_pauseOnLostFocus, false, L"Pause Unfocused" });
     g_menuItems.push_back({ ID_TRAY_CLOSE_ON_EXIT, g_closeOnExit,  false, L"Close on Exit" });
@@ -320,21 +327,29 @@ static LRESULT CALLBACK DarkTrayMenuProc(HWND hWnd, UINT msg, WPARAM wParam, LPA
 
 void TogglePictureInPicture(HWND hWnd, bool enable)
 {
+    if (enable == g_isPipMode) return;
+    static bool previousAlwaysOnTop = false;
+    if (enable && g_isFullscreen) {
+        ToggleFullScreen(hWnd, false);
+        if (g_webview) g_webview->ExecuteScript(L"if(document.fullscreenElement)document.exitFullscreen();", nullptr);
+    }
     LONG style = GetWindowLong(hWnd, GWL_STYLE);
     if(enable) {
+        previousAlwaysOnTop = g_alwaysOnTop;
         g_alwaysOnTop = true;
         style &= ~WS_CAPTION;
         SetWindowLong(hWnd, GWL_STYLE, style);
         SetWindowPos(hWnd, HWND_TOPMOST,0,0,0,0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE|SWP_FRAMECHANGED);
     } else {
-        g_alwaysOnTop = false;
+        g_alwaysOnTop = previousAlwaysOnTop;
         style |= WS_CAPTION;
         SetWindowLong(hWnd, GWL_STYLE, style);
-        SetWindowPos(hWnd, HWND_NOTOPMOST,0,0,0,0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE|SWP_FRAMECHANGED);
+        SetWindowPos(hWnd, g_alwaysOnTop ? HWND_TOPMOST : HWND_NOTOPMOST,0,0,0,0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE|SWP_FRAMECHANGED);
     }
     g_isPipMode = enable;
 
     if(g_webview) {
+        SendToJS("picture-in-picture-changed", {{"enabled", enable}});
         nlohmann::json j;
         if(enable)
             SendToJS("showPictureInPicture", j);

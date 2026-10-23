@@ -11,6 +11,10 @@
 #include "../utils/helpers.h"
 #include "../utils/config.h"
 #include "../mpv/player.h"
+#include "../mpv/ambient.h"
+#include "../mpv/display_mode.h"
+#include "../mpv/playback_defaults.h"
+#include "../webview/player_resources.h"
 #include "../tray/tray.h"
 #include "../ui/splash.h"
 #include "../webview/webview.h"
@@ -74,6 +78,7 @@ void ToggleFullScreen(HWND hWnd, bool enable)
 {
     static WINDOWPLACEMENT prevPlc={sizeof(prevPlc)};
     if(enable==g_isFullscreen) return;
+    if (enable && g_isPipMode) TogglePictureInPicture(hWnd, false);
     g_isFullscreen = enable;
 
     if(enable){
@@ -130,9 +135,55 @@ void SendToJS(const std::string &eventName, const nlohmann::json &eventData)
 #endif
 }
 
+static void ToggleAmbientBorders()
+{
+    if (ToggleBorderBlur(g_mpv, GetExeDirectory() + L"\\portable_config\\stremio-settings.ini")) {
+        if (IsBorderBlurEnabled(g_mpv)) g_initialVO = "gpu-next";
+    } else {
+        AppendToCrashLog("[MPV]: Could not toggle or save ambient border blur");
+    }
+}
+
+void NotifyDisplayModeState(bool active)
+{
+    if (g_webview) SendToJS("display-mode-changed", {
+        {"mode", DisplayModeName(CurrentDisplayMode())}, {"active", active}});
+}
+
+static bool HasNativeVideo()
+{
+    int64_t width = 0;
+    return g_mpv && mpv_get_property(g_mpv, "video-params/w", MPV_FORMAT_INT64, &width) >= 0 && width > 0;
+}
+
 void HandleEvent(const std::string &ev, std::vector<std::string> &args)
 {
-    if(ev=="mpv-command"){
+    if (ev == "set-volume-limit" && args.size() == 1) {
+        try {
+            size_t consumed = 0;
+            const double maximum = std::stod(args[0], &consumed);
+            if (consumed == args[0].size() && !ApplyMaximumVolume(g_mpv, maximum))
+                AppendToCrashLog("[MPV]: Could not apply maximum volume");
+        } catch (const std::exception&) { /* Ignore invalid settings. */ }
+    } else if (ev == "get-picture-in-picture") {
+        if (g_webview) SendToJS("picture-in-picture-changed", {{"enabled", g_isPipMode}});
+    } else if (ev == "toggle-picture-in-picture") {
+        TogglePictureInPicture(g_hWnd, !g_isPipMode);
+    } else if (ev == "toggle-border-blur") {
+        ToggleAmbientBorders();
+    } else if (ev == "detect-encoded-bars") {
+        if (HasNativeVideo()) {
+            const char* command[] = {"script-message-to", "fork_bar_detection", "detect", nullptr};
+            if (mpv_command_async(g_mpv, 0, command) < 0)
+                AppendToCrashLog("[MPV]: Could not request encoded black-bar detection");
+        }
+    } else if (ev == "get-display-mode") {
+        NotifyDisplayModeState(HasNativeVideo());
+    } else if (ev == "cycle-display-mode") {
+        if (HasNativeVideo() && !CycleDisplayMode(g_mpv))
+            AppendToCrashLog("[MPV]: Could not change display mode");
+        NotifyDisplayModeState(HasNativeVideo());
+    } else if(ev=="mpv-command"){
         // Allow list check
         std::string cmdName = args.empty() ? "" : ToLowerStr(args[0]);
         if(!g_mpvCommandAllowlist.count(cmdName)){
@@ -151,10 +202,8 @@ void HandleEvent(const std::string &ev, std::vector<std::string> &args)
             if (args[1].rfind("http://", 0) != 0 && args[1].rfind("https://", 0) != 0) {
                 args[1] = decodeURIComponent(args[1]);
             }
-            std::vector<std::string> voArgs = {"vo",g_initialVO};
+            std::vector<std::string> voArgs = {"vo", IsBorderBlurEnabled(g_mpv) ? "gpu-next" : g_initialVO};
             HandleMpvSetProp(voArgs);
-            std::vector<std::string> volumeArgs = {"volume", std::to_string(g_currentVolume)};
-            HandleMpvSetProp(volumeArgs);
             g_initialSet = true;
         }
         HandleMpvCommand(args);
@@ -446,6 +495,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
         switch(LOWORD(wParam))
         {
+        case ID_TRAY_BORDER_BLUR:
+            ToggleAmbientBorders();
+            break;
+        case ID_TRAY_DISPLAY_MODE:
+        {
+            std::vector<std::string> args;
+            HandleEvent("cycle-display-mode", args);
+            break;
+        }
         case ID_TRAY_SHOWWINDOW:
             g_showWindow = !g_showWindow;
             ShowWindow(hWnd, g_showWindow?SW_SHOW:SW_HIDE);
@@ -605,8 +663,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_MPV_WAKEUP:
         HandleMpvEvents();
         break;
+    case WM_FORK_PLAYER_RESOURCE:
+        CompletePlayerResource(lParam);
+        break;
     case WM_DESTROY:
     {
+        ShutdownPlayerResources();
         // release mutex
         if(g_hMutex) { CloseHandle(g_hMutex); g_hMutex=nullptr; }
         PostQuitMessage(0);

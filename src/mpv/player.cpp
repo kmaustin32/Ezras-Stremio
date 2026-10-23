@@ -1,5 +1,9 @@
 #include "player.h"
+#include "ambient.h"
+#include "display_mode.h"
+#include "playback_defaults.h"
 #include <iostream>
+#include <algorithm>
 #include <cctype>
 #include "../core/globals.h"
 #include "../utils/crashlog.h"
@@ -84,6 +88,19 @@ void HandleMpvEvents()
 
         switch(ev->event_id)
         {
+        case MPV_EVENT_FILE_LOADED:
+            // Each video starts at normal full volume, independently of the last video.
+            g_currentVolume = (std::min)(100.0, MaximumPlayerVolume());
+            if (!ApplyVideoStartDefaults(g_mpv))
+                AppendToCrashLog("[MPV]: Could not reset video to 100% volume and Fit");
+            [[fallthrough]];
+        case MPV_EVENT_VIDEO_RECONFIG:
+        {
+            int64_t width = 0;
+            const bool active = mpv_get_property(g_mpv, "video-params/w", MPV_FORMAT_INT64, &width) >= 0 && width > 0;
+            NotifyDisplayModeState(active);
+            break;
+        }
         case MPV_EVENT_PROPERTY_CHANGE:
         {
             mpv_event_property* prop=(mpv_event_property*)ev->data;
@@ -131,7 +148,12 @@ void HandleMpvEvents()
                     j["data"]=nullptr;
                 break;
             }
-            if (j["name"] == "volume" && g_initialSet) {
+            if (j["name"] == "volume" && j["data"].is_number() && j["data"].get<double>() > MaximumPlayerVolume()) {
+                // Enforce caps below 100 even for mpv's own keyboard bindings.
+                ApplyPlayerVolume(g_mpv, j["data"].get<double>());
+                j["data"] = MaximumPlayerVolume();
+            }
+            if (j["name"] == "volume" && g_initialSet && j["data"].is_number()) {
                 g_currentVolume = j["data"];
             }
             SendToJS("mpv-prop-change", j);
@@ -139,6 +161,7 @@ void HandleMpvEvents()
         }
         case MPV_EVENT_END_FILE:
         {
+            NotifyDisplayModeState(false);
             mpv_event_end_file* ef=(mpv_event_end_file*)ev->data;
             nlohmann::json j;
             j["type"]="mpv-event-ended";
@@ -192,6 +215,14 @@ void HandleMpvCommand(const std::vector<std::string>& args)
 
 void HandleMpvSetProp(const std::vector<std::string>& args)
 {
+    if (args.size() >= 2 && args[0] == "volume") {
+        try {
+            size_t consumed = 0;
+            const double volume = std::stod(args[1], &consumed);
+            if (consumed == args[1].size()) ApplyPlayerVolume(g_mpv, volume);
+        } catch (const std::exception&) { /* Ignore invalid volume requests. */ }
+        return;
+    }
     std::thread([args](){
         if(!g_mpv || args.size()<2) return;
         std::string val=args[1];
@@ -254,8 +285,10 @@ bool InitMPV(HWND hwnd)
         return false;
     }
 
-    // Set VO
-    mpv_set_option_string(g_mpv,"vo","gpu-next");
+    if (!ApplyBorderBlurPreference(g_mpv, ReadBorderBlurPreference(
+            cfg + L"\\stremio-settings.ini"))) {
+        AppendToCrashLog("[MPV]: Could not apply ambient border blur preference");
+    }
 
     // demux/caching
     mpv_set_property_string(g_mpv,"demuxer-lavf-probesize",     "524288");

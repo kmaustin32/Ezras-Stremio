@@ -24,20 +24,24 @@ const CONFIG_DIR = path.join(SOURCE_DIR, 'dist', `win-${ARCH}`, 'portable_config
 const PROJECT_NAME = 'stremio';
 
 // Paths to Additional Dependencies
-const MPV_DLL = ARCH === 'x86'
+const MPV_DLL = process.env.STREMIO_MPV_DIR
+    ? path.join(process.env.STREMIO_MPV_DIR, 'libmpv-2.dll')
+    : ARCH === 'x86'
     ? path.join(SOURCE_DIR, 'deps', 'libmpv', 'i686', 'libmpv-2.dll')
     : path.join(SOURCE_DIR, 'deps', 'libmpv', 'x86_64', 'libmpv-2.dll');
 const SERVER_JS = path.join(SOURCE_DIR, 'utils', 'windows', 'server.js');
 const STREMIO_RUNTIME_EXE = path.join(SOURCE_DIR, 'utils', 'windows', 'stremio-runtime.exe');
-const FFMPEG_FOLDER = path.join(SOURCE_DIR, 'utils', 'windows', 'ffmpeg');
+const FFMPEG_FOLDER = process.env.STREMIO_FFMPEG_DIR || path.join(SOURCE_DIR, 'utils', 'windows', 'ffmpeg');
 const MPV_FOLDER = path.join(SOURCE_DIR, 'utils', 'mpv', 'anime4k');
 const DEFAULT_SETTINGS_FOLDER = path.join(SOURCE_DIR, 'utils', 'stremio');
 
 // Default Paths
-const DEFAULT_NSIS = 'C:\\Program Files (x86)\\NSIS\\makensis.exe';
+const DEFAULT_NSIS = process.env.NSIS_EXE || 'C:\\Program Files (x86)\\NSIS\\makensis.exe';
 //VCPKG
 const VCPKG_TRIPLET = ARCH === 'x86' ? 'x86-windows-static' : 'x64-windows-static';
-const VCPKG_CMAKE = 'G:\\Documents\\Github\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake';
+const VCPKG_CMAKE = process.env.VCPKG_ROOT
+    ? path.join(process.env.VCPKG_ROOT, 'scripts', 'buildsystems', 'vcpkg.cmake')
+    : 'C:\\bin\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake';
 
 // ---------------------------------------------------------------------
 // Main
@@ -57,12 +61,14 @@ const VCPKG_CMAKE = 'G:\\Documents\\Github\\vcpkg\\scripts\\buildsystems\\vcpkg.
 
         console.log(`\n=== Running CMake in cmake-build-${debugBuild ? "Debug" : "Release"} ===`);
         process.chdir(BUILD_DIR);
+        if (!args.includes('--skip-build')) {
         execSync(
-            `cmake -G Ninja -DCMAKE_BUILD_TYPE=${debugBuild ? "Debug" : "Release"} -DCMAKE_TOOLCHAIN_FILE=${VCPKG_CMAKE} -DVCPKG_TARGET_TRIPLET=${VCPKG_TRIPLET} ..`,
+            `cmake -G Ninja -DCMAKE_BUILD_TYPE=${debugBuild ? "Debug" : "Release"} "-DCMAKE_TOOLCHAIN_FILE=${VCPKG_CMAKE}" -DVCPKG_TARGET_TRIPLET=${VCPKG_TRIPLET} "-DSTREMIO_MPV_DIR=${process.env.STREMIO_MPV_DIR || ''}" ..`,
             { stdio: 'inherit' }
         );
         console.log('=== Running Ninja in cmake-build-release ===');
         execSync('ninja', { stdio: 'inherit' });
+        }
 
         // Return to script directory
         process.chdir(__dirname);
@@ -76,9 +82,16 @@ const VCPKG_CMAKE = 'G:\\Documents\\Github\\vcpkg\\scripts\\buildsystems\\vcpkg.
         const builtExe = path.join(BUILD_DIR, `${PROJECT_NAME}.exe`);
         const distExe = path.join(DIST_DIR, `${PROJECT_NAME}.exe`);
         copyFile(builtExe, distExe);
+        copyFile(path.join(SOURCE_DIR, 'images/player/NOTICE.md'), path.join(DIST_DIR, 'Stremio-icons-LICENSE.txt'));
 
         // 6) Copy mpv DLL, server.js, node.exe
         copyFile(MPV_DLL, path.join(DIST_DIR, path.basename(MPV_DLL)));
+        if (process.env.STREMIO_MPV_DIR) {
+            for (const file of fs.readdirSync(process.env.STREMIO_MPV_DIR)) {
+                if (file.endsWith('.dll') && file !== path.basename(MPV_DLL))
+                    copyFile(path.join(process.env.STREMIO_MPV_DIR, file), path.join(DIST_DIR, file));
+            }
+        }
         copyFile(SERVER_JS, path.join(DIST_DIR, path.basename(SERVER_JS)));
 
 
@@ -90,6 +103,24 @@ const VCPKG_CMAKE = 'G:\\Documents\\Github\\vcpkg\\scripts\\buildsystems\\vcpkg.
         copyFolderContents(FFMPEG_FOLDER, DIST_DIR);
         copyFolderContentsPreservingStructure(MPV_FOLDER, DIST_DIR);
         copyFolderContentsPreservingStructure(DEFAULT_SETTINGS_FOLDER, CONFIG_DIR);
+        copyFile(path.join(SOURCE_DIR, 'docs', 'FORK.md'), path.join(DIST_DIR, 'README-fork.md'));
+        copyFile(path.join(SOURCE_DIR, 'build', 'dependencies.lock.json'), path.join(DIST_DIR, 'dependencies.lock.json'));
+        copyFile(path.join(SOURCE_DIR, 'LICENSE.md'), path.join(DIST_DIR, 'LICENSE.md'));
+        const licensesDir = path.join(DIST_DIR, 'licenses');
+        fs.mkdirSync(licensesDir, { recursive: true });
+        if (process.env.STREMIO_MPV_DIR) {
+            copyFile(path.join(process.env.STREMIO_MPV_DIR, 'LICENSE-vulkan.txt'), path.join(licensesDir, 'vulkan.txt'));
+        }
+        const portShare = path.join(BUILD_DIR, 'vcpkg_installed', VCPKG_TRIPLET, 'share');
+        if (fs.existsSync(portShare)) {
+            for (const port of fs.readdirSync(portShare)) {
+                const copyright = path.join(portShare, port, 'copyright');
+                if (fs.existsSync(copyright)) copyFile(copyright, path.join(licensesDir, `${port}.txt`));
+            }
+        }
+        const lock = require('./dependencies.lock.json');
+        const discordLicense = path.join(SOURCE_DIR, '.build-cache', `discord-rpc-${lock.discordCommit}`, 'LICENSE');
+        if (fs.existsSync(discordLicense)) copyFile(discordLicense, path.join(licensesDir, 'discord-rpc.txt'));
 
         console.log('\n=== dist\\win preparation complete. ===');
 
@@ -126,8 +157,7 @@ function safeRemove(dirPath) {
 
 function copyFile(src, dest) {
     if (!fs.existsSync(src)) {
-        console.warn(`Warning: missing file: ${src}`);
-        return;
+        throw new Error(`Required file is missing: ${src}`);
     }
     fs.copyFileSync(src, dest);
     console.log(`Copied: ${src} -> ${dest}`);
@@ -140,8 +170,7 @@ function copyFile(src, dest) {
  */
 function copyFolderContents(src, dest) {
     if (!fs.existsSync(src)) {
-        console.warn(`Warning: missing folder: ${src}`);
-        return;
+        throw new Error(`Required folder is missing: ${src}`);
     }
     const stats = fs.statSync(src);
     if (!stats.isDirectory()) {
@@ -166,8 +195,7 @@ function copyFolderContents(src, dest) {
  */
 function copyFolderContentsPreservingStructure(src, dest) {
     if (!fs.existsSync(src)) {
-        console.warn(`Warning: missing folder: ${src}`);
-        return;
+        throw new Error(`Required folder is missing: ${src}`);
     }
 
     const stats = fs.statSync(src);
@@ -220,8 +248,7 @@ function getPackageVersionFromCMake() {
 
 function buildNsisInstaller() {
     if (!fs.existsSync(DEFAULT_NSIS)) {
-        console.warn(`NSIS not found at default path: ${DEFAULT_NSIS}. Skipping installer.`);
-        return;
+        throw new Error(`NSIS not found: ${DEFAULT_NSIS}`);
     }
     try {
         const arch = process.argv.includes('--x86') ? 'x86' : 'x64'; // Determine architecture
@@ -240,7 +267,7 @@ function buildNsisInstaller() {
         execSync(`"${DEFAULT_NSIS}" "${nsiScript}"`, { stdio: 'inherit' });
         console.log(`\nInstaller created: "Stremio ${process.env.package_version}.exe"`);
     } catch (err) {
-        console.error('Failed to run NSIS (makensis.exe):', err);
+        throw err;
     }
 }
 

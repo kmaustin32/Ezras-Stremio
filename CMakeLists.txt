@@ -6,6 +6,28 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 option(DEBUG_LOG "Allow debug logs" ON)
+include(cmake/ForkDefaults.cmake)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-player.js")
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-player.js" FORK_PLAYER_SCRIPT)
+foreach(mode fit crop stretch)
+    set(icon "${CMAKE_CURRENT_SOURCE_DIR}/images/player/video-scale-${mode}.svg")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${icon}")
+    file(READ "${icon}" svg)
+    string(STRIP "${svg}" svg)
+    string(TOUPPER "${mode}" marker)
+    string(REPLACE "__FORK_${marker}_SVG__" "${svg}" FORK_PLAYER_SCRIPT "${FORK_PLAYER_SCRIPT}")
+endforeach()
+# MSVC limits individual wide string literals. Keep the embedded script in
+# adjacent per-line literals while preserving its exact text.
+string(REPLACE "\n" "\n)FORKJS\"\nLR\"FORKJS(" FORK_PLAYER_SCRIPT "${FORK_PLAYER_SCRIPT}")
+configure_file(cmake/ForkWebAssets.h.in generated/ForkWebAssets.h @ONLY)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/player_bundle_patch.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/player_resources.cpp")
+file(SHA256 src/webview/player_bundle_patch.cpp bundle_revision)
+file(SHA256 src/webview/player_resources.cpp loader_revision)
+string(SHA256 PLAYER_PATCH_REVISION "${bundle_revision}${loader_revision}")
 
 # Locate MPV
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -26,7 +48,17 @@ else()
     set(DISCORD_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/discord-rpc/win32-static/include")
 endif()
 
+if(STREMIO_MPV_DIR)
+    set(MPV_INCLUDE_DIR "${STREMIO_MPV_DIR}/include")
+    set(MPV_LIBRARY "${STREMIO_MPV_DIR}/mpv.lib")
+    set(MPV_DLL "${STREMIO_MPV_DIR}/libmpv-2.dll")
+endif()
+
 include_directories(${DISCORD_INCLUDE_DIR})
+set(MPV_RUNTIME_DLLS "${MPV_DLL}")
+if(STREMIO_MPV_DIR)
+    file(GLOB MPV_RUNTIME_DLLS "${STREMIO_MPV_DIR}/*.dll")
+endif()
 include_directories(${MPV_INCLUDE_DIR})
 
 find_package(OpenSSL REQUIRED)
@@ -47,6 +79,9 @@ set(SOURCES
         src/utils/crashlog.cpp
         src/mpv/player.h
         src/mpv/player.cpp
+        src/mpv/ambient.cpp
+        src/mpv/display_mode.cpp
+        src/mpv/playback_defaults.cpp
         src/node/server.cpp
         src/node/server.h
         src/tray/tray.h
@@ -57,6 +92,8 @@ set(SOURCES
         src/updater/updater.h
         src/webview/webview.h
         src/webview/webview.cpp
+        src/webview/player_bundle_patch.cpp
+        src/webview/player_resources.cpp
         src/ui/mainwindow.h
         src/ui/mainwindow.cpp
         src/resource.h
@@ -67,6 +104,7 @@ set(SOURCES
 )
 
 add_executable(${PROJECT_NAME} WIN32 ${SOURCES})
+target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
@@ -86,10 +124,48 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE DEBUG_LOG)
+target_compile_definitions(${PROJECT_NAME} PRIVATE STREMIO_DEFAULT_UPDATE_URL="${STREMIO_UPDATE_URL}")
+target_compile_definitions(${PROJECT_NAME} PRIVATE STREMIO_PLAYER_PATCH_REVISION="${PLAYER_PATCH_REVISION}")
+
+include(CTest)
+if(BUILD_TESTING)
+    add_executable(player-bundle-tests tests/player_bundle_test.cpp src/webview/player_bundle_patch.cpp)
+    add_test(NAME player-autoplay-guard COMMAND player-bundle-tests)
+    add_executable(player-bundle-patch tests/player_bundle_patch.cpp src/webview/player_bundle_patch.cpp)
+    add_executable(player-webview-test tests/player_webview_test.cpp src/webview/player_resources.cpp src/webview/player_bundle_patch.cpp)
+    target_link_libraries(player-webview-test PRIVATE unofficial::webview2::webview2 CURL::libcurl shlwapi.lib ole32.lib)
+    target_compile_definitions(player-webview-test PRIVATE STREMIO_PLAYER_PATCH_REVISION="${PLAYER_PATCH_REVISION}")
+    add_executable(ambient-tests tests/ambient_test.cpp src/mpv/ambient.cpp)
+    # Keep test DLL copies separate from the application's parallel post-build copy.
+    set_target_properties(ambient-tests PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests")
+    target_include_directories(ambient-tests PRIVATE src)
+    target_link_libraries(ambient-tests PRIVATE ${MPV_LIBRARY})
+    add_test(NAME ambient-settings COMMAND ambient-tests)
+    add_custom_command(TARGET ambient-tests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${MPV_RUNTIME_DLLS} $<TARGET_FILE_DIR:ambient-tests>)
+    add_executable(discord-tests tests/discord_test.cpp)
+    target_link_libraries(discord-tests PRIVATE nlohmann_json::nlohmann_json ${DISCORD_LIB})
+    add_test(NAME discord-presence COMMAND discord-tests)
+    add_executable(display-tests tests/display_mode_test.cpp src/mpv/display_mode.cpp src/mpv/playback_defaults.cpp)
+    set_target_properties(display-tests PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/display-tests")
+    target_include_directories(display-tests PRIVATE src)
+    target_link_libraries(display-tests PRIVATE ${MPV_LIBRARY})
+    add_test(NAME display-modes COMMAND display-tests)
+    # Python's embedded rendering test calls the same native implementation.
+    add_library(display-test-bridge SHARED tests/display_bridge.cpp src/mpv/display_mode.cpp)
+    set_target_properties(display-test-bridge PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/display-bridge")
+    target_include_directories(display-test-bridge PRIVATE src)
+    target_link_libraries(display-test-bridge PRIVATE ${MPV_LIBRARY})
+    add_custom_command(TARGET display-tests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${MPV_RUNTIME_DLLS} $<TARGET_FILE_DIR:display-tests>)
+endif()
 
 # Copy MPV DLL
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${MPV_DLL}"
+        ${MPV_RUNTIME_DLLS}
         $<TARGET_FILE_DIR:${PROJECT_NAME}>
 )

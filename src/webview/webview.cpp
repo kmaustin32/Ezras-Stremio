@@ -4,6 +4,7 @@
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <utility>
 #include <Shlwapi.h>
 #include <wrl.h>
 #include "../core/globals.h"
@@ -11,6 +12,32 @@
 #include "../utils/helpers.h"
 #include "../ui/mainwindow.h"
 #include "../utils/extensions.h"
+#include "../resource.h"
+#include "ForkWebAssets.h"
+#include "player_resources.h"
+
+static std::wstring EmbeddedBrandImage(int resourceId)
+{
+    HRSRC resource = FindResource(g_hInst, MAKEINTRESOURCE(resourceId), RT_RCDATA);
+    if (!resource) return L"";
+    HGLOBAL data = LoadResource(g_hInst, resource);
+    const char* bytes = static_cast<const char*>(LockResource(data));
+    if (!bytes) return L"";
+    return L"data:image/png;base64," + Utf8ToWstring(Base64Encode(
+        std::string(bytes, SizeofResource(g_hInst, resource))));
+}
+
+static std::wstring WithBrandImages(const wchar_t* source)
+{
+    std::wstring script = source;
+    for (const auto& [marker, id] : {std::pair{L"__FORK_SYMBOL__", IDR_BRAND_SYMBOL},
+                                    std::pair{L"__FORK_WORDMARK__", IDR_BRAND_WORDMARK},
+                                    std::pair{L"__FORK_ICON__", IDR_BRAND_ICON}}) {
+        const size_t pos = script.find(marker);
+        if (pos != std::wstring::npos) script.replace(pos, wcslen(marker), EmbeddedBrandImage(id));
+    }
+    return script;
+}
 
 static const wchar_t* EXEC_SHELL_SCRIPT = LR"JS_CODE(
 try {
@@ -69,6 +96,38 @@ try {
 static const wchar_t* INJECTED_KEYDOWN_SCRIPT = LR"JS(
 (function() {
     window.addEventListener('keydown', function(event) {
+        const editable = event.target && (event.target.isContentEditable ||
+            /^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName));
+        if (event.ctrlKey && !event.altKey && !event.shiftKey &&
+            event.code === 'KeyB' && !editable) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            if (!event.repeat) window.chrome.webview.postMessage(JSON.stringify({
+                type: 6, object: 'transport', method: 'handleInboundJSON', id: 1000,
+                args: ['toggle-border-blur', []]
+            }));
+            return;
+        }
+        if (event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey &&
+            event.code === 'KeyF' && !editable) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            if (!event.repeat) window.chrome.webview.postMessage(JSON.stringify({
+                type: 6, object: 'transport', method: 'handleInboundJSON', id: 1002,
+                args: ['cycle-display-mode', []]
+            }));
+            return;
+        }
+        if (event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey &&
+            event.code === 'KeyC' && !editable) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            if (!event.repeat) window.chrome.webview.postMessage(JSON.stringify({
+                type: 6, object: 'transport', method: 'handleInboundJSON', id: 1003,
+                args: ['detect-encoded-bars', []]
+            }));
+            return;
+        }
         if (event.code === 'F5') {
             event.preventDefault();
             const ctrlPressed = event.ctrlKey || event.metaKey;
@@ -84,7 +143,7 @@ static const wchar_t* INJECTED_KEYDOWN_SCRIPT = LR"JS(
             };
             window.chrome.webview.postMessage(JSON.stringify(msg));
         }
-    });
+    }, true);
 })();
 )JS";
 
@@ -122,7 +181,7 @@ static const wchar_t* INJECTED_BUTTON_SCRIPT = LR"JS(
 
   // Create an image element for the logo
   var img = document.createElement('img');
-  img.src = 'https://stremio.zarg.me/images/stremio_symbol.png';
+  img.src = '__FORK_SYMBOL__';
   img.alt = 'Logo';
   img.style.height = '24px';
   img.style.width = '24px';
@@ -241,7 +300,7 @@ void InitWebView2(HWND hWnd)
             env->CreateCoreWebView2Controller(
                 hWnd,
                 Microsoft::WRL::Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
-                [hWnd](HRESULT result, ICoreWebView2Controller* rawController)->HRESULT
+                [hWnd, environment = wil::com_ptr<ICoreWebView2Environment>(env)](HRESULT result, ICoreWebView2Controller* rawController)->HRESULT
                 {
                     if (FAILED(result) || !rawController) return E_FAIL;
                     std::cout << "[WEBVIEW]: Initializing WebView..." << std::endl;
@@ -288,12 +347,17 @@ void InitWebView2(HWND hWnd)
 
                     g_webview->AddScriptToExecuteOnDocumentCreated(EXEC_SHELL_SCRIPT,nullptr);
                     g_webview->AddScriptToExecuteOnDocumentCreated(INJECTED_KEYDOWN_SCRIPT,nullptr);
+                    const std::wstring forkScript = WithBrandImages(kForkPlayerScript);
+                    g_webview->AddScriptToExecuteOnDocumentCreated(forkScript.c_str(), nullptr);
+                    SetupPlayerResources(environment.get(), g_webview.get(), hWnd);
 
                     SetupWebMods();
 
                     SetupExtensions();
                     SetupWebMessageHandler();
 
+                    PreparePlayerScriptCache(g_webviewProfile.get(),
+                        GetExeDirectory() + L"\\portable_config\\stremio-settings.ini", [] {
                     std::thread([](){
                         std::wcout << L"[WEBVIEW]: Checking web ui endpoints..." << std::endl;
                         std::wstring foundUrl = GetFirstReachableUrl();
@@ -302,6 +366,7 @@ void InitWebView2(HWND hWnd)
                         PostMessage(g_hWnd, WM_REACHABILITY_DONE, (WPARAM)pResult, 0);
                         FetchAndParseWhitelist();
                     }).detach();
+                    });
                     return S_OK;
                 }).Get()
             );
@@ -337,7 +402,8 @@ static void SetupWebMessageHandler()
 
             // Add back to stremio button if not on stremio
             if (finalUri.find(g_webuiUrl) == std::wstring::npos) {
-                sender->ExecuteScript(INJECTED_BUTTON_SCRIPT, nullptr);
+                const std::wstring backScript = WithBrandImages(INJECTED_BUTTON_SCRIPT);
+                sender->ExecuteScript(backScript.c_str(), nullptr);
             }
 
             if(isSuccess) {

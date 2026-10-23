@@ -1,0 +1,164 @@
+name: Windows build and release
+on:
+  push:
+    branches: ['webview-windows', 'codex/**']
+    tags: ['v*-mpv.*', 'v1.*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - uses: actions/cache/restore@v6
+        id: dependency-cache
+        with:
+          path: |
+            .build-cache
+            cmake-build-release-x64/vcpkg_installed
+            ~/AppData/Local/vcpkg/archives
+          key: windows-x64-${{ hashFiles('build/dependencies.lock.json', 'vcpkg.json') }}
+          restore-keys: windows-x64-
+      - name: Prepare verified player and media dependencies
+        shell: pwsh
+        run: ./build/prepare-fork.ps1
+      - name: Prepare pinned vcpkg
+        shell: pwsh
+        run: |
+          $lock = Get-Content build/dependencies.lock.json -Raw | ConvertFrom-Json
+          if (!(Test-Path .build-cache/vcpkg/.git)) { git clone https://github.com/microsoft/vcpkg .build-cache/vcpkg }
+          git -C .build-cache/vcpkg checkout $lock.vcpkgCommit
+          if ($LASTEXITCODE) { throw 'vcpkg checkout failed' }
+          & ./.build-cache/vcpkg/bootstrap-vcpkg.bat -disableMetrics
+          if ($LASTEXITCODE) { throw 'vcpkg bootstrap failed' }
+      - name: Compile application and tests
+        shell: pwsh
+        run: |
+          cmake -S . -B cmake-build-release-x64 -G Ninja -DCMAKE_BUILD_TYPE=Release -DVCPKG_TARGET_TRIPLET=x64-windows-static "-DCMAKE_TOOLCHAIN_FILE=$pwd/.build-cache/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DSTREMIO_MPV_DIR=$pwd/.build-cache/libmpv"
+          if ($LASTEXITCODE) { throw 'CMake configure failed' }
+          cmake --build cmake-build-release-x64
+          if ($LASTEXITCODE) { throw 'C++ compilation failed' }
+      - name: Test configuration, toggling, persistence, and rendering
+        shell: pwsh
+        run: |
+          ctest --test-dir cmake-build-release-x64 --output-on-failure
+          if ($LASTEXITCODE) { throw 'C++ tests failed' }
+          node --test tests/player_autoplay.test.js
+          if ($LASTEXITCODE) { throw 'Live autoplay compatibility test failed' }
+          node --test tests/player_compatibility.test.js
+          if ($LASTEXITCODE) { throw 'Independent player compatibility tests failed' }
+          python tests/media_tools.py --tools .build-cache/media-tools --runtime utils/windows/stremio-runtime.exe --server utils/windows/server.js --output .build-cache/media-test
+          if ($LASTEXITCODE) { throw 'Streaming dependency tests failed' }
+          python tests/mpv_smoke.py --dll .build-cache/libmpv/libmpv-2.dll --output .build-cache/render-test --video .build-cache/media-test/sample.avi --display-bridge cmake-build-release-x64/display-bridge/display-test-bridge.dll
+          if ($LASTEXITCODE) { throw 'Embedded rendering tests failed' }
+          python tests/bar_detection.py --dll .build-cache/libmpv/libmpv-2.dll --ffmpeg .build-cache/media-tools/ffmpeg.exe --output .build-cache/bar-detection-test
+          if ($LASTEXITCODE) { throw 'Manual black-bar detection tests failed' }
+          node --test tests/shortcut.test.js tests/server_patch.test.js
+          if ($LASTEXITCODE) { throw 'Shortcut tests failed' }
+      - name: Test player button in Edge
+        shell: pwsh
+        run: |
+          npm install --prefix .build-cache/ui-test --no-save --ignore-scripts playwright@1.62.1
+          if ($LASTEXITCODE) { throw 'UI test dependency install failed' }
+          $env:NODE_PATH = "$pwd/.build-cache/ui-test/node_modules"
+          node --test tests/player_controls.test.js tests/player_layout.test.js tests/episode_blur.test.js tests/player_shortcuts.test.js
+          if ($LASTEXITCODE) { throw 'Player UI tests failed' }
+      - name: Test native WebView2 bootstrap and cached reload
+        shell: pwsh
+        run: |
+          choco install webview2-runtime -y --no-progress
+          if ($LASTEXITCODE -and $LASTEXITCODE -ne 3010) { throw 'Test WebView2 runtime installation failed' }
+          ./cmake-build-release-x64/player-webview-test.exe
+          if ($LASTEXITCODE) { throw 'Native WebView2 autoplay integration test failed' }
+      - name: Install packaging tools
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          if ($LASTEXITCODE) { throw 'NSIS installation failed' }
+          Copy-Item utils/windows/NsProcess/Include/nsProcess.nsh 'C:/Program Files (x86)/NSIS/Include/'
+          Copy-Item utils/windows/NsProcess/Plugin/x86-unicode/nsProcess.dll 'C:/Program Files (x86)/NSIS/Plugins/x86-unicode/'
+      - name: Package installer and portable archive
+        shell: pwsh
+        run: |
+          $env:STREMIO_MPV_DIR = "$pwd/.build-cache/libmpv"
+          $env:STREMIO_FFMPEG_DIR = "$pwd/.build-cache/media-tools"
+          node build/deploy_windows.js --skip-build --installer
+          if ($LASTEXITCODE) { throw 'Packaging failed' }
+          python tests/branding_package.py --exe dist/win-x64/stremio.exe --original .build-cache/upstream/stremio.exe --installer 'utils/Stremio 5.0.22-x64.exe'
+          if ($LASTEXITCODE) { throw 'Packaged application branding verification failed' }
+          New-Item -ItemType Directory -Force out | Out-Null
+          Copy-Item 'utils/Stremio 5.0.22-x64.exe' out/Ezras-Stremio-1.0.2-x64.exe
+          Compress-Archive -Path dist/win-x64/* -DestinationPath out/Ezras-Stremio-1.0.2-x64.zip
+          Copy-Item images/stremio2.png out/stremio-icon.png
+          Get-ChildItem out -File | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)" } | Set-Content out/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v7
+        if: success()
+        with:
+          name: Windows-x64
+          path: out/
+          if-no-files-found: error
+      - name: Upload test evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: Test-evidence
+          path: |
+            .build-cache/render-test/*.png
+            .build-cache/media-test/server.log
+            .build-cache/ui-test-evidence/*.png
+            .build-cache/bar-detection-test/*.png
+          include-hidden-files: true
+          if-no-files-found: warn
+      - name: Upload reproducible dependency archives
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v7
+        with:
+          name: Dependency-archives
+          include-hidden-files: true
+          if-no-files-found: error
+          path: |
+            .build-cache/mpv*.7z
+            .build-cache/ffmpeg*.zip
+            .build-cache/Stremio.5.0.22-x64.exe
+            .build-cache/VulkanRT*.zip
+      - uses: actions/cache/save@v6
+        if: always() && steps.dependency-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            .build-cache
+            cmake-build-release-x64/vcpkg_installed
+            ~/AppData/Local/vcpkg/archives
+          key: windows-x64-${{ hashFiles('build/dependencies.lock.json', 'vcpkg.json') }}
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: Windows-x64
+          path: release-files
+      - uses: actions/download-artifact@v8
+        with:
+          name: Dependency-archives
+          path: dependency-files
+      - name: Publish tested release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          for file in dependency-files/*.exe; do
+            mv -- "$file" "${file%/*}/BUILD-ONLY-${file##*/}"
+          done
+          gh release create "$GITHUB_REF_NAME" --title "Ezra's Stremio 1.0.2" --notes-file docs/RELEASE-mpv.md release-files/* dependency-files/*

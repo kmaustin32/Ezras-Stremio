@@ -16,7 +16,10 @@ std::vector<std::wstring> g_webuiUrls = {
     L"https://web.stremio.com/"
 };
 std::vector<std::wstring> g_domainWhitelist;
-std::string  g_updateUrl= "https://raw.githubusercontent.com/Zaarrg/stremio-desktop-v5/refs/heads/webview-windows/version/version.json";
+#ifndef STREMIO_DEFAULT_UPDATE_URL
+#define STREMIO_DEFAULT_UPDATE_URL ""
+#endif
+std::string  g_updateUrl = STREMIO_DEFAULT_UPDATE_URL;
 std::wstring  g_extensionsDetailsUrl= L"https://raw.githubusercontent.com/Zaarrg/stremio-desktop-v5/refs/heads/webview-windows/extensions/extensions.json";
 std::wstring  g_webuiUrl;
 
@@ -29,7 +32,7 @@ mpv_handle* g_mpv = nullptr;
 std::set<std::string> g_observedProps;
 bool g_initialSet = false;
 std::string g_initialVO = "gpu-next";
-int g_currentVolume = 50;
+int g_currentVolume = 100;
 const std::vector<std::wstring> g_subtitleExtensions = {
     L".srt", L".ass", L".ssa", L".sub", L".vtt", L".ttml",
     L".dfxp", L".smi", L".sami", L".sup", L".scc",

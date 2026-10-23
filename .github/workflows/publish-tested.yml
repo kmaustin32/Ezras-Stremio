@@ -1,0 +1,56 @@
+name: Publish tested Windows build
+
+on:
+  push:
+    branches: ['codex/mpv-ambient-blur']
+    paths: ['.github/workflows/publish-tested.yml']
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      TESTED_RUN: '38539625258'
+      TESTED_SHA: '1d9657f1e0e4d3af47f4950ed22357a6df4e38ad'
+      RELEASE_TAG: 'v1.0.2'
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Verify successful source build
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$TESTED_RUN" > run.json
+          jq -e --arg sha "$TESTED_SHA" --arg repo "$GITHUB_REPOSITORY" \
+            '.conclusion == "success" and .status == "completed" and .head_sha == $sha and .head_repository.full_name == $repo and .name == "Windows build and release"' run.json
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TESTED_SHA }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: Windows-x64
+          run-id: ${{ env.TESTED_RUN }}
+          github-token: ${{ github.token }}
+          path: release-files
+      - name: Verify existing release tag
+        run: |
+          # A maintainer creates the tag after tests pass. The Actions token
+          # cannot create tags at commits that change workflow files.
+          tag_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.sha')
+          test "$tag_sha" = "$TESTED_SHA"
+      - name: Verify artifacts and publish
+        run: |
+          cd release-files
+          sha256sum --strict -c SHA256SUMS.txt
+          test -f Ezras-Stremio-1.0.2-x64.exe
+          test -f Ezras-Stremio-1.0.2-x64.zip
+          test -f stremio-icon.png
+          cd ..
+          cp docs/RELEASE-mpv.md release-notes.md
+          printf '\n\nBuilt and tested by [GitHub Actions](https://github.com/%s/actions/runs/%s) from commit %s. These downloads are the exact verified artifacts from that run.\n' "$GITHUB_REPOSITORY" "$TESTED_RUN" "$TESTED_SHA" >> release-notes.md
+          gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --latest \
+            --title "Ezra's Stremio 1.0.2" --notes-file release-notes.md \
+            'release-files/Ezras-Stremio-1.0.2-x64.exe#Windows installer - download this' \
+            'release-files/Ezras-Stremio-1.0.2-x64.zip#Portable Windows application' \
+            release-files/stremio-icon.png release-files/SHA256SUMS.txt
