@@ -1,10 +1,20 @@
 name: Publish tested Windows build
 
 on:
-  push:
-    branches: ['codex/mpv-ambient-blur']
-    paths: ['.github/workflows/publish-tested.yml']
   workflow_dispatch:
+    inputs:
+      tested_run:
+        description: Successful Windows build run ID
+        required: true
+        type: string
+      tested_sha:
+        description: Exact source commit from that run
+        required: true
+        type: string
+      release_version:
+        description: Release version, such as 1.0.3 (without v)
+        required: true
+        type: string
 
 permissions:
   actions: read
@@ -14,13 +24,17 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     env:
-      TESTED_RUN: '38539625258'
-      TESTED_SHA: '1d9657f1e0e4d3af47f4950ed22357a6df4e38ad'
-      RELEASE_TAG: 'v1.0.2'
+      TESTED_RUN: ${{ inputs.tested_run }}
+      TESTED_SHA: ${{ inputs.tested_sha }}
+      RELEASE_VERSION: ${{ inputs.release_version }}
+      RELEASE_TAG: v${{ inputs.release_version }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Verify successful source build
         run: |
+          [[ "$TESTED_RUN" =~ ^[0-9]+$ ]]
+          [[ "$TESTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$TESTED_RUN" > run.json
           jq -e --arg sha "$TESTED_SHA" --arg repo "$GITHUB_REPOSITORY" \
             '.conclusion == "success" and .status == "completed" and .head_sha == $sha and .head_repository.full_name == $repo and .name == "Windows build and release"' run.json
@@ -43,14 +57,14 @@ jobs:
         run: |
           cd release-files
           sha256sum --strict -c SHA256SUMS.txt
-          test -f Ezras-Stremio-1.0.2-x64.exe
-          test -f Ezras-Stremio-1.0.2-x64.zip
+          test -f "Ezras-Stremio-$RELEASE_VERSION-x64.exe"
+          test -f "Ezras-Stremio-$RELEASE_VERSION-x64.zip"
           test -f stremio-icon.png
           cd ..
           cp docs/RELEASE-mpv.md release-notes.md
           printf '\n\nBuilt and tested by [GitHub Actions](https://github.com/%s/actions/runs/%s) from commit %s. These downloads are the exact verified artifacts from that run.\n' "$GITHUB_REPOSITORY" "$TESTED_RUN" "$TESTED_SHA" >> release-notes.md
           gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --latest \
-            --title "Ezra's Stremio 1.0.2" --notes-file release-notes.md \
-            'release-files/Ezras-Stremio-1.0.2-x64.exe#Windows installer - download this' \
-            'release-files/Ezras-Stremio-1.0.2-x64.zip#Portable Windows application' \
+            --title "Ezra's Stremio $RELEASE_VERSION" --notes-file release-notes.md \
+            "release-files/Ezras-Stremio-$RELEASE_VERSION-x64.exe#Windows installer - download this" \
+            "release-files/Ezras-Stremio-$RELEASE_VERSION-x64.zip#Portable Windows application" \
             release-files/stremio-icon.png release-files/SHA256SUMS.txt

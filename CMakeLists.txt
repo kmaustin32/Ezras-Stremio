@@ -8,8 +8,11 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 option(DEBUG_LOG "Allow debug logs" ON)
 include(cmake/ForkDefaults.cmake)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-player.js")
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-player.js"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-backup.js")
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-player.js" FORK_PLAYER_SCRIPT)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-backup.js" FORK_BACKUP_SCRIPT)
+string(APPEND FORK_PLAYER_SCRIPT "\n${FORK_BACKUP_SCRIPT}")
 foreach(mode fit crop stretch)
     set(icon "${CMAKE_CURRENT_SOURCE_DIR}/images/player/video-scale-${mode}.svg")
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${icon}")
@@ -135,6 +138,9 @@ if(BUILD_TESTING)
     add_executable(player-webview-test tests/player_webview_test.cpp src/webview/player_resources.cpp src/webview/player_bundle_patch.cpp)
     target_link_libraries(player-webview-test PRIVATE unofficial::webview2::webview2 CURL::libcurl shlwapi.lib ole32.lib)
     target_compile_definitions(player-webview-test PRIVATE STREMIO_PLAYER_PATCH_REVISION="${PLAYER_PATCH_REVISION}")
+    add_executable(backup-webview-test tests/backup_webview_test.cpp)
+    target_include_directories(backup-webview-test PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+    target_link_libraries(backup-webview-test PRIVATE unofficial::webview2::webview2 shlwapi.lib ole32.lib)
     add_executable(ambient-tests tests/ambient_test.cpp src/mpv/ambient.cpp)
     # Keep test DLL copies separate from the application's parallel post-build copy.
     set_target_properties(ambient-tests PROPERTIES
