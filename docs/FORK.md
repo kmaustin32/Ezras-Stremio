@@ -8,7 +8,7 @@ D3D11 playback. Use Windows 10/11 x64.
 
 ## Install and use
 
-Download `Ezras-Stremio-1.0.2-x64.exe` from this fork's release. The installer
+Download `Ezras-Stremio-1.0.3-x64.exe` from this fork's release. The installer
 installs WebView2 when needed. The `.zip` is portable but requires the system
 WebView2 runtime. Extract the ZIP into its own directory and run `stremio.exe`.
 Use the installer whose filename starts with `Ezras-Stremio`; **BUILD-ONLY** downloads are
@@ -222,3 +222,37 @@ a small SDK extension, tested against the actual compiled serializer.
 The mpv publisher retains only 30 days of build archives. The release includes
 the original checksum-verified dependency archives. The build script falls
 back to those mirrors, keeping this commit buildable after upstream cleanup.
+
+## Library and add-on backup
+
+In Settings, use **Library & add-on backup → Export library & add-ons**.
+The dated ZIP contains `Library.html` (readable offline, browser Find/Print),
+`Library.csv` and `Addons.csv` (UTF-8 spreadsheets), and `Backup.json`.
+
+This is a local snapshot of both `library` and `library_recent`, with newer
+records winning by `_mtime`. Open Library and Add-ons while online first so
+Stremio can synchronize its saved data. The export itself makes no network
+requests and does not check account synchronization. It reports saved-title
+and add-on counts and flags a missing library part. Unsupported data, account
+mismatches and a locked add-on list fail visibly instead of silently truncating.
+
+The report lists current saved titles and installed Stremio add-ons, preserving
+add-on order and separate configurations. JSON also retains removed/temporary
+records and available playback/watched state. It has a format ID and schema
+version for future import tooling; automatic restore is not implemented.
+
+Keep the ZIP and JSON private: configured add-on URLs can contain access keys.
+Those URLs appear only in JSON. Stremio login credentials, account details and
+unrelated local storage are never exported. This backs up Stremio add-ons,
+not browser extensions or their internal settings.
+
+The implementation is isolated in `src/webview/fork-backup.js` and embedded
+with the existing fork script by CMake. It reads only the three expected
+storage entries, adds its own Settings section, and leaves community-owned
+DOM, stored data, playback and streaming code unchanged.
+
+For a release, pass the successful Windows run ID, exact source SHA, and version
+to the manual **Publish tested Windows build** workflow. A maintainer must
+create the matching lightweight version tag at that tested SHA first. The
+publisher checks the run, tag, file names and checksums before uploading those
+exact artifacts. It no longer needs a publisher-only source commit.
