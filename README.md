@@ -84,7 +84,7 @@ Blur fills the space **outside the video picture**. For black bars baked into th
 
 Detection and blur are separate controls. The detected aspect ratio stays fixed for the current video, including videos whose framing changes later. See [the detailed guide](docs/FORK.md#encoded-black-bars) for detection safeguards, compatible filters and the seam fix.
 
-## ⌨️ Player shortcuts
+## ⌨ Player shortcuts
 
 The same list is available in **Settings → Player Shortcuts**. These are the shipped defaults; a custom `input.conf` may change them.
 
