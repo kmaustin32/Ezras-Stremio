@@ -19,6 +19,13 @@
     let pipButton;
     let compatibility = null;
     let compatibilityStatus;
+    let paused = false;
+    let pausedPlayer = null;
+    let pausedTimer = null;
+    let pausedEligible = false;
+    let pausedBlocked = true;
+    let pointerHeld = false;
+    let keyboardFocus = true;
     const appliedStyles = new WeakMap();
     const playerShortcuts = [
         {key: 'CTRL+b', keys: ['Ctrl', 'B'], label: 'Toggle ambient border blur'},
@@ -135,6 +142,122 @@
             type: 6, object: 'transport', method: 'handleInboundJSON', id: 1001,
             args: [event, args]
         }));
+    }
+
+    function clearPausedTimer() {
+        clearTimeout(pausedTimer);
+        pausedTimer = null;
+    }
+
+    function pausedControlsBlocked() {
+        if (pointerHeld || document.documentElement.className.includes('active-slider-within')) return true;
+        const controls = '[class*="nav-bar-layer"], [class*="control-bar-layer"], [class*="side-drawer-button-layer"]';
+        if (keyboardFocus && pausedPlayer?.contains(document.activeElement) && document.activeElement.closest(controls)) return true;
+        // Never hide a settings/subtitle/speed menu, episode drawer, popup,
+        // error or loading state. These elements are owned by the hosted UI.
+        const selectors = '[class*="menu-layer"], [class*="side-drawer-layer"], [class*="error-layer"], [class*="buffering-layer"], [class*="context-menu-container"], [role="dialog"], [role="menu"]';
+        return Array.from(document.querySelectorAll(selectors)).some(element => {
+            const rect = element.getBoundingClientRect();
+            const style = getComputedStyle(element);
+            return rect.width > 0 && rect.height > 0 && style.display !== 'none' &&
+                style.visibility !== 'hidden' && Number(style.opacity) > 0;
+        });
+    }
+
+    function showPausedControls() {
+        if (pausedPlayer?.getAttribute('data-stremio-paused-controls') !== 'visible')
+            pausedPlayer?.setAttribute('data-stremio-paused-controls', 'visible');
+    }
+
+    function armPausedTimer() {
+        clearPausedTimer();
+        if (!pausedEligible || pausedControlsBlocked()) return;
+        pausedTimer = setTimeout(() => {
+            pausedTimer = null;
+            if (pausedEligible && pausedPlayer?.isConnected && !pausedControlsBlocked())
+                pausedPlayer.setAttribute('data-stremio-paused-controls', 'hidden');
+        }, 1000);
+    }
+
+    function pausedActivity() {
+        if (!pausedEligible) return;
+        showPausedControls();
+        armPausedTimer();
+    }
+
+    function updatePausedControls(player) {
+        if (player !== pausedPlayer) {
+            clearPausedTimer();
+            pausedPlayer?.removeAttribute('data-stremio-paused-controls');
+            pausedPlayer = player;
+            pausedEligible = false;
+            pausedBlocked = true;
+            pointerHeld = false;
+        }
+        const eligible = Boolean(player && state.active && paused);
+        if (!eligible) {
+            clearPausedTimer();
+            player?.removeAttribute('data-stremio-paused-controls');
+            pausedEligible = false;
+            pausedBlocked = true;
+            return;
+        }
+        const blocked = pausedControlsBlocked();
+        if (!pausedEligible || blocked) showPausedControls();
+        const shouldArm = !pausedEligible || (pausedBlocked && !blocked);
+        pausedEligible = true;
+        if (blocked) clearPausedTimer();
+        else if (shouldArm) armPausedTimer();
+        pausedBlocked = blocked;
+    }
+
+    function startPausedControls() {
+        const style = document.createElement('style');
+        style.textContent = `
+            [data-stremio-paused-controls="hidden"], [data-stremio-paused-controls="hidden"] * {cursor:none!important}
+            [data-stremio-paused-controls="visible"] {cursor:auto!important}
+            [data-stremio-paused-controls="hidden"] [class*="nav-bar-layer"],
+            [data-stremio-paused-controls="hidden"] [class*="control-bar-layer"],
+            [data-stremio-paused-controls="hidden"] [class*="side-drawer-button-layer"] {
+                opacity:0!important;visibility:hidden!important;pointer-events:none!important;transition:none!important;
+            }
+            [data-stremio-paused-controls="visible"] [class*="nav-bar-layer"],
+            [data-stremio-paused-controls="visible"] [class*="control-bar-layer"],
+            [data-stremio-paused-controls="visible"] [class*="side-drawer-button-layer"] {
+                opacity:1!important;visibility:visible!important;
+            }`;
+        document.head.append(style);
+        document.addEventListener('mousemove', event => {
+            if (pausedPlayer?.contains(event.target)) pausedActivity();
+        }, true);
+        document.addEventListener('pointerdown', event => {
+            keyboardFocus = false;
+            if (!pausedPlayer?.contains(event.target)) return;
+            pointerHeld = true;
+            pausedActivity();
+        }, true);
+        const release = () => {
+            if (!pointerHeld) return;
+            pointerHeld = false;
+            pausedActivity();
+        };
+        window.addEventListener('pointerup', release, true);
+        window.addEventListener('pointercancel', release, true);
+        window.addEventListener('blur', release);
+        document.addEventListener('keydown', event => {
+            keyboardFocus = true;
+            if (pausedPlayer?.contains(event.target) || event.target === document.body) pausedActivity();
+        }, true);
+        document.addEventListener('focusin', event => {
+            if (pausedPlayer?.contains(event.target)) pausedActivity();
+        }, true);
+        document.addEventListener('focusout', () => queueMicrotask(() => {
+            if (pausedPlayer?.getAttribute('data-stremio-paused-controls') === 'visible') armPausedTimer();
+        }), true);
+        document.addEventListener('transitionend', () => {
+            if (pausedEligible) updatePausedControls(pausedPlayer);
+        }, true);
+        send('mpv-observe-prop', ['pause']);
     }
 
     function applyVolumeLimit(value) {
@@ -295,6 +418,7 @@
         recolorLogos();
         updatePlayerShortcuts();
         const player = document.querySelector('[class*="player-container"]');
+        updatePausedControls(player);
         updateVolume(player);
         updatePip(player);
         updateCompatibility(player);
@@ -359,6 +483,7 @@
             if (property?.name === 'volume' && typeof property.data === 'number' && Number.isFinite(property.data))
                 volume = property.data;
             else if (property?.name === 'mute' && typeof property.data === 'boolean') muted = property.data;
+            else if (property?.name === 'pause' && typeof property.data === 'boolean') paused = property.data;
             else return;
             schedule();
             return;
@@ -373,6 +498,7 @@
     function start() {
         receiveCompatibility(window.__stremioForkCompatibility);
         adjustSettingsLayout();
+        startPausedControls();
         try { applyVolumeLimit(JSON.parse(localStorage.getItem('localProfile') || '{}').maxVolume ?? 130); }
         catch { applyVolumeLimit(130); }
         const observer = new MutationObserver(schedule);

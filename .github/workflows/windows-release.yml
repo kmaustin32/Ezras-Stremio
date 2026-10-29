@@ -71,7 +71,7 @@ jobs:
           npm install --prefix .build-cache/ui-test --no-save --ignore-scripts playwright@1.62.1
           if ($LASTEXITCODE) { throw 'UI test dependency install failed' }
           $env:NODE_PATH = "$pwd/.build-cache/ui-test/node_modules"
-          node --test tests/player_controls.test.js tests/player_layout.test.js tests/episode_blur.test.js tests/player_shortcuts.test.js tests/backup_ui.test.js
+          node --test tests/player_controls.test.js tests/player_layout.test.js tests/episode_blur.test.js tests/player_shortcuts.test.js tests/backup_ui.test.js tests/paused_controls.test.js
           if ($LASTEXITCODE) { throw 'Player UI tests failed' }
       - name: Test native WebView2 bootstrap and cached reload
         shell: pwsh

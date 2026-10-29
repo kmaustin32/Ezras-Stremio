@@ -108,6 +108,14 @@ the previous always-on-top preference. Fullscreen and picture-in-picture are
 mutually exclusive. Long settings labels wrap, with more room before the options
 column and stacked controls in narrow windows.
 
+While a video is paused, the top bar, progress bar, playback controls, episode
+drawer button, and pointer hide after one second without activity. Moving the
+mouse or using the keyboard restores them. Open menus, loading/error messages,
+slider drags, and keyboard focus on controls keep them usable. Subtitles remain
+visible. Resuming playback restores the community player's normal control timing.
+This behavior lives in the isolated fork script; it does not patch the hosted
+player bundle or change playback state.
+
 Turning off **Auto play next episode** now also disables advancement when the
 video ends and cancels an open next-episode countdown. Manual Next still works, and completion/watch-progress handling
 remains intact. A scoped compatibility patch applies this setting check to the
