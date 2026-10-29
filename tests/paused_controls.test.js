@@ -41,7 +41,10 @@ async function setup() {
     await page.addScriptTag({content: source});
     await page.evaluate(() => window.activeVideo(true));
     const player = page.locator('#player');
-    const wait = state => page.waitForFunction(state => document.querySelector('#player')?.getAttribute('data-stremio-paused-controls') === state, state);
+    const wait = async state => {
+        await page.waitForFunction(state => document.querySelector('#player')?.getAttribute('data-stremio-paused-controls') === state, state);
+        if (state === 'hidden') await page.locator('#bottom').waitFor({state: 'hidden'});
+    };
     const addLayer = (id, layer) => page.evaluate(({id, layer}) => {
         const node = document.createElement('div'); node.id = id; node.className = layer;
         node.style.cssText = 'position:absolute;right:50px;bottom:150px;width:300px;height:200px;background:#333';
@@ -137,6 +140,82 @@ test('Playback, navigation, new videos and repeated bootstrap cannot leave hidde
         assert.equal(await page.evaluate(() => window.handlers.length), before);
         await page.evaluate(() => window.pauseState('bad'));
         assert.equal(await page.locator('#player').getAttribute('data-stremio-paused-controls'), null);
+        assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+});
+
+test('Half-second slides move top and bottom controls off opposite edges and reverse smoothly without moving the picture', async () => {
+    const {browser, page, wait, errors} = await setup();
+    try {
+        await page.emulateMedia({reducedMotion: 'no-preference'});
+        for (const viewport of [{width: 1280, height: 720}, {width: 480, height: 270}]) {
+            await page.setViewportSize(viewport);
+            const frame = await page.locator('#frame').boundingBox();
+            const drawerTransform = await page.locator('#drawer-button').evaluate(el => getComputedStyle(el).transform);
+            await page.evaluate(() => window.pauseState(true));
+            await page.waitForFunction(() => document.querySelector('#player').getAttribute('data-stremio-paused-controls') === 'hidden');
+            // Freeze real CSS transitions halfway through, rather than relying
+            // on a wall-clock screenshot landing on one particular frame.
+            const halfway = await page.evaluate(() => ['top', 'bottom'].map(id => {
+                const el = document.getElementById(id);
+                const animations = el.getAnimations();
+                const slide = animations.find(animation => animation.transitionProperty === 'transform');
+                if (!slide) throw new Error('Missing slide transition: ' + id);
+                const duration = slide.effect.getTiming().duration;
+                for (const animation of animations) { animation.pause(); animation.currentTime = 250; }
+                const style = getComputedStyle(el);
+                return {duration, y: new DOMMatrixReadOnly(style.transform).m42, height: el.getBoundingClientRect().height,
+                    opacity: Number(style.opacity), visibility: style.visibility, pointerEvents: style.pointerEvents};
+            }));
+            for (const control of halfway) {
+                assert.equal(control.duration, 500);
+                assert.ok(control.opacity > 0 && control.opacity < 1, 'Shadows fade during the slide');
+                assert.equal(control.visibility, 'visible', 'Do not disappear before the slide finishes');
+                assert.equal(control.pointerEvents, 'none', 'Exiting controls cannot intercept video clicks');
+            }
+            assert.ok(halfway[0].y < 0 && halfway[0].y > -halfway[0].height, 'Top slides upward');
+            assert.ok(halfway[1].y > 0 && halfway[1].y < halfway[1].height, 'Bottom slides downward');
+            const output = '.build-cache/ui-test-evidence'; fs.mkdirSync(output, {recursive: true});
+            await page.screenshot({path: `${output}/paused-slide-halfway-${viewport.width}.png`});
+            await page.mouse.move(viewport.width / 2, viewport.height / 2);
+            await wait('visible');
+            const reversing = await page.evaluate(() => ['top', 'bottom'].map(id =>
+                new DOMMatrixReadOnly(getComputedStyle(document.getElementById(id)).transform).m42));
+            assert.ok(reversing[0] < -1 && reversing[1] > 1, 'Interrupted slides reverse from the current position without snapping');
+            await page.waitForFunction(() => ['top', 'bottom'].every(id =>
+                Math.abs(new DOMMatrixReadOnly(getComputedStyle(document.getElementById(id)).transform).m42) < 0.1));
+            await wait('hidden');
+            const bounds = await page.evaluate(() => {
+                const player = document.getElementById('player').getBoundingClientRect();
+                const top = document.getElementById('top').getBoundingClientRect();
+                const bottom = document.getElementById('bottom').getBoundingClientRect();
+                return {topOffscreen: top.bottom <= player.top + 0.1, bottomOffscreen: bottom.top >= player.bottom - 0.1,
+                    noOverflow: document.documentElement.scrollHeight <= innerHeight && document.documentElement.scrollWidth <= innerWidth};
+            });
+            assert.deepEqual(bounds, {topOffscreen: true, bottomOffscreen: true, noOverflow: true});
+            assert.deepEqual(await page.locator('#frame').boundingBox(), frame, 'Video geometry remains fixed');
+            assert.equal(await page.locator('#drawer-button').evaluate(el => getComputedStyle(el).transform), drawerTransform, 'Preserve the episode button positioning');
+            await page.evaluate(() => window.pauseState(false));
+            await page.waitForFunction(() => !document.getElementById('player').hasAttribute('data-stremio-paused-controls'));
+        }
+        assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+});
+
+test('Reduced motion hides paused controls without animation and mouse movement still restores them', async () => {
+    const {browser, page, wait, errors} = await setup();
+    try {
+        await page.emulateMedia({reducedMotion: 'reduce'});
+        await page.evaluate(() => window.pauseState(true));
+        await wait('hidden');
+        for (const id of ['top', 'bottom', 'drawer-button']) {
+            assert.equal(await page.locator('#' + id).isVisible(), false);
+            assert.equal(await page.locator('#' + id).evaluate(el => el.getAnimations().length), 0);
+        }
+        await page.mouse.move(600, 350);
+        await wait('visible');
+        assert.ok(await page.locator('#top').isVisible());
+        assert.ok(await page.locator('#bottom').isVisible());
         assert.deepEqual(errors, []);
     } finally { await browser.close(); }
 });

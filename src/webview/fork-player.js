@@ -214,17 +214,35 @@
     function startPausedControls() {
         const style = document.createElement('style');
         style.textContent = `
+            [data-stremio-paused-controls] {overflow:clip!important}
             [data-stremio-paused-controls="hidden"], [data-stremio-paused-controls="hidden"] * {cursor:none!important}
             [data-stremio-paused-controls="visible"] {cursor:auto!important}
+            [data-stremio-paused-controls] [class*="nav-bar-layer"],
+            [data-stremio-paused-controls] [class*="control-bar-layer"],
+            [data-stremio-paused-controls] [class*="side-drawer-button-layer"] {
+                transition:transform .5s ease,opacity .5s ease,visibility 0s!important;
+            }
+            [data-stremio-paused-controls] [class*="nav-bar-layer"],
+            [data-stremio-paused-controls] [class*="control-bar-layer"] {transform:translateY(0)!important}
             [data-stremio-paused-controls="hidden"] [class*="nav-bar-layer"],
             [data-stremio-paused-controls="hidden"] [class*="control-bar-layer"],
             [data-stremio-paused-controls="hidden"] [class*="side-drawer-button-layer"] {
-                opacity:0!important;visibility:hidden!important;pointer-events:none!important;transition:none!important;
+                opacity:0!important;visibility:hidden!important;pointer-events:none!important;
+                transition-delay:0s,0s,.5s!important;
             }
+            [data-stremio-paused-controls="hidden"] [class*="nav-bar-layer"] {transform:translateY(-100%)!important}
+            [data-stremio-paused-controls="hidden"] [class*="control-bar-layer"] {transform:translateY(100%)!important}
             [data-stremio-paused-controls="visible"] [class*="nav-bar-layer"],
             [data-stremio-paused-controls="visible"] [class*="control-bar-layer"],
             [data-stremio-paused-controls="visible"] [class*="side-drawer-button-layer"] {
                 opacity:1!important;visibility:visible!important;
+            }
+            @media (prefers-reduced-motion:reduce) {
+                [data-stremio-paused-controls] [class*="nav-bar-layer"],
+                [data-stremio-paused-controls] [class*="control-bar-layer"],
+                [data-stremio-paused-controls] [class*="side-drawer-button-layer"] {
+                    transition:none!important;
+                }
             }`;
         document.head.append(style);
         document.addEventListener('mousemove', event => {
