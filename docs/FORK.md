@@ -116,7 +116,13 @@ Moving the mouse or using the keyboard slides the controls back in, including
 when an exit animation is still in progress. Reduced-motion preferences skip
 the animation. Open menus, loading/error messages,
 slider drags, and keyboard focus on controls keep them usable. Subtitles remain
-visible. Resuming playback restores the community player's normal control timing.
+visible. The same 0.5-second slides apply during normal playback whenever the
+community player hides or restores its controls, including mouse movement,
+mouse exit and menu changes. Normal playback keeps the community player's
+existing visibility timing and active-slider protection. Newly mounted toolbars
+also slide into place. Changing pause state retains the animation rather than
+removing its styles partway through. Reduced-motion preferences apply in both
+playing and paused states.
 This behavior lives in the isolated fork script; it does not patch the hosted
 player bundle or change playback state.
 

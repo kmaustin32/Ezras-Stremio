@@ -46,7 +46,11 @@ async function setup() {
         if (state === 'hidden') await page.locator('#bottom').waitFor({state: 'hidden'});
         if (state === 'visible' && settled) await page.waitForFunction(() =>
             document.getElementById('player').getAttribute('data-stremio-paused-controls') === 'visible' &&
-            ['top', 'bottom'].every(id => Math.abs(new DOMMatrixReadOnly(getComputedStyle(document.getElementById(id)).transform).m42) < 0.1));
+            ['top', 'bottom'].every(id => {
+                const el = document.getElementById(id);
+                return Math.abs(new DOMMatrixReadOnly(getComputedStyle(el).transform).m42) < 0.1 &&
+                    !el.getAnimations().some(animation => animation.transitionProperty === 'transform' && animation.playState !== 'finished');
+            }));
     };
     const addLayer = (id, layer) => page.evaluate(({id, layer}) => {
         const node = document.createElement('div'); node.id = id; node.className = layer;
@@ -54,6 +58,34 @@ async function setup() {
         document.querySelector('#player').append(node);
     }, {id, layer: name(layer)});
     return {browser, page, player, wait, addLayer, body, name, errors};
+}
+
+async function sampleSlides(page) {
+    return page.evaluate(() => ['top', 'bottom'].map(id => {
+        const el = document.getElementById(id);
+        const animations = el.getAnimations();
+        const slide = animations.find(animation => animation.transitionProperty === 'transform');
+        if (!slide) throw new Error('Missing slide transition: ' + id);
+        const duration = slide.effect.getTiming().duration;
+        for (const animation of animations) { animation.pause(); animation.currentTime = 250; }
+        const style = getComputedStyle(el);
+        return {duration, y: new DOMMatrixReadOnly(style.transform).m42, height: el.getBoundingClientRect().height,
+            opacity: Number(style.opacity), visibility: style.visibility, pointerEvents: style.pointerEvents};
+    }));
+}
+
+async function finishSlides(page) {
+    await page.evaluate(() => ['top', 'bottom'].forEach(id =>
+        document.getElementById(id).getAnimations().forEach(animation => animation.finish())));
+}
+
+async function waitForEntry(page) {
+    await page.waitForFunction(() => ['top', 'bottom'].every(id => {
+        const el = document.getElementById(id);
+        const style = getComputedStyle(el);
+        return style.visibility === 'visible' && Math.abs(new DOMMatrixReadOnly(style.transform).m42) < 0.1 &&
+            !el.getAnimations().some(animation => animation.transitionProperty === 'transform' && animation.playState !== 'finished');
+    }));
 }
 
 test('Pause hides all player chrome after one second, mouse motion restores it, and playback/subtitles stay intact', async () => {
@@ -159,17 +191,7 @@ test('Half-second slides move top and bottom controls off opposite edges and rev
             await page.waitForFunction(() => document.querySelector('#player').getAttribute('data-stremio-paused-controls') === 'hidden');
             // Freeze real CSS transitions halfway through, rather than relying
             // on a wall-clock screenshot landing on one particular frame.
-            const halfway = await page.evaluate(() => ['top', 'bottom'].map(id => {
-                const el = document.getElementById(id);
-                const animations = el.getAnimations();
-                const slide = animations.find(animation => animation.transitionProperty === 'transform');
-                if (!slide) throw new Error('Missing slide transition: ' + id);
-                const duration = slide.effect.getTiming().duration;
-                for (const animation of animations) { animation.pause(); animation.currentTime = 250; }
-                const style = getComputedStyle(el);
-                return {duration, y: new DOMMatrixReadOnly(style.transform).m42, height: el.getBoundingClientRect().height,
-                    opacity: Number(style.opacity), visibility: style.visibility, pointerEvents: style.pointerEvents};
-            }));
+            const halfway = await sampleSlides(page);
             for (const control of halfway) {
                 assert.equal(control.duration, 500);
                 assert.ok(control.opacity > 0 && control.opacity < 1, 'Shadows fade during the slide');
@@ -219,6 +241,96 @@ test('Reduced motion hides paused controls without animation and mouse movement 
         await wait('visible');
         assert.ok(await page.locator('#top').isVisible());
         assert.ok(await page.locator('#bottom').isVisible());
+        assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+});
+
+test('Playing controls slide on every upstream visibility change, reverse on mouse movement, and protect active sliders', async () => {
+    const {browser, page, player, name, errors} = await setup();
+    const overlay = hidden => player.evaluate((el, {hidden, className}) => el.classList.toggle(className, hidden), {hidden, className: name('overlayHidden')});
+    try {
+        await page.emulateMedia({reducedMotion: 'no-preference'});
+        // Match the hosted player's mouse-move visibility update. Its existing
+        // debounce owns the playing-video timing; the fork only supplies CSS.
+        await player.evaluate((el, className) => el.addEventListener('mousemove', () => el.classList.remove(className)), name('overlayHidden'));
+        await waitForEntry(page);
+        const frame = await page.locator('#frame').boundingBox();
+        for (let cycle = 0; cycle < 3; cycle++) {
+            await overlay(true);
+            const exiting = await sampleSlides(page);
+            assert.ok(exiting[0].y < 0 && exiting[1].y > 0);
+            for (const control of exiting) assert.equal(control.duration, 500);
+            await page.mouse.move(550 + cycle, 350);
+            const reversing = await page.evaluate(() => ['top', 'bottom'].map(id =>
+                new DOMMatrixReadOnly(getComputedStyle(document.getElementById(id)).transform).m42));
+            assert.ok(reversing[0] < -1 && reversing[1] > 1, 'Playing controls reverse without snapping');
+            await waitForEntry(page);
+        }
+        await overlay(true);
+        await page.locator('#bottom').waitFor({state: 'hidden'});
+        await page.evaluate(className => document.documentElement.classList.add(className), 'active-slider-within-fixture');
+        await waitForEntry(page);
+        await page.waitForTimeout(1100);
+        assert.ok(await page.locator('#bottom').isVisible(), 'The upstream active-slider exception wins over overlayHidden');
+        await page.evaluate(() => document.documentElement.classList.remove('active-slider-within-fixture'));
+        await page.locator('#bottom').waitFor({state: 'hidden'});
+        assert.equal(await player.getAttribute('data-stremio-paused-controls'), null, 'No paused timer or state during playback');
+        assert.deepEqual(await page.locator('#frame').boundingBox(), frame);
+        assert.ok(await page.locator('#subtitle').isVisible());
+        await page.emulateMedia({reducedMotion: 'reduce'});
+        await overlay(false); await waitForEntry(page);
+        await overlay(true); await page.locator('#bottom').waitFor({state: 'hidden'});
+        assert.equal(await page.locator('#bottom').evaluate(el => el.getAnimations().length), 0);
+        assert.deepEqual(await page.evaluate(() => window.messages.filter(m => m.args[0] === 'mpv-command')), []);
+        assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+});
+
+test('Playing and paused visibility handoffs preserve hidden frames and animate returning controls', async () => {
+    const {browser, page, player, wait, name, errors} = await setup();
+    try {
+        await page.emulateMedia({reducedMotion: 'no-preference'});
+        await page.evaluate(() => window.pauseState(true));
+        await wait('hidden');
+        await player.evaluate((el, className) => el.classList.add(className), name('overlayHidden'));
+        await page.evaluate(() => window.pauseState(false));
+        await page.waitForFunction(() => !document.getElementById('player').hasAttribute('data-stremio-paused-controls'));
+        assert.equal(await page.locator('#bottom').isVisible(), false, 'Resuming into hidden playback does not flash controls');
+        assert.equal(await page.locator('#bottom').evaluate(el => el.getAnimations().length), 0, 'Identical hidden states do not restart a transition');
+        await page.evaluate(() => window.pauseState(true));
+        await wait('visible', false);
+        await page.locator('#fullscreen').focus();
+        const returning = await sampleSlides(page);
+        assert.ok(returning[0].y < 0 && returning[1].y > 0);
+        for (const control of returning) assert.equal(control.duration, 500);
+        await finishSlides(page); await waitForEntry(page);
+        assert.ok(await page.locator('#top').isVisible(), 'Paused visibility wins while the upstream class is catching up');
+        await player.evaluate((el, className) => el.classList.remove(className), name('overlayHidden'));
+        await page.evaluate(() => window.pauseState(false));
+        await page.waitForFunction(() => !document.getElementById('player').hasAttribute('data-stremio-paused-controls'));
+        assert.ok(await page.locator('#bottom').isVisible());
+        assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+});
+
+test('Newly mounted toolbars slide into position without moving the picture', async () => {
+    const {browser, page, errors} = await setup();
+    try {
+        await page.emulateMedia({reducedMotion: 'no-preference'});
+        await waitForEntry(page);
+        const frame = await page.locator('#frame').boundingBox();
+        await page.evaluate(() => {
+            const bars = ['top', 'bottom'].map(id => document.getElementById(id));
+            const markup = bars.map(el => el.outerHTML).join('');
+            bars.forEach(el => el.remove());
+            document.getElementById('player').insertAdjacentHTML('beforeend', markup);
+        });
+        const entering = await sampleSlides(page);
+        assert.ok(entering[0].y < 0 && entering[1].y > 0);
+        for (const control of entering) assert.equal(control.duration, 500);
+        await finishSlides(page); await waitForEntry(page);
+        assert.deepEqual(await page.locator('#frame').boundingBox(), frame);
+        assert.ok(await page.locator('#subtitle').isVisible());
         assert.deepEqual(errors, []);
     } finally { await browser.close(); }
 });

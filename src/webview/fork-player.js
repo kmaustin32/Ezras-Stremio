@@ -213,34 +213,33 @@
 
     function startPausedControls() {
         const style = document.createElement('style');
+        const player = '[class*="player-container"]';
+        const chrome = ':is([class*="nav-bar-layer"], [class*="control-bar-layer"], [class*="side-drawer-button-layer"])';
+        // Follow the community player's own visibility policy during playback.
+        // Paused visibility takes priority while its inactivity timer is active.
+        const hidden = `:is([data-stremio-paused-controls="hidden"], html:not([class*="active-slider-within"]) ${player}[class*="overlayHidden"]:not([data-stremio-paused-controls]))`;
         style.textContent = `
-            [data-stremio-paused-controls] {overflow:clip!important}
+            ${player} {overflow:clip!important}
             [data-stremio-paused-controls="hidden"], [data-stremio-paused-controls="hidden"] * {cursor:none!important}
             [data-stremio-paused-controls="visible"] {cursor:auto!important}
-            [data-stremio-paused-controls] [class*="nav-bar-layer"],
-            [data-stremio-paused-controls] [class*="control-bar-layer"],
-            [data-stremio-paused-controls] [class*="side-drawer-button-layer"] {
+            ${player} ${chrome} {
+                opacity:1!important;visibility:visible!important;
                 transition:transform .5s ease,opacity .5s ease,visibility 0s!important;
             }
-            [data-stremio-paused-controls] [class*="nav-bar-layer"],
-            [data-stremio-paused-controls] [class*="control-bar-layer"] {transform:translateY(0)!important}
-            [data-stremio-paused-controls="hidden"] [class*="nav-bar-layer"],
-            [data-stremio-paused-controls="hidden"] [class*="control-bar-layer"],
-            [data-stremio-paused-controls="hidden"] [class*="side-drawer-button-layer"] {
+            ${player} :is([class*="nav-bar-layer"], [class*="control-bar-layer"]) {transform:translateY(0)!important}
+            ${hidden} ${chrome} {
                 opacity:0!important;visibility:hidden!important;pointer-events:none!important;
                 transition-delay:0s,0s,.5s!important;
             }
-            [data-stremio-paused-controls="hidden"] [class*="nav-bar-layer"] {transform:translateY(-100%)!important}
-            [data-stremio-paused-controls="hidden"] [class*="control-bar-layer"] {transform:translateY(100%)!important}
-            [data-stremio-paused-controls="visible"] [class*="nav-bar-layer"],
-            [data-stremio-paused-controls="visible"] [class*="control-bar-layer"],
-            [data-stremio-paused-controls="visible"] [class*="side-drawer-button-layer"] {
-                opacity:1!important;visibility:visible!important;
+            ${hidden} [class*="nav-bar-layer"] {transform:translateY(-100%)!important}
+            ${hidden} [class*="control-bar-layer"] {transform:translateY(100%)!important}
+            @starting-style {
+                ${player} [class*="nav-bar-layer"] {transform:translateY(-100%)!important;opacity:0!important}
+                ${player} [class*="control-bar-layer"] {transform:translateY(100%)!important;opacity:0!important}
+                ${player} [class*="side-drawer-button-layer"] {opacity:0!important}
             }
             @media (prefers-reduced-motion:reduce) {
-                [data-stremio-paused-controls] [class*="nav-bar-layer"],
-                [data-stremio-paused-controls] [class*="control-bar-layer"],
-                [data-stremio-paused-controls] [class*="side-drawer-button-layer"] {
+                ${player} ${chrome}, ${hidden} ${chrome} {
                     transition:none!important;
                 }
             }`;
