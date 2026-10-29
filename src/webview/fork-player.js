@@ -26,6 +26,10 @@
     let pausedBlocked = true;
     let pointerHeld = false;
     let keyboardFocus = true;
+    const animationStorageKey = 'stremio-fork-control-animation-duration';
+    const animationDurations = ['0', '0.25', '0.5', '0.75', '1'];
+    let animationDuration = '0.5';
+    let animationStatus = '';
     const appliedStyles = new WeakMap();
     const playerShortcuts = [
         {key: 'CTRL+b', keys: ['Ctrl', 'B'], label: 'Toggle ambient border blur'},
@@ -144,6 +148,84 @@
         }));
     }
 
+    function readAnimationDuration() {
+        try {
+            const saved = localStorage.getItem(animationStorageKey);
+            return animationDurations.includes(saved) ? saved : '0.5';
+        } catch { return '0.5'; }
+    }
+
+    function applyAnimationDuration(value) {
+        animationDuration = animationDurations.includes(value) ? value : '0.5';
+        const root = document.documentElement;
+        const duration = animationDuration + 's';
+        if (root.style.getPropertyValue('--stremio-control-animation-duration') !== duration)
+            root.style.setProperty('--stremio-control-animation-duration', duration);
+        root.toggleAttribute('data-stremio-control-animation-off', animationDuration === '0');
+    }
+
+    function updateAnimationSetting() {
+        for (const settings of document.querySelectorAll('[class*="settings-container"]')) {
+            const playerLabel = settings.querySelector('[data-section="player"]')?.textContent.trim();
+            if (!playerLabel) continue;
+            const section = Array.from(settings.querySelectorAll('[class*="section-container"]')).find(candidate =>
+                candidate.querySelector(':scope > [class*="section-title"]')?.textContent.trim() === playerLabel);
+            if (!section) continue;
+            let group = section.querySelector('#stremio-fork-animation-setting');
+            if (!group) {
+                const row = section.querySelector(':scope > [class*="option-container"]');
+                const name = row?.querySelector('[class*="option-name-container"]');
+                const input = row?.querySelector('[class*="option-input-container"]');
+                const label = name?.querySelector('[class*="label"]');
+                if (!row || !name || !input || !label) continue;
+                group = document.createElement('div');
+                group.id = 'stremio-fork-animation-setting';
+                const category = section.querySelector(':scope > [class*="section-category-container"]');
+                if (category) {
+                    const heading = document.createElement('div'); heading.className = category.className;
+                    const title = document.createElement('div');
+                    title.className = category.querySelector('[class*="label"]')?.className || label.className;
+                    title.textContent = 'Controls'; heading.append(title); group.append(heading);
+                }
+                const entry = document.createElement('div'); entry.className = row.className;
+                const description = document.createElement('div'); description.className = name.className;
+                const title = document.createElement('label'); title.className = label.className;
+                title.htmlFor = 'stremio-fork-animation-duration'; title.textContent = 'Control animation speed';
+                const help = document.createElement('p'); help.className = 'stremio-fork-shortcuts-note';
+                help.id = 'stremio-fork-animation-help';
+                help.textContent = 'Choose how quickly player controls slide in and out. Off shows and hides them instantly. Reduced motion follows your system preference.';
+                description.append(title, help);
+                const controls = document.createElement('div');
+                controls.className = input.className.split(/\s+/).filter(value => value.includes('option-input-container')).join(' ');
+                const select = document.createElement('select'); select.id = title.htmlFor;
+                select.setAttribute('aria-describedby', help.id);
+                animationDurations.forEach((value, index) => {
+                    const option = document.createElement('option'); option.value = value;
+                    option.textContent = ['Off', '0.25 sec', '0.5 sec (default)', '0.75 sec', '1 sec'][index];
+                    select.append(option);
+                });
+                select.addEventListener('change', () => {
+                    if (!animationDurations.includes(select.value)) return;
+                    applyAnimationDuration(select.value);
+                    animationStatus = '';
+                    try { localStorage.setItem(animationStorageKey, animationDuration); }
+                    catch { animationStatus = 'Applied for this session. This device could not save the preference.'; }
+                    schedule();
+                });
+                controls.append(select); entry.append(description, controls); group.append(entry);
+                const status = document.createElement('p'); status.setAttribute('role', 'status');
+                status.className = 'stremio-fork-shortcuts-note'; group.append(status);
+                // Append only fork-owned nodes; React retains all native rows.
+                section.querySelector(':scope > [class*="section-title"]').after(group);
+            }
+            const select = group.querySelector('select');
+            if (select.value !== animationDuration) select.value = animationDuration;
+            const status = group.querySelector('[role="status"]');
+            if (status.textContent !== animationStatus) status.textContent = animationStatus;
+            status.hidden = !animationStatus;
+        }
+    }
+
     function clearPausedTimer() {
         clearTimeout(pausedTimer);
         pausedTimer = null;
@@ -224,12 +306,12 @@
             [data-stremio-paused-controls="visible"] {cursor:auto!important}
             ${player} ${chrome} {
                 opacity:1!important;visibility:visible!important;
-                transition:transform .5s ease,opacity .5s ease,visibility 0s!important;
+                transition:transform var(--stremio-control-animation-duration,.5s) ease,opacity var(--stremio-control-animation-duration,.5s) ease,visibility 0s!important;
             }
             ${player} :is([class*="nav-bar-layer"], [class*="control-bar-layer"]) {transform:translateY(0)!important}
             ${hidden} ${chrome} {
                 opacity:0!important;visibility:hidden!important;pointer-events:none!important;
-                transition-delay:0s,0s,.5s!important;
+                transition-delay:0s,0s,var(--stremio-control-animation-duration,.5s)!important;
             }
             ${hidden} [class*="nav-bar-layer"] {transform:translateY(-100%)!important}
             ${hidden} [class*="control-bar-layer"] {transform:translateY(100%)!important}
@@ -238,6 +320,8 @@
                 ${player} [class*="control-bar-layer"] {transform:translateY(100%)!important;opacity:0!important}
                 ${player} [class*="side-drawer-button-layer"] {opacity:0!important}
             }
+            html[data-stremio-control-animation-off] ${player} ${chrome},
+            html[data-stremio-control-animation-off] ${hidden} ${chrome} {transition:none!important}
             @media (prefers-reduced-motion:reduce) {
                 ${player} ${chrome}, ${hidden} ${chrome} {
                     transition:none!important;
@@ -382,6 +466,17 @@
             .stremio-fork-shortcuts [class*="option-name-container"] {
                 flex-direction: column !important; align-items: stretch !important;
             }
+            #stremio-fork-animation-setting {margin-bottom:2rem;min-width:0}
+            #stremio-fork-animation-setting [class*="option-name-container"] {
+                flex-direction:column!important;align-items:stretch!important;
+            }
+            #stremio-fork-animation-duration {
+                width:100%;max-width:20rem;min-height:3.25rem;padding:.65rem 1rem;
+                border:1px solid #7272c280;border-radius:.75rem;font:inherit;
+                color:var(--primary-foreground-color,#fff);background:var(--modal-background-color,#272238);
+                cursor:pointer;color-scheme:dark;appearance:auto;
+            }
+            #stremio-fork-animation-duration:focus-visible {outline:2px solid #7272c2;outline-offset:3px}
             [class*="settings-container"] [class*="option-container"]:has(> [class*="option-name-container"]) {
                 max-width: 46rem !important;
             }
@@ -434,6 +529,7 @@
         scheduled = false;
         recolorLogos();
         updatePlayerShortcuts();
+        updateAnimationSetting();
         const player = document.querySelector('[class*="player-container"]');
         updatePausedControls(player);
         updateVolume(player);
@@ -515,6 +611,7 @@
     function start() {
         receiveCompatibility(window.__stremioForkCompatibility);
         adjustSettingsLayout();
+        applyAnimationDuration(readAnimationDuration());
         startPausedControls();
         try { applyVolumeLimit(JSON.parse(localStorage.getItem('localProfile') || '{}').maxVolume ?? 130); }
         catch { applyVolumeLimit(130); }
@@ -527,6 +624,12 @@
     }
     window.addEventListener('stremio-fork-volume-limit', event => applyVolumeLimit(event.detail));
     window.addEventListener('stremio-fork-compatibility', event => receiveCompatibility(event.detail));
+    window.addEventListener('storage', event => {
+        if (event.key !== animationStorageKey && event.key !== null) return;
+        animationStatus = '';
+        applyAnimationDuration(readAnimationDuration());
+        schedule();
+    });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, {once: true});
     else start();
 })();
