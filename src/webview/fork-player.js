@@ -19,6 +19,17 @@
     let pipButton;
     let compatibility = null;
     let compatibilityStatus;
+    let paused = false;
+    let pausedPlayer = null;
+    let pausedTimer = null;
+    let pausedEligible = false;
+    let pausedBlocked = true;
+    let pointerHeld = false;
+    let keyboardFocus = true;
+    const animationStorageKey = 'stremio-fork-control-animation-duration';
+    const animationDurations = ['0', '0.25', '0.5', '0.75', '1'];
+    let animationDuration = '0.5';
+    let animationStatus = '';
     const appliedStyles = new WeakMap();
     const playerShortcuts = [
         {key: 'CTRL+b', keys: ['Ctrl', 'B'], label: 'Toggle ambient border blur'},
@@ -137,6 +148,219 @@
         }));
     }
 
+    function readAnimationDuration() {
+        try {
+            const saved = localStorage.getItem(animationStorageKey);
+            return animationDurations.includes(saved) ? saved : '0.5';
+        } catch { return '0.5'; }
+    }
+
+    function applyAnimationDuration(value) {
+        animationDuration = animationDurations.includes(value) ? value : '0.5';
+        const root = document.documentElement;
+        const duration = animationDuration + 's';
+        if (root.style.getPropertyValue('--stremio-control-animation-duration') !== duration)
+            root.style.setProperty('--stremio-control-animation-duration', duration);
+        root.toggleAttribute('data-stremio-control-animation-off', animationDuration === '0');
+    }
+
+    function updateAnimationSetting() {
+        for (const settings of document.querySelectorAll('[class*="settings-container"]')) {
+            const playerLabel = settings.querySelector('[data-section="player"]')?.textContent.trim();
+            if (!playerLabel) continue;
+            const section = Array.from(settings.querySelectorAll('[class*="section-container"]')).find(candidate =>
+                candidate.querySelector(':scope > [class*="section-title"]')?.textContent.trim() === playerLabel);
+            if (!section) continue;
+            let group = section.querySelector('#stremio-fork-animation-setting');
+            if (!group) {
+                const row = section.querySelector(':scope > [class*="option-container"]');
+                const name = row?.querySelector('[class*="option-name-container"]');
+                const input = row?.querySelector('[class*="option-input-container"]');
+                const label = name?.querySelector('[class*="label"]');
+                if (!row || !name || !input || !label) continue;
+                group = document.createElement('div');
+                group.id = 'stremio-fork-animation-setting';
+                const category = section.querySelector(':scope > [class*="section-category-container"]');
+                if (category) {
+                    const heading = document.createElement('div'); heading.className = category.className;
+                    const title = document.createElement('div');
+                    title.className = category.querySelector('[class*="label"]')?.className || label.className;
+                    title.textContent = 'Controls'; heading.append(title); group.append(heading);
+                }
+                const entry = document.createElement('div'); entry.className = row.className;
+                const description = document.createElement('div'); description.className = name.className;
+                const title = document.createElement('label'); title.className = label.className;
+                title.htmlFor = 'stremio-fork-animation-duration'; title.textContent = 'Control animation speed';
+                const help = document.createElement('p'); help.className = 'stremio-fork-shortcuts-note';
+                help.id = 'stremio-fork-animation-help';
+                help.textContent = 'Choose how quickly player controls slide in and out. Off shows and hides them instantly. Reduced motion follows your system preference.';
+                description.append(title, help);
+                const controls = document.createElement('div');
+                controls.className = input.className.split(/\s+/).filter(value => value.includes('option-input-container')).join(' ');
+                const select = document.createElement('select'); select.id = title.htmlFor;
+                select.setAttribute('aria-describedby', help.id);
+                animationDurations.forEach((value, index) => {
+                    const option = document.createElement('option'); option.value = value;
+                    option.textContent = ['Off', '0.25 sec', '0.5 sec (default)', '0.75 sec', '1 sec'][index];
+                    select.append(option);
+                });
+                select.addEventListener('change', () => {
+                    if (!animationDurations.includes(select.value)) return;
+                    applyAnimationDuration(select.value);
+                    animationStatus = '';
+                    try { localStorage.setItem(animationStorageKey, animationDuration); }
+                    catch { animationStatus = 'Applied for this session. This device could not save the preference.'; }
+                    schedule();
+                });
+                controls.append(select); entry.append(description, controls); group.append(entry);
+                const status = document.createElement('p'); status.setAttribute('role', 'status');
+                status.className = 'stremio-fork-shortcuts-note'; group.append(status);
+                // Append only fork-owned nodes; React retains all native rows.
+                section.querySelector(':scope > [class*="section-title"]').after(group);
+            }
+            const select = group.querySelector('select');
+            if (select.value !== animationDuration) select.value = animationDuration;
+            const status = group.querySelector('[role="status"]');
+            if (status.textContent !== animationStatus) status.textContent = animationStatus;
+            status.hidden = !animationStatus;
+        }
+    }
+
+    function clearPausedTimer() {
+        clearTimeout(pausedTimer);
+        pausedTimer = null;
+    }
+
+    function pausedControlsBlocked() {
+        if (pointerHeld || document.documentElement.className.includes('active-slider-within')) return true;
+        const controls = '[class*="nav-bar-layer"], [class*="control-bar-layer"], [class*="side-drawer-button-layer"]';
+        if (keyboardFocus && pausedPlayer?.contains(document.activeElement) && document.activeElement.closest(controls)) return true;
+        // Never hide a settings/subtitle/speed menu, episode drawer, popup,
+        // error or loading state. These elements are owned by the hosted UI.
+        const selectors = '[class*="menu-layer"], [class*="side-drawer-layer"], [class*="error-layer"], [class*="buffering-layer"], [class*="context-menu-container"], [role="dialog"], [role="menu"]';
+        return Array.from(document.querySelectorAll(selectors)).some(element => {
+            const rect = element.getBoundingClientRect();
+            const style = getComputedStyle(element);
+            return rect.width > 0 && rect.height > 0 && style.display !== 'none' &&
+                style.visibility !== 'hidden' && Number(style.opacity) > 0;
+        });
+    }
+
+    function showPausedControls() {
+        if (pausedPlayer?.getAttribute('data-stremio-paused-controls') !== 'visible')
+            pausedPlayer?.setAttribute('data-stremio-paused-controls', 'visible');
+    }
+
+    function armPausedTimer() {
+        clearPausedTimer();
+        if (!pausedEligible || pausedControlsBlocked()) return;
+        pausedTimer = setTimeout(() => {
+            pausedTimer = null;
+            if (pausedEligible && pausedPlayer?.isConnected && !pausedControlsBlocked())
+                pausedPlayer.setAttribute('data-stremio-paused-controls', 'hidden');
+        }, 1000);
+    }
+
+    function pausedActivity() {
+        if (!pausedEligible) return;
+        showPausedControls();
+        armPausedTimer();
+    }
+
+    function updatePausedControls(player) {
+        if (player !== pausedPlayer) {
+            clearPausedTimer();
+            pausedPlayer?.removeAttribute('data-stremio-paused-controls');
+            pausedPlayer = player;
+            pausedEligible = false;
+            pausedBlocked = true;
+            pointerHeld = false;
+        }
+        const eligible = Boolean(player && state.active && paused);
+        if (!eligible) {
+            clearPausedTimer();
+            player?.removeAttribute('data-stremio-paused-controls');
+            pausedEligible = false;
+            pausedBlocked = true;
+            return;
+        }
+        const blocked = pausedControlsBlocked();
+        if (!pausedEligible || blocked) showPausedControls();
+        const shouldArm = !pausedEligible || (pausedBlocked && !blocked);
+        pausedEligible = true;
+        if (blocked) clearPausedTimer();
+        else if (shouldArm) armPausedTimer();
+        pausedBlocked = blocked;
+    }
+
+    function startPausedControls() {
+        const style = document.createElement('style');
+        const player = '[class*="player-container"]';
+        const chrome = ':is([class*="nav-bar-layer"], [class*="control-bar-layer"], [class*="side-drawer-button-layer"])';
+        // Follow the community player's own visibility policy during playback.
+        // Paused visibility takes priority while its inactivity timer is active.
+        const hidden = `:is([data-stremio-paused-controls="hidden"], html:not([class*="active-slider-within"]) ${player}[class*="overlayHidden"]:not([data-stremio-paused-controls]))`;
+        style.textContent = `
+            ${player} {overflow:clip!important}
+            [data-stremio-paused-controls="hidden"], [data-stremio-paused-controls="hidden"] * {cursor:none!important}
+            [data-stremio-paused-controls="visible"] {cursor:auto!important}
+            ${player} ${chrome} {
+                opacity:1!important;visibility:visible!important;
+                transition:transform var(--stremio-control-animation-duration,.5s) ease,opacity var(--stremio-control-animation-duration,.5s) ease,visibility 0s!important;
+            }
+            ${player} :is([class*="nav-bar-layer"], [class*="control-bar-layer"]) {transform:translateY(0)!important}
+            ${hidden} ${chrome} {
+                opacity:0!important;visibility:hidden!important;pointer-events:none!important;
+                transition-delay:0s,0s,var(--stremio-control-animation-duration,.5s)!important;
+            }
+            ${hidden} [class*="nav-bar-layer"] {transform:translateY(-100%)!important}
+            ${hidden} [class*="control-bar-layer"] {transform:translateY(100%)!important}
+            @starting-style {
+                ${player} [class*="nav-bar-layer"] {transform:translateY(-100%)!important;opacity:0!important}
+                ${player} [class*="control-bar-layer"] {transform:translateY(100%)!important;opacity:0!important}
+                ${player} [class*="side-drawer-button-layer"] {opacity:0!important}
+            }
+            html[data-stremio-control-animation-off] ${player} ${chrome},
+            html[data-stremio-control-animation-off] ${hidden} ${chrome} {transition:none!important}
+            @media (prefers-reduced-motion:reduce) {
+                ${player} ${chrome}, ${hidden} ${chrome} {
+                    transition:none!important;
+                }
+            }`;
+        document.head.append(style);
+        document.addEventListener('mousemove', event => {
+            if (pausedPlayer?.contains(event.target)) pausedActivity();
+        }, true);
+        document.addEventListener('pointerdown', event => {
+            keyboardFocus = false;
+            if (!pausedPlayer?.contains(event.target)) return;
+            pointerHeld = true;
+            pausedActivity();
+        }, true);
+        const release = () => {
+            if (!pointerHeld) return;
+            pointerHeld = false;
+            pausedActivity();
+        };
+        window.addEventListener('pointerup', release, true);
+        window.addEventListener('pointercancel', release, true);
+        window.addEventListener('blur', release);
+        document.addEventListener('keydown', event => {
+            keyboardFocus = true;
+            if (pausedPlayer?.contains(event.target) || event.target === document.body) pausedActivity();
+        }, true);
+        document.addEventListener('focusin', event => {
+            if (pausedPlayer?.contains(event.target)) pausedActivity();
+        }, true);
+        document.addEventListener('focusout', () => queueMicrotask(() => {
+            if (pausedPlayer?.getAttribute('data-stremio-paused-controls') === 'visible') armPausedTimer();
+        }), true);
+        document.addEventListener('transitionend', () => {
+            if (pausedEligible) updatePausedControls(pausedPlayer);
+        }, true);
+        send('mpv-observe-prop', ['pause']);
+    }
+
     function applyVolumeLimit(value) {
         const setting = Number(value);
         if (!Number.isFinite(setting) || setting < 1 || setting > 1000) return;
@@ -242,6 +466,17 @@
             .stremio-fork-shortcuts [class*="option-name-container"] {
                 flex-direction: column !important; align-items: stretch !important;
             }
+            #stremio-fork-animation-setting {margin-bottom:2rem;min-width:0}
+            #stremio-fork-animation-setting [class*="option-name-container"] {
+                flex-direction:column!important;align-items:stretch!important;
+            }
+            #stremio-fork-animation-duration {
+                width:100%;max-width:20rem;min-height:3.25rem;padding:.65rem 1rem;
+                border:1px solid #7272c280;border-radius:.75rem;font:inherit;
+                color:var(--primary-foreground-color,#fff);background:var(--modal-background-color,#272238);
+                cursor:pointer;color-scheme:dark;appearance:auto;
+            }
+            #stremio-fork-animation-duration:focus-visible {outline:2px solid #7272c2;outline-offset:3px}
             [class*="settings-container"] [class*="option-container"]:has(> [class*="option-name-container"]) {
                 max-width: 46rem !important;
             }
@@ -294,7 +529,9 @@
         scheduled = false;
         recolorLogos();
         updatePlayerShortcuts();
+        updateAnimationSetting();
         const player = document.querySelector('[class*="player-container"]');
+        updatePausedControls(player);
         updateVolume(player);
         updatePip(player);
         updateCompatibility(player);
@@ -359,6 +596,7 @@
             if (property?.name === 'volume' && typeof property.data === 'number' && Number.isFinite(property.data))
                 volume = property.data;
             else if (property?.name === 'mute' && typeof property.data === 'boolean') muted = property.data;
+            else if (property?.name === 'pause' && typeof property.data === 'boolean') paused = property.data;
             else return;
             schedule();
             return;
@@ -373,6 +611,8 @@
     function start() {
         receiveCompatibility(window.__stremioForkCompatibility);
         adjustSettingsLayout();
+        applyAnimationDuration(readAnimationDuration());
+        startPausedControls();
         try { applyVolumeLimit(JSON.parse(localStorage.getItem('localProfile') || '{}').maxVolume ?? 130); }
         catch { applyVolumeLimit(130); }
         const observer = new MutationObserver(schedule);
@@ -384,6 +624,12 @@
     }
     window.addEventListener('stremio-fork-volume-limit', event => applyVolumeLimit(event.detail));
     window.addEventListener('stremio-fork-compatibility', event => receiveCompatibility(event.detail));
+    window.addEventListener('storage', event => {
+        if (event.key !== animationStorageKey && event.key !== null) return;
+        animationStatus = '';
+        applyAnimationDuration(readAnimationDuration());
+        schedule();
+    });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, {once: true});
     else start();
 })();

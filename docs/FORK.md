@@ -8,7 +8,7 @@ D3D11 playback. Use Windows 10/11 x64.
 
 ## Install and use
 
-Download `Ezras-Stremio-1.0.3-x64.exe` from this fork's release. The installer
+Download `Ezras-Stremio-1.1.0-x64.exe` from this fork's release. The installer
 installs WebView2 when needed. The `.zip` is portable but requires the system
 WebView2 runtime. Extract the ZIP into its own directory and run `stremio.exe`.
 Use the installer whose filename starts with `Ezras-Stremio`; **BUILD-ONLY** downloads are
@@ -107,6 +107,31 @@ borderless, always-on-top mode, synchronized with the tray toggle. Exiting resto
 the previous always-on-top preference. Fullscreen and picture-in-picture are
 mutually exclusive. Long settings labels wrap, with more room before the options
 column and stacked controls in narrow windows.
+
+While a video is paused, the top bar, progress bar, playback controls, episode
+drawer button, and pointer hide after one second without activity. The top bar
+slides upward and the bottom controls downward over the selected duration, with their
+shadows fading out. The episode drawer button fades without changing position.
+Moving the mouse or using the keyboard slides the controls back in, including
+when an exit animation is still in progress. Reduced-motion preferences skip
+the animation. Open menus, loading/error messages,
+slider drags, and keyboard focus on controls keep them usable. Subtitles remain
+visible. The same slides apply during normal playback whenever the
+community player hides or restores its controls, including mouse movement,
+mouse exit and menu changes. Normal playback keeps the community player's
+existing visibility timing and active-slider protection. Newly mounted toolbars
+also slide into place. Changing pause state retains the animation rather than
+removing its styles partway through. Reduced-motion preferences apply in both
+playing and paused states.
+Settings → Player → Controls → **Control animation speed** offers Off, 0.25 sec,
+0.5 sec (default), 0.75 sec and 1 sec. Off makes showing and hiding instantaneous;
+the inactivity delays are unchanged. The preference applies immediately and is
+saved on this device in the fork's own local-storage entry, separate from the
+community profile. If storage is unavailable it still applies for the session.
+Other open windows receive saved changes; clearing the preference restores the
+default. System reduced-motion preferences take priority over the selected speed.
+This behavior lives in the isolated fork script; it does not patch the hosted
+player bundle or change playback state.
 
 Turning off **Auto play next episode** now also disables advancement when the
 video ends and cancels an open next-episode countdown. Manual Next still works, and completion/watch-progress handling
