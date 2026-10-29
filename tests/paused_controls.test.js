@@ -41,9 +41,12 @@ async function setup() {
     await page.addScriptTag({content: source});
     await page.evaluate(() => window.activeVideo(true));
     const player = page.locator('#player');
-    const wait = async state => {
+    const wait = async (state, settled = true) => {
         await page.waitForFunction(state => document.querySelector('#player')?.getAttribute('data-stremio-paused-controls') === state, state);
         if (state === 'hidden') await page.locator('#bottom').waitFor({state: 'hidden'});
+        if (state === 'visible' && settled) await page.waitForFunction(() =>
+            document.getElementById('player').getAttribute('data-stremio-paused-controls') === 'visible' &&
+            ['top', 'bottom'].every(id => Math.abs(new DOMMatrixReadOnly(getComputedStyle(document.getElementById(id)).transform).m42) < 0.1));
     };
     const addLayer = (id, layer) => page.evaluate(({id, layer}) => {
         const node = document.createElement('div'); node.id = id; node.className = layer;
@@ -178,7 +181,7 @@ test('Half-second slides move top and bottom controls off opposite edges and rev
             const output = '.build-cache/ui-test-evidence'; fs.mkdirSync(output, {recursive: true});
             await page.screenshot({path: `${output}/paused-slide-halfway-${viewport.width}.png`});
             await page.mouse.move(viewport.width / 2, viewport.height / 2);
-            await wait('visible');
+            await wait('visible', false);
             const reversing = await page.evaluate(() => ['top', 'bottom'].map(id =>
                 new DOMMatrixReadOnly(getComputedStyle(document.getElementById(id)).transform).m42));
             assert.ok(reversing[0] < -1 && reversing[1] > 1, 'Interrupted slides reverse from the current position without snapping');
