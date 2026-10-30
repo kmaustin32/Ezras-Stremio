@@ -521,7 +521,7 @@
     function applyTheme(dark) {
         if (typeof dark !== 'boolean') return;
         window.__stremioForkDarkTheme = dark;
-        document.documentElement.toggleAttribute('data-stremio-dark-theme', dark);
+        document.documentElement?.toggleAttribute('data-stremio-dark-theme', dark);
     }
 
     function startTheme() {

@@ -4,6 +4,30 @@ const fs = require('node:fs');
 const {chromium} = require('playwright');
 const script = fs.readFileSync('src/webview/fork-player.js', 'utf8').replace('__FORK_FIT_SVG__', fs.readFileSync('images/player/video-scale-fit.svg','utf8').trim());
 const executablePath = [process.env.STREMIO_TEST_BROWSER, 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files/Microsoft/Edge/Application/msedge.exe'].find(x => x && fs.existsSync(x));
+
+test('An early shell response before the document root exists is retained and applied when the page becomes ready',async()=>{
+    const browser=await chromium.launch({executablePath,headless:true});
+    try{
+        const page=await browser.newPage(); const errors=[];
+        page.on('pageerror',error=>errors.push(error.message));
+        await page.route('https://stremio.zarg.me/**',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><html><head></head><body>Loading</body></html>'}));
+        await page.addInitScript({content:`
+            window.__stremioForkDarkTheme=false;
+            window.handlers=[];
+            window.chrome={webview:{addEventListener:(_,handler)=>window.handlers.push(handler),postMessage:text=>{
+                if(JSON.parse(text).args[0]!=='get-theme')return;
+                window.rootAtThemeRequest=Boolean(document.documentElement);
+                window.handlers.forEach(handler=>handler({data:{args:['theme-changed',{dark:true}]}}));
+            }}};
+            ${script}`});
+        await page.goto('https://stremio.zarg.me/');
+        assert.equal(await page.evaluate(()=>window.rootAtThemeRequest),false,'Exercise the document-created injection path');
+        assert.equal(await page.locator('#stremio-fork-theme').count(),1);
+        assert.equal(await page.locator('html').getAttribute('data-stremio-dark-theme'),'');
+        assert.deepEqual(errors,[]);
+    }finally{await browser.close();}
+});
+
 let assets;
 async function setup(dark = true, currentDark = dark) {
     assets ||= (async () => {
