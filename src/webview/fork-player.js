@@ -538,7 +538,6 @@
             }
             [class*="player-container"] [class*="seek-bar"] {
                 --primary-accent-color:#7272c2;
-                --primary-foreground-color:#7272c2;
             }
             html[data-stremio-dark-theme] [class*="player-container"] :is(
                 [class*="nav-bar-layer"], [class*="control-bar-layer"], [class*="side-drawer-button-layer"]

@@ -38,6 +38,7 @@ async function setup(dark = true, currentDark = dark) {
         const Multiselect=load(Object.values(window.modules).find(fn=>fn.toString().includes('a(48221)') && fn.toString().includes('multiSelect')));
         const settings=load(find('"multiselect-container":"multiselect-container-'));
         const controls=load(find('"seek-bar":"seek-bar-'));
+        const seek=load(find('"seek-bar-container":"seek-bar-container-'));
         const slider=load(find('"track-after":"track-after-'));
         const player=load(find('"nav-bar-layer":"nav-bar-layer-'));
         const h=React.createElement;
@@ -55,7 +56,9 @@ async function setup(dark = true, currentDark = dark) {
                 h('div',{id:'player',className:player['player-container'],style:{position:'relative',height:150}},
                     h('div',{className:player['nav-bar-layer'],style:{height:50}},icon('top-icon','white'),h('span',{id:'stremio-fork-compatibility',style:{color:'orange'}},icon('warning','orange'))),
                     h('div',{className:player['control-bar-layer'],style:{height:100}},icon('bottom-icon','white'),h('div',{className:controls['control-bar-buttons-menu-container']}),
-                        h('div',{id:'seek',className:controls['seek-bar']+' '+slider['slider-container'],style:{height:30}},...['track','track-before','track-after','thumb'].map(name=>h('div',{id:'seek-'+name,className:slider[name],style:{width:'50%'}}))),
+                        h('div',{id:'seek',className:controls['seek-bar']+' '+seek['seek-bar-container'],style:{height:30}},
+                            h('span',{id:'seek-time',className:seek.label},'00:32'),
+                            h('div',{className:seek.slider+' '+slider['slider-container']},...['track','track-before','track-after','thumb'].map(name=>h('div',{id:'seek-'+name,className:slider[name],style:{width:'50%'}})))),
                         h('div',{id:'volume',className:controls['volume-slider'],style:{width:100}},h('div',{id:'volume-fill',className:slider['track-after']}),h('div',{className:slider.thumb}))),
                     h('div',{id:'subtitle',style:{color:'white'}},'Subtitles stay white')));
         }
@@ -76,6 +79,7 @@ test('Dark Mode follows the shell toggle, restores normal colors, and scopes see
         for(const id of ['top-icon','bottom-icon']) assert.equal(await color(id),'rgb(133, 139, 153)');
         assert.equal(await color('warning'),'rgb(255, 165, 0)');
         assert.equal(await color('subtitle'),'rgb(255, 255, 255)');
+        assert.equal(await color('seek-time'),'rgba(255, 255, 255, 0.9)');
         const fill=id=>page.locator('#'+id).evaluate(el=>getComputedStyle(el).backgroundColor);
         assert.equal(await fill('seek-track-after'),'rgb(114, 114, 194)');
         assert.equal(await fill('seek-thumb'),'rgb(114, 114, 194)');
