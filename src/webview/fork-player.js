@@ -470,13 +470,24 @@
             #stremio-fork-animation-setting [class*="option-name-container"] {
                 flex-direction:column!important;align-items:stretch!important;
             }
-            #stremio-fork-animation-duration {
-                width:100%;max-width:20rem;min-height:3.25rem;padding:.65rem 1rem;
+            [class*="settings-container"] [class*="option-input-container"]:has(> select) {padding:0!important}
+            #stremio-fork-animation-duration,
+            [class*="settings-container"] [class*="option-input-container"] select,
+            [class*="settings-container"] [class*="option-input-container"][class*="multiselect-container"] {
+                width:100%;max-width:20rem;min-height:3.25rem;padding:.65rem 1rem!important;
                 border:1px solid #7272c280;border-radius:.75rem;font:inherit;
                 color:var(--primary-foreground-color,#fff);background:var(--modal-background-color,#272238);
                 cursor:pointer;color-scheme:dark;appearance:auto;
+                box-sizing:border-box;height:auto;overflow:visible;
             }
-            #stremio-fork-animation-duration:focus-visible {outline:2px solid #7272c2;outline-offset:3px}
+            #stremio-fork-animation-duration:focus-visible,
+            [class*="settings-container"] [class*="option-input-container"] select:focus-visible,
+            [class*="settings-container"] [class*="option-input-container"][class*="multiselect-container"]:focus-visible {
+                outline:2px solid #7272c2;outline-offset:3px;
+            }
+            [class*="settings-container"] [class*="option-input-container"][class*="multiselect-container"] > [class*="menu-container"] {
+                border:1px solid #7272c280;border-radius:.75rem;box-sizing:border-box;
+            }
             [class*="settings-container"] [class*="option-container"]:has(> [class*="option-name-container"]) {
                 max-width: 46rem !important;
             }
@@ -505,6 +516,35 @@
                 }
             }`;
         document.head.append(style);
+    }
+
+    function applyTheme(dark) {
+        if (typeof dark !== 'boolean') return;
+        window.__stremioForkDarkTheme = dark;
+        document.documentElement?.toggleAttribute('data-stremio-dark-theme', dark);
+    }
+
+    function startTheme() {
+        const style = document.createElement('style');
+        style.id = 'stremio-fork-theme';
+        style.textContent = `
+            html[data-stremio-dark-theme] {
+                --primary-background-color:#292D3E!important;
+                --secondary-background-color:#292D3E!important;
+                --modal-background-color:#292D3E!important;
+            }
+            html[data-stremio-dark-theme] [class*="intro-container"] > [class*="background-container"] {
+                background-image:none!important;
+            }
+            [class*="player-container"] [class*="seek-bar"] {
+                --primary-accent-color:#7272c2;
+            }
+            html[data-stremio-dark-theme] [class*="player-container"] :is(
+                [class*="nav-bar-layer"], [class*="control-bar-layer"], [class*="side-drawer-button-layer"]
+            ) svg:not(#stremio-fork-compatibility svg) {color:#858B99!important}
+        `;
+        document.head.append(style);
+        applyTheme(window.__stremioForkDarkTheme);
     }
 
     function recolorLogos() {
@@ -585,6 +625,10 @@
     window.chrome.webview.addEventListener('message', event => {
         let payload;
         try { payload = typeof event.data === 'string' ? JSON.parse(event.data) : event.data; } catch { return; }
+        if (payload?.args?.[0] === 'theme-changed') {
+            applyTheme(payload.args[1]?.dark);
+            return;
+        }
         if (payload?.args?.[0] === 'picture-in-picture-changed') {
             if (typeof payload.args[1]?.enabled !== 'boolean') return;
             pipEnabled = payload.args[1].enabled;
@@ -610,6 +654,7 @@
 
     function start() {
         receiveCompatibility(window.__stremioForkCompatibility);
+        startTheme();
         adjustSettingsLayout();
         applyAnimationDuration(readAnimationDuration());
         startPausedControls();
@@ -630,6 +675,9 @@
         applyAnimationDuration(readAnimationDuration());
         schedule();
     });
+    // Ask on every document before DOM readiness, so a reload uses the latest
+    // tray choice even when it differs from the shell's startup snapshot.
+    send('get-theme');
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, {once: true});
     else start();
 })();

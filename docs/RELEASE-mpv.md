@@ -1,16 +1,16 @@
-## Ezra's Stremio 1.1.0
+## Ezra's Stremio 1.2.0
 
-This stable release brings the animated player controls from the 1.0.4 betas together with a new animation-speed preference and a complete fork feature guide.
+A calmer Dark Mode, a matching playback bar and consistent settings dropdowns, with all existing fork features retained.
 
-### Choose your animation speed
+### What's new
 
-Open **Settings → Player → Controls → Control animation speed** and choose **Off**, **0.25 sec**, **0.5 sec (default)**, **0.75 sec** or **1 sec**.
+- **Dark Mode background: #292D3E.** Enable **Use Dark Theme** in the tray menu. The saved setting applies on startup and updates the app immediately when toggled. Turning it off restores the original background.
+- **Softer player icons: #858B99 in Dark Mode.** Applies to the top and bottom player controls, including Picture-in-Picture and Fit/Crop/Stretch. Normal mode retains its existing icon colors.
+- **Purple playback bar: #7272c2 in both modes.** The played track and seek handle match the fork's theme. The volume slider retains its separate orange-to-red boost range.
+- **Consistent settings dropdowns.** Rounded corners, purple borders, dark surfaces and clear keyboard focus match the animation-speed selector. Existing single/multiple selections, keyboard controls and narrow layouts remain supported.
+- **Updated feature guide.** The README includes these additions alongside the complete fork feature list.
 
-- The choice applies immediately to playing and paused controls and to newly appearing toolbars. It is saved on this device separately from the community profile and survives reloads and upgrades.
-- Off makes transitions instant, including cancelling an in-progress slide. Existing inactivity delays stay unchanged: one second while paused and the community player's usual timing while playing.
-- Top controls slide upward, bottom controls slide downward, shading fades with them, and the episode button fades in place. Mouse movement smoothly reverses an unfinished slide.
-- Menus, slider use, keyboard focus, subtitles and video framing remain usable. System reduced-motion preferences take priority.
-- The setting follows the Player section even when its navigation label is translated, supports the keyboard and fits narrow windows. If storage cannot save the setting, it still works for the current session and reports that limitation.
+Video, subtitles, framing, playback behavior and animation-speed preferences retain their existing behavior. System reduced-motion preferences still take priority.
 
 ### Everything from the fork, in one stable release
 
@@ -31,14 +31,14 @@ The redesigned [README](../README.md) covers these features, installation, short
 
 ### Downloads
 
-- [Windows x64 installer](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.1.0/Ezras-Stremio-1.1.0-x64.exe)
-- [Portable Windows x64 ZIP](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.1.0/Ezras-Stremio-1.1.0-x64.zip)
-- [SHA256 checksums](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.1.0/SHA256SUMS.txt)
+- [Windows x64 installer](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.2.0/Ezras-Stremio-1.2.0-x64.exe)
+- [Portable Windows x64 ZIP](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.2.0/Ezras-Stremio-1.2.0-x64.zip)
+- [SHA256 checksums](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.2.0/SHA256SUMS.txt)
 
 Use Windows 10/11 x64. The installer sets up WebView2 when needed; the portable ZIP needs the system WebView2 Runtime. When upgrading, retain your configuration to keep custom mpv.conf, input.conf and other scripts. The fork's own black-bar script is updated. The original shell version and installation/profile paths are retained for upgrade compatibility.
 
 ### Validation and upstream compatibility
 
-GitHub Actions builds the installer and portable archive and runs the native configuration, blur/framing/rendering, black-bar/seam, shader, streaming/transcoding, live player compatibility, real community slider, episode-image blur, settings/shortcuts, animation preference, backup, WebView2 and installer-branding checks before publication.
+GitHub Actions builds the installer and portable archive and runs the native configuration, blur/framing/rendering, black-bar/seam, shader, streaming/transcoding, live player compatibility, real community slider, episode-image blur, settings/shortcuts, animation preference, theme switching, live dropdown interaction, backup, WebView2 and installer-branding checks before publication.
 
-The animation preference is isolated in the fork script; it does not rewrite the hosted community bundle or profile. Automatic upstream binary updates remain disabled. Source history is preserved for future upstream merges; incompatible hosted UI changes are reported rather than silently discarding other compatible fixes.
+Theme and settings styling are isolated in the fork script; they do not rewrite the hosted community bundle or profile. Automatic upstream binary updates remain disabled. Source history is preserved for future upstream merges; incompatible hosted UI changes are reported rather than silently discarding other compatible fixes.

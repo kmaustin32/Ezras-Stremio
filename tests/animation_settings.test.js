@@ -52,7 +52,15 @@ async function setup(saved) {
         document.getElementById('settings').style.display = playing ? 'none' : '';
         document.getElementById('player').style.display = playing ? '' : 'none';
     }, playing);
-    const overlay = hidden => page.locator('#player').evaluate((el, {hidden, name}) => el.classList.toggle(name, hidden), {hidden, name: playerClass('overlayHidden')});
+    const overlay = (hidden, capture = false) => page.locator('#player').evaluate((el, {hidden, capture, name}) => {
+        el.classList.toggle(name, hidden);
+        if (!capture) return;
+        // Trigger and inspect in one browser task; a busy runner can otherwise
+        // finish the 250ms transition between separate automation calls.
+        const slide = document.getElementById('top').getAnimations().find(animation => animation.transitionProperty === 'transform');
+        slide?.pause();
+        return slide ? slide.effect.getTiming().duration : null;
+    }, {hidden, capture, name: playerClass('overlayHidden')});
     const settled = () => page.waitForFunction(() => ['top', 'bottom'].every(id => {
         const el = document.getElementById(id), style = getComputedStyle(el);
         return style.visibility === 'visible' && Math.abs(new DOMMatrixReadOnly(style.transform).m42) < 0.1 && !el.getAnimations().length;
@@ -70,11 +78,7 @@ test('Player animation setting offers every requested speed, changes real transi
             await select.selectOption(value);
             assert.equal(await page.evaluate(key => localStorage.getItem(key), key), value);
             await show(true); await settled();
-            await overlay(true);
-            const animation = await page.locator('#top').evaluate(el => {
-                const slide = el.getAnimations().find(animation => animation.transitionProperty === 'transform');
-                return slide ? slide.effect.getTiming().duration : null;
-            });
+            const animation = await overlay(true, true);
             assert.equal(animation, value === '0' ? null : Number(value) * 1000);
             await page.evaluate(() => ['top', 'bottom'].forEach(id => document.getElementById(id).getAnimations().forEach(animation => animation.finish())));
             await page.locator('#bottom').waitFor({state: 'hidden'});
@@ -85,9 +89,21 @@ test('Player animation setting offers every requested speed, changes real transi
         assert.equal(await select.inputValue(), '0.75');
         await page.evaluate(() => window.native('display-mode-changed', {mode: 'fit', active: true}));
         await show(true); await settled();
-        await page.evaluate(() => window.native('mpv-prop-change', {name: 'pause', data: true}));
-        await page.waitForFunction(() => document.getElementById('player').getAttribute('data-stremio-paused-controls') === 'hidden');
-        assert.equal(await page.locator('#top').evaluate(el => el.getAnimations().find(animation => animation.transitionProperty === 'transform')?.effect.getTiming().duration), 750);
+        await page.evaluate(() => {
+            window.pausedSlideDuration = null;
+            const player = document.getElementById('player');
+            const observer = new MutationObserver(() => {
+                if (player.getAttribute('data-stremio-paused-controls') !== 'hidden') return;
+                const slide = document.getElementById('top').getAnimations().find(animation => animation.transitionProperty === 'transform');
+                slide?.pause();
+                window.pausedSlideDuration = slide?.effect.getTiming().duration;
+                observer.disconnect();
+            });
+            observer.observe(player, {attributes:true, attributeFilter:['data-stremio-paused-controls']});
+            window.native('mpv-prop-change', {name: 'pause', data: true});
+        });
+        await page.waitForFunction(() => window.pausedSlideDuration != null);
+        assert.equal(await page.evaluate(() => window.pausedSlideDuration), 750);
         assert.deepEqual(await page.evaluate(() => [localStorage.getItem('localProfile'), localStorage.getItem('profile')]), ['{"maxVolume":"200","unchanged":"keep"}', '{"test":"untouched"}']);
         assert.deepEqual(errors, []);
     } finally { await browser.close(); }
