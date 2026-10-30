@@ -347,7 +347,8 @@ void InitWebView2(HWND hWnd)
 
                     g_webview->AddScriptToExecuteOnDocumentCreated(EXEC_SHELL_SCRIPT,nullptr);
                     g_webview->AddScriptToExecuteOnDocumentCreated(INJECTED_KEYDOWN_SCRIPT,nullptr);
-                    const std::wstring forkScript = WithBrandImages(kForkPlayerScript);
+                    const std::wstring forkScript = std::wstring(L"window.__stremioForkDarkTheme=") +
+                        (g_useDarkTheme ? L"true;" : L"false;") + WithBrandImages(kForkPlayerScript);
                     g_webview->AddScriptToExecuteOnDocumentCreated(forkScript.c_str(), nullptr);
                     SetupPlayerResources(environment.get(), g_webview.get(), hWnd);
 

@@ -23,7 +23,7 @@
 
 ## ✨ Made for your player
 
-Everything added to this fork, from the first mpv upgrade through **1.1.0**:
+Everything added to this fork, from the first mpv upgrade through **1.2.0**:
 
 | Feature | What you get |
 | --- | --- |
@@ -40,6 +40,9 @@ Everything added to this fork, from the first mpv upgrade through **1.1.0**:
 | 🙈 **Consistent spoiler protection** | Unwatched episode thumbnails stay blurred on show pages, in the episode drawer and in the next-episode popup, including alternate images and anime using absolute episode numbers. Watched-state and setting changes update existing images. |
 | 📚 **Readable library & add-on backup** | Export a dated ZIP with an offline HTML report, CSV lists and structured JSON, preserving saved titles, add-on order/configurations and available playback history. |
 | ⚙️ **Clearer settings & shortcuts** | Long labels wrap, options have more breathing room, narrow windows stack controls, and Player Shortcuts lists every shipped input.conf binding plus the fork controls. |
+| 🌑 **A calmer Dark Mode** | Turn on **Use Dark Theme** in the tray menu for a **#292D3E** app background and softer **#858B99** player icons. Changes apply immediately; turning it off restores the original background and icon colors. |
+| 🟣 **A matching playback bar** | The seek bar and its handle use **#7272c2** in both modes. Volume keeps its orange-to-red boost indicator. |
+| 🎛️ **Polished settings dropdowns** | All settings dropdowns share the animation selector's rounded shape, purple border, dark surface and visible keyboard focus, with the existing single- and multiple-selection behavior preserved. |
 | 💜 **A consistent purple identity** | **#7272c2** across app, desktop and tray icons, splash, installer/uninstaller, web logos, return button and default Discord branding. |
 
 ### 🎥 Native playback, refreshed
@@ -55,9 +58,9 @@ Everything added to this fork, from the first mpv upgrade through **1.1.0**:
 
 | Download | How to use it |
 | --- | --- |
-| 📥 [**1.1.0 installer — recommended**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.1.0/Ezras-Stremio-1.1.0-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
-| 💼 [**1.1.0 portable ZIP**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.1.0/Ezras-Stremio-1.1.0-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
-| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.1.0/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
+| 📥 [**1.2.0 installer — recommended**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.2.0/Ezras-Stremio-1.2.0-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
+| 💼 [**1.2.0 portable ZIP**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.2.0/Ezras-Stremio-1.2.0-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
+| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.2.0/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
 
 Use files named **Ezras-Stremio** for this fork. Downloads marked **BUILD-ONLY** are archived build dependencies. Community package-manager listings install the upstream edition; use this fork's releases for these features.
 
@@ -68,7 +71,8 @@ The fork's own black-bar script is updated by the installer even when retaining 
 1. **Start a video.** Use the toolbar's display button to choose Fit, Crop or Stretch.
 2. **Fill the borders.** Press **Ctrl+B** for ambient blur. For bars encoded into the picture, press **Ctrl+Shift+C** during a clear, playing scene first.
 3. **Choose your motion.** Open **Settings → Player → Controls** and pick the animation speed. Playback keeps the community player's usual hide timing; paused videos keep the one-second delay.
-4. **Make a backup.** Open Library and Add-ons while online, then use **Settings → Library & add-on backup → Export library & add-ons**.
+4. **Try the calmer palette.** Enable **Use Dark Theme** in the tray menu for the slate background and softer player icons. The purple seek bar and refreshed settings dropdowns appear in both modes.
+5. **Make a backup.** Open Library and Add-ons while online, then use **Settings → Library & add-on backup → Export library & add-ons**.
 
 ### 🌫️ Ambient blur & encoded bars
 
@@ -174,7 +178,7 @@ Fork features are kept in separate native code, scripts and carefully checked in
 - Autoplay, volume and episode-blur patches validate independently. If the hosted UI changes incompatibly, an amber player indicator names the unavailable fixes while other compatible fixes remain active.
 - Changed compatibility patches refresh the hosted UI's script cache once while preserving login storage, preferences and player configuration.
 - Dependency versions and checksums are pinned, archived build dependencies have mirrors, and GitHub builds/tests the installer and portable package before publication.
-- Release checks cover native blur/framing, no-bar and seam safety, FSR/Anime4K interactions, streaming/transcoding, real community sliders and episode images, settings/shortcuts/animation preferences, backup archives, WebView2 reloads and installer branding.
+- Release checks cover native blur/framing, no-bar and seam safety, FSR/Anime4K interactions, streaming/transcoding, real community sliders and episode images, settings/shortcuts/animation preferences, theme switching and live dropdown interaction, backup archives, WebView2 reloads and installer branding.
 
 For development, start from **`webview-windows`** in this fork. Merge upstream changes into a feature branch, run the checks and review the result before merging back. The integration checks help detect upstream changes; future compatibility still needs verification.
 

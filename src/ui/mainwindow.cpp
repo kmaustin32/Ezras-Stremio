@@ -106,6 +106,7 @@ void ToggleFullScreen(HWND hWnd, bool enable)
 
 static void UpdateTheme(HWND hWnd)
 {
+    if (g_webview) SendToJS("theme-changed", {{"dark", g_useDarkTheme}});
     if(g_useDarkTheme){
         BOOL dark = TRUE;
         DwmSetWindowAttribute(hWnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark, sizeof(dark));
@@ -165,6 +166,8 @@ void HandleEvent(const std::string &ev, std::vector<std::string> &args)
             if (consumed == args[0].size() && !ApplyMaximumVolume(g_mpv, maximum))
                 AppendToCrashLog("[MPV]: Could not apply maximum volume");
         } catch (const std::exception&) { /* Ignore invalid settings. */ }
+    } else if (ev == "get-theme") {
+        if (g_webview) SendToJS("theme-changed", {{"dark", g_useDarkTheme}});
     } else if (ev == "get-picture-in-picture") {
         if (g_webview) SendToJS("picture-in-picture-changed", {{"enabled", g_isPipMode}});
     } else if (ev == "toggle-picture-in-picture") {

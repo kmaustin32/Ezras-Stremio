@@ -12,7 +12,7 @@ on:
         required: true
         type: string
       release_version:
-        description: Release version, such as 1.1.0 (without v)
+        description: Release version, such as 1.2.0 (without v)
         required: true
         type: string
 

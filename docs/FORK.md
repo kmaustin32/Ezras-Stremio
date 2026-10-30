@@ -8,7 +8,7 @@ D3D11 playback. Use Windows 10/11 x64.
 
 ## Install and use
 
-Download `Ezras-Stremio-1.1.0-x64.exe` from this fork's release. The installer
+Download `Ezras-Stremio-1.2.0-x64.exe` from this fork's release. The installer
 installs WebView2 when needed. The `.zip` is portable but requires the system
 WebView2 runtime. Extract the ZIP into its own directory and run `stremio.exe`.
 Use the installer whose filename starts with `Ezras-Stremio`; **BUILD-ONLY** downloads are
@@ -281,3 +281,11 @@ to the manual **Publish tested Windows build** workflow. A maintainer must
 create the matching lightweight version tag at that tested SHA first. The
 publisher checks the run, tag, file names and checksums before uploading those
 exact artifacts. It no longer needs a publisher-only source commit.
+
+## Theme and settings appearance (1.2.0)
+
+The tray's **Use Dark Theme** setting (`[General] UseDarkTheme`) now also controls the hosted app palette. When enabled, the app background uses `#292D3E` and player toolbar/episode-button icons use `#858B99`. Turning it off restores the hosted UI's original background and icon colors. The shell supplies its saved state on startup, answers `get-theme`, and sends `theme-changed` when toggled, including after navigation/reload. This does not follow the operating system's color preference or change the user's setting.
+
+The playback seek bar and handle use `#7272c2` in both modes. Styling is scoped to the seek bar so volume boost gradients, subtitles, video and warning colors retain their existing behavior. Settings dropdowns share rounded corners, purple borders, dark surfaces and keyboard focus outlines with the animation selector. Existing community React controls and their selection handlers remain intact.
+
+Theme styles live in `src/webview/fork-player.js`; shell notifications are in `src/ui/mainwindow.cpp`. `tests/theme.test.js` uses the live community CSS and Multiselect component to check theme toggling, color boundaries, clicks, keyboard selection, multiple selection and narrow layouts.
