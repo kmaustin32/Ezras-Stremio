@@ -99,8 +99,8 @@ jobs:
           python tests/branding_package.py --exe dist/win-x64/stremio.exe --original .build-cache/upstream/stremio.exe --installer 'utils/Stremio 5.0.22-x64.exe'
           if ($LASTEXITCODE) { throw 'Packaged application branding verification failed' }
           New-Item -ItemType Directory -Force out | Out-Null
-          Copy-Item 'utils/Stremio 5.0.22-x64.exe' out/Ezras-Stremio-1.2.0-x64.exe
-          Compress-Archive -Path dist/win-x64/* -DestinationPath out/Ezras-Stremio-1.2.0-x64.zip
+          Copy-Item 'utils/Stremio 5.0.22-x64.exe' out/Ezras-Stremio-1.3.0-x64.exe
+          Compress-Archive -Path dist/win-x64/* -DestinationPath out/Ezras-Stremio-1.3.0-x64.zip
           Copy-Item images/stremio2.png out/stremio-icon.png
           Get-ChildItem out -File | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)" } | Set-Content out/SHA256SUMS.txt
       - uses: actions/upload-artifact@v7
@@ -165,4 +165,4 @@ jobs:
           for file in dependency-files/*.exe; do
             mv -- "$file" "${file%/*}/BUILD-ONLY-${file##*/}"
           done
-          gh release create "$GITHUB_REF_NAME" --title "Ezra's Stremio 1.2.0" --notes-file docs/RELEASE-mpv.md release-files/* dependency-files/*
+          gh release create "$GITHUB_REF_NAME" --title "Ezra's Stremio 1.3.0" --notes-file docs/RELEASE-mpv.md release-files/* dependency-files/*

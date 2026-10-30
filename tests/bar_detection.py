@@ -156,7 +156,10 @@ def main():
                 user32.SetWindowPos(hwnd, None, -32000, -32000, *size, 0)
                 pump(1)
                 picture = output / f'seam-{clip}-{size[0]}.png'
-                command('screenshot-to-file', picture, 'window')
+                def resized_frame_ready():
+                    command('screenshot-to-file', picture, 'window')
+                    return read_png(picture)[:2] == size
+                wait(resized_frame_ready, f'Screenshot must reflect the resized host {size}', timeout=10)
                 width, height, pixel = read_png(picture)
                 assert (width, height) == size, 'Screenshot must reflect the resized host'
                 minimum = min(
@@ -203,10 +206,14 @@ def main():
         assert str(shader) in prop('glsl-shaders'), 'Preserve active shaders'
         command('vf', 'remove', '@unrelated')
         setprop('border-background', 'blur')
-        pump(0.3)
         picture = output / 'encoded-bars-blurred.png'
-        command('screenshot-to-file', picture, 'window')
-        assert max(read_png(picture)[2](25, 225)) > 30, 'Blur must fill the newly exposed border'
+        def blur_fills_border():
+            command('screenshot-to-file', picture, 'window')
+            return max(read_png(picture)[2](25, 225)) > 30
+        # Accepting a property change does not mean gpu-next has presented it.
+        # Wait for the actual pixels, keeping the same border-color assertion
+        # and a bounded deadline so a persistent rendering failure still fails.
+        wait(blur_fills_border, 'Blur must fill the newly exposed border', timeout=5)
         load('ten-bit')
         detect()
         assert state() == 'locked' and prop('video-crop') == '320x178+0+31', prop('video-crop')

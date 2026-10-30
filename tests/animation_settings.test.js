@@ -8,7 +8,7 @@ const executablePath = [process.env.STREMIO_TEST_BROWSER,
     'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
     'C:/Program Files/Microsoft/Edge/Application/msedge.exe'].find(file => file && fs.existsSync(file));
 let assets;
-async function setup(saved) {
+async function setup(saved, savedTimeout, useClock = false) {
     if (!assets) assets = (async () => {
         const home = await fetch('https://stremio.zarg.me/'); assert.ok(home.ok);
         const url = (await home.text()).match(/href="([^"\s]+\/styles\/main\.css)"/)[1];
@@ -31,11 +31,13 @@ async function setup(saved) {
     await page.emulateMedia({reducedMotion: 'no-preference'});
     await page.route('https://stremio.zarg.me/**', route => route.fulfill({body: html, contentType: 'text/html'}));
     await page.goto('https://stremio.zarg.me/#/settings');
-    await page.evaluate(({key, saved}) => {
+    if (useClock) await page.clock.install();
+    await page.evaluate(({key, saved, savedTimeout}) => {
         localStorage.setItem('localProfile', '{"maxVolume":"200","unchanged":"keep"}');
         localStorage.setItem('profile', '{"test":"untouched"}');
         if (saved !== undefined) localStorage.setItem(key, saved);
-    }, {key, saved});
+        if (savedTimeout !== undefined) localStorage.setItem('stremio-fork-control-timeout', savedTimeout);
+    }, {key, saved, savedTimeout});
     const errors = []; page.on('pageerror', error => errors.push(error.message));
     const boot = async () => {
         await page.evaluate(() => {
@@ -165,4 +167,77 @@ test('Invalid or unavailable storage falls back safely; Off cancels a running sl
         assert.equal(await select.inputValue(), '0.25');
         assert.deepEqual(errors, []);
     } finally { await browser.close(); }
+});
+
+
+test('Paused control timeout offers every choice after animation speed, honors the delay and Never hide, and preserves playing behavior', async () => {
+    const {browser,page,select,show,overlay,errors}=await setup(undefined,undefined,true);
+    const timeout=page.getByLabel('Control player timeout',{exact:true});
+    try {
+        assert.equal(await timeout.inputValue(),'1');
+        assert.deepEqual(await timeout.locator('option').allTextContents(),['0.5 sec','1 sec (default)','2 sec','5 sec','Never hide']);
+        assert.ok(await timeout.evaluate(el=>Boolean(document.getElementById('stremio-fork-animation-duration').compareDocumentPosition(el)&Node.DOCUMENT_POSITION_FOLLOWING)));
+        await select.selectOption('0');
+        await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+1000));
+        for (const value of ['0.5','1','2','5']) {
+            await timeout.selectOption(value);
+            await show(true);
+            await page.evaluate(()=>{window.native('display-mode-changed',{mode:'fit',active:true});window.native('mpv-prop-change',{name:'pause',data:true});});
+            await page.clock.runFor(32);
+            await page.clock.runFor(Number(value)*1000-60);
+            assert.equal(await page.locator('#player').getAttribute('data-stremio-paused-controls'),'visible',`Does not hide early for ${value}s`);
+            await page.clock.runFor(80);
+            assert.equal(await page.locator('#player').getAttribute('data-stremio-paused-controls'),'hidden',`Hides at ${value}s`);
+            await page.mouse.move(300,300);
+            assert.equal(await page.locator('#player').getAttribute('data-stremio-paused-controls'),'visible','Mouse motion resets the timeout');
+            await page.evaluate(()=>window.native('display-mode-changed',{mode:'fit',active:false}));
+            await page.clock.runFor(32); await show(false);
+        }
+        await timeout.selectOption('never'); await show(true);
+        await page.evaluate(()=>{window.native('display-mode-changed',{mode:'fit',active:true});window.native('mpv-prop-change',{name:'pause',data:true});});
+        await page.clock.runFor(60000);
+        assert.equal(await page.locator('#player').getAttribute('data-stremio-paused-controls'),'visible');
+        await page.evaluate(()=>window.native('mpv-prop-change',{name:'pause',data:false}));
+        await page.clock.runFor(32);
+        assert.equal(await page.locator('#player').getAttribute('data-stremio-paused-controls'),null,'Playing behavior remains owned by the community player');
+        await overlay(true); await page.clock.runFor(32);
+        assert.equal(await page.locator('#bottom').isVisible(),false,'Never hide is scoped to paused controls');
+        assert.deepEqual(await page.evaluate(()=>window.messages.filter(m=>m.args[0]==='mpv-command')),[]);
+        assert.deepEqual(errors,[]);
+    } finally {await browser.close();}
+});
+
+test('Control timeout persists through reload, synchronizes another window, falls back safely and reports unavailable storage',async()=>{
+    const {browser,page,boot,show,errors}=await setup(undefined,'invalid');
+    const timeout=page.getByLabel('Control player timeout',{exact:true});
+    const timeoutKey='stremio-fork-control-timeout';
+    try {
+        assert.equal(await timeout.inputValue(),'1');
+        await timeout.selectOption('2');
+        await page.reload();await boot();
+        assert.equal(await timeout.inputValue(),'2');
+        assert.deepEqual(await page.evaluate(()=>[localStorage.getItem('localProfile'),localStorage.getItem('profile')]),['{"maxVolume":"200","unchanged":"keep"}','{"test":"untouched"}']);
+        await show(true);
+        await page.evaluate(()=>{window.native('display-mode-changed',{mode:'fit',active:true});window.native('mpv-prop-change',{name:'pause',data:true});});
+        await page.waitForFunction(()=>document.getElementById('player').getAttribute('data-stremio-paused-controls')==='hidden');
+        const other=await page.context().newPage();
+        await other.route('https://stremio.zarg.me/**',route=>route.fulfill({body:'<html></html>',contentType:'text/html'}));
+        await other.goto('https://stremio.zarg.me/#/timeout-preference-test');
+        await other.evaluate(key=>localStorage.setItem(key,'never'),timeoutKey);
+        await page.waitForFunction(()=>document.getElementById('stremio-fork-control-timeout').value==='never');
+        assert.equal(await page.locator('#player').getAttribute('data-stremio-paused-controls'),'visible','Never hide reveals an already hidden paused toolbar');
+        await other.evaluate(key=>localStorage.removeItem(key),timeoutKey);
+        await page.waitForFunction(()=>document.getElementById('stremio-fork-control-timeout').value==='1');
+        await other.close();
+        await page.evaluate(()=>window.native('display-mode-changed',{mode:'fit',active:false}));
+        await show(false);
+        await page.evaluate(key=>{
+            const write=Storage.prototype.setItem;
+            Storage.prototype.setItem=function(name,value){if(name===key)throw new DOMException('Unavailable','QuotaExceededError');return write.call(this,name,value);};
+        },timeoutKey);
+        await timeout.selectOption('5');
+        await page.waitForFunction(()=>document.getElementById('stremio-fork-timeout-status').textContent.includes('Applied for this session'));
+        assert.equal(await timeout.inputValue(),'5');
+        assert.deepEqual(errors,[]);
+    }finally{await browser.close();}
 });
