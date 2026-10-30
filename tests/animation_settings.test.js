@@ -95,13 +95,13 @@ test('Player animation setting offers every requested speed, changes real transi
             window.pausedSlideDuration = null;
             const player = document.getElementById('player');
             const observer = new MutationObserver(() => {
-                if (player.getAttribute('data-stremio-paused-controls') !== 'hidden') return;
+                if (player.getAttribute('data-stremio-controls') !== 'hidden') return;
                 const slide = document.getElementById('top').getAnimations().find(animation => animation.transitionProperty === 'transform');
                 slide?.pause();
                 window.pausedSlideDuration = slide?.effect.getTiming().duration;
                 observer.disconnect();
             });
-            observer.observe(player, {attributes:true, attributeFilter:['data-stremio-paused-controls']});
+            observer.observe(player, {attributes:true, attributeFilter:['data-stremio-controls']});
             window.native('mpv-prop-change', {name: 'pause', data: true});
         });
         await page.waitForFunction(() => window.pausedSlideDuration != null);
@@ -170,7 +170,7 @@ test('Invalid or unavailable storage falls back safely; Off cancels a running sl
 });
 
 
-test('Paused control timeout offers every choice after animation speed, honors the delay and Never hide, and preserves playing behavior', async () => {
+test('Control timeout honors every choice during playing and paused playback after mouse and keyboard activity', async () => {
     const {browser,page,select,show,overlay,errors}=await setup(undefined,undefined,true);
     const timeout=page.getByLabel('Control player timeout',{exact:true});
     try {
@@ -179,29 +179,47 @@ test('Paused control timeout offers every choice after animation speed, honors t
         assert.ok(await timeout.evaluate(el=>Boolean(document.getElementById('stremio-fork-animation-duration').compareDocumentPosition(el)&Node.DOCUMENT_POSITION_FOLLOWING)));
         await select.selectOption('0');
         await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+1000));
-        for (const value of ['0.5','1','2','5']) {
+        for (const paused of [false,true]) for (const value of ['0.5','1','2','5']) {
             await timeout.selectOption(value);
             await show(true);
-            await page.evaluate(()=>{window.native('display-mode-changed',{mode:'fit',active:true});window.native('mpv-prop-change',{name:'pause',data:true});});
+            await page.evaluate(paused=>{window.native('display-mode-changed',{mode:'fit',active:true});window.native('mpv-prop-change',{name:'pause',data:paused});},paused);
             await page.clock.runFor(32);
+            await overlay(true);
             await page.clock.runFor(Number(value)*1000-60);
-            assert.equal(await page.locator('#player').getAttribute('data-stremio-paused-controls'),'visible',`Does not hide early for ${value}s`);
+            assert.equal(await page.locator('#player').getAttribute('data-stremio-controls'),'visible',`Does not hide early for ${value}s`);
             await page.clock.runFor(80);
-            assert.equal(await page.locator('#player').getAttribute('data-stremio-paused-controls'),'hidden',`Hides at ${value}s`);
+            assert.equal(await page.locator('#player').getAttribute('data-stremio-controls'),'hidden',`Hides at ${value}s`);
             await page.mouse.move(300,300);
-            assert.equal(await page.locator('#player').getAttribute('data-stremio-paused-controls'),'visible','Mouse motion resets the timeout');
+            assert.equal(await page.locator('#player').getAttribute('data-stremio-controls'),'visible','Mouse motion resets the timeout');
+            await page.clock.runFor(Number(value)*1000+32);
+            assert.equal(await page.locator('#player').getAttribute('data-stremio-controls'),'hidden','Mouse inactivity uses the selected delay');
+            await page.evaluate(()=>document.activeElement.blur());
+            await page.keyboard.press('k');
+            assert.equal(await page.locator('#player').getAttribute('data-stremio-controls'),'visible','Keyboard activity restarts the same delay');
+            await page.clock.runFor(Number(value)*1000-40);
+            assert.equal(await page.locator('#player').getAttribute('data-stremio-controls'),'visible');
+            await page.clock.runFor(80);
+            assert.equal(await page.locator('#player').getAttribute('data-stremio-controls'),'hidden');
+            for (const type of ['wheel','pointermove']) {
+                await page.locator('#player').evaluate((el,type)=>el.dispatchEvent(type==='wheel'?new WheelEvent(type,{bubbles:true}):new PointerEvent(type,{pointerType:'touch',bubbles:true})),type);
+                assert.equal(await page.locator('#player').getAttribute('data-stremio-controls'),'visible',type+' wakes controls');
+                await page.clock.runFor(Number(value)*1000+32);
+                assert.equal(await page.locator('#player').getAttribute('data-stremio-controls'),'hidden',type+' follows the selected timeout');
+            }
             await page.evaluate(()=>window.native('display-mode-changed',{mode:'fit',active:false}));
-            await page.clock.runFor(32); await show(false);
+            await page.clock.runFor(32); await overlay(false); await show(false);
         }
         await timeout.selectOption('never'); await show(true);
         await page.evaluate(()=>{window.native('display-mode-changed',{mode:'fit',active:true});window.native('mpv-prop-change',{name:'pause',data:true});});
         await page.clock.runFor(60000);
-        assert.equal(await page.locator('#player').getAttribute('data-stremio-paused-controls'),'visible');
+        assert.equal(await page.locator('#player').getAttribute('data-stremio-controls'),'visible');
         await page.evaluate(()=>window.native('mpv-prop-change',{name:'pause',data:false}));
         await page.clock.runFor(32);
-        assert.equal(await page.locator('#player').getAttribute('data-stremio-paused-controls'),null,'Playing behavior remains owned by the community player');
-        await overlay(true); await page.clock.runFor(32);
-        assert.equal(await page.locator('#bottom').isVisible(),false,'Never hide is scoped to paused controls');
+        assert.equal(await page.locator('#player').getAttribute('data-stremio-controls'),'visible','Never hide also applies while playing');
+        await overlay(true); await page.mouse.move(1,1); await page.clock.runFor(60000);
+        assert.equal(await page.locator('#bottom').isVisible(),true,'Upstream hide and mouse leave cannot override Never hide');
+        assert.equal(await page.locator('#bottom').evaluate(el=>getComputedStyle(el).pointerEvents),'auto');
+        assert.equal(await page.locator('#player').evaluate(el=>getComputedStyle(el).cursor),'auto');
         assert.deepEqual(await page.evaluate(()=>window.messages.filter(m=>m.args[0]==='mpv-command')),[]);
         assert.deepEqual(errors,[]);
     } finally {await browser.close();}
@@ -219,13 +237,13 @@ test('Control timeout persists through reload, synchronizes another window, fall
         assert.deepEqual(await page.evaluate(()=>[localStorage.getItem('localProfile'),localStorage.getItem('profile')]),['{"maxVolume":"200","unchanged":"keep"}','{"test":"untouched"}']);
         await show(true);
         await page.evaluate(()=>{window.native('display-mode-changed',{mode:'fit',active:true});window.native('mpv-prop-change',{name:'pause',data:true});});
-        await page.waitForFunction(()=>document.getElementById('player').getAttribute('data-stremio-paused-controls')==='hidden');
+        await page.waitForFunction(()=>document.getElementById('player').getAttribute('data-stremio-controls')==='hidden');
         const other=await page.context().newPage();
         await other.route('https://stremio.zarg.me/**',route=>route.fulfill({body:'<html></html>',contentType:'text/html'}));
         await other.goto('https://stremio.zarg.me/#/timeout-preference-test');
         await other.evaluate(key=>localStorage.setItem(key,'never'),timeoutKey);
         await page.waitForFunction(()=>document.getElementById('stremio-fork-control-timeout').value==='never');
-        assert.equal(await page.locator('#player').getAttribute('data-stremio-paused-controls'),'visible','Never hide reveals an already hidden paused toolbar');
+        assert.equal(await page.locator('#player').getAttribute('data-stremio-controls'),'visible','Never hide reveals an already hidden paused toolbar');
         await other.evaluate(key=>localStorage.removeItem(key),timeoutKey);
         await page.waitForFunction(()=>document.getElementById('stremio-fork-control-timeout').value==='1');
         await other.close();
