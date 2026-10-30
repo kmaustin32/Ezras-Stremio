@@ -41,6 +41,7 @@ async function setup(dark = true, currentDark = dark) {
     const [bundle, css] = await assets;
     const browser = await chromium.launch({executablePath, headless: true});
     const page = await browser.newPage({viewport: {width: 1280, height: 800}});
+    try {
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.route('https://stremio.zarg.me/**', route => route.fulfill({contentType:'text/html',body:`<html><head><style>${css}</style></head><body><div id="app"></div></body></html>`}));
     await page.addInitScript(({dark, currentDark}) => {
@@ -58,11 +59,33 @@ async function setup(dark = true, currentDark = dark) {
     await page.evaluate(() => {
         const req=window.req, React=req(30758), ReactDOM=req(99576);
         const find=term=>Object.values(window.modules).find(fn=>fn.toString().includes(term));
-        const load=factory=>{const m={exports:{}};factory(m,m.exports,req);return m.exports;};
+        const load=(factory,overrides={})=>{
+            const m={exports:{}};
+            const custom=Object.assign(id=>Object.hasOwn(overrides,id)?overrides[id]:req(id),req);
+            factory(m,m.exports,custom);return m.exports;
+        };
+        const dependency=(factory,property)=>{
+            const source=factory.toString();
+            const direct=source.match(new RegExp(`a\\((\\d+)\\)\\.${property}`));
+            if(direct)return Number(direct[1]);
+            for(const match of source.matchAll(/([\w$]+)=a\((\d+)\)/g))
+                if(source.includes(`${match[1]}.${property}`))return Number(match[2]);
+            throw Error('Missing live dependency: '+property);
+        };
+        const sliderFactory=Object.values(window.modules).find(fn=>fn.toString().includes('active-slider-within')&&fn.toString().includes('getBoundingClientRect'));
+        const RealSlider=load(sliderFactory,{
+            [dependency(sliderFactory,'useRouteFocused')]:{useRouteFocused:()=>true},
+            [dependency(sliderFactory,'useServices')]:{useServices:()=>({shell:{active:false}})}
+        });
+        const seekFactory=Object.values(window.modules).find(fn=>fn.toString().includes('a(75166)')&&fn.toString().includes('onSeekRequested'));
+        const RealSeekBar=load(seekFactory,{
+            [dependency(seekFactory,'useRouteFocused')]:{useRouteFocused:()=>true},
+            [dependency(seekFactory,'Button')]:{Button:req(dependency(seekFactory,'Button')).Button,Slider:RealSlider}
+        });
+        const loading=load(find('"addons-loading-bar":"addons-loading-bar-'));
         const Multiselect=load(Object.values(window.modules).find(fn=>fn.toString().includes('a(48221)') && fn.toString().includes('multiSelect')));
         const settings=load(find('"multiselect-container":"multiselect-container-'));
         const controls=load(find('"seek-bar":"seek-bar-'));
-        const seek=load(find('"seek-bar-container":"seek-bar-container-'));
         const slider=load(find('"track-after":"track-after-'));
         const player=load(find('"nav-bar-layer":"nav-bar-layer-'));
         const nav=load(find('"vertical-nav-bar-container":"vertical-nav-bar-container-'));
@@ -83,25 +106,32 @@ async function setup(dark = true, currentDark = dark) {
             return h(React.Fragment,null,
                 h('nav',{className:nav['vertical-nav-bar-container']},...['Library','Calendar','Discover'].map((text,index)=>h('button',{id:'nav-'+index,className:tab['nav-tab-button-container']+(index===0?' selected':'')},h(Icon,{className:tab.icon,name:'play'}),h('span',{className:tab.label},text)))),
                 h('div',{className:episode['video-container']},h('div',{className:episode['thumbnail-container']},h('div',{className:episode['progress-bar-container']},h('div',{id:'episode-progress',className:episode['progress-bar'],style:{width:'37%'}},null)))),
+                h('div',{id:'addon-loading',className:loading['streams-list-container']},h('div',{className:loading['addons-loading-container']},h('div',{id:'addon-loading-label',className:loading['addons-loading']},'1 addons are still loading'),h('div',{id:'addon-loading-bar',className:loading['addons-loading-bar']}))),
                 h('div',{className:stream['stream-container']},h('div',{className:stream['info-container']},h('div',{className:stream['progress-bar-container']},h('div',{id:'stream-progress',className:stream['progress-bar'],style:{width:'37%'}},null)))),
                 h('div',{id:'settings',className:settings['settings-container'],style:{height:650}},h('div',{className:settings['settings-content']},
                     h('div',{className:settings['side-menu-container']},h('button',{'data-section':'player'},'Player')),
                     h('div',{className:settings['sections-container']},h('div',{className:settings['section-container']},h('div',{className:settings['section-title']},'Player'),row('Audio language'),row('Subtitle languages',{multiSelect:true,selected:multi,onSelect:e=>{window.multi=e.value;setMulti([...new Set([...multi,e.value])]);}}))))),
                 h('div',{id:'player',className:player['player-container'],style:{position:'relative',height:150}},
-                    h('nav',{className:player['nav-bar-layer']+' '+navbar['horizontal-nav-bar-container'],style:{height:50}},icon('top-icon','white'),h('div',{className:navbar['buttons-container']},h('button',{id:'fullscreen',title:fullscreen?'Exit fullscreen mode':'Enter fullscreen mode',className:navbar['button-container']},h(Icon,{className:navbar.icon,name:fullscreen?'minimize':'maximize'}))),h('span',{id:'stremio-fork-compatibility',style:{color:'orange'}},icon('warning','orange'))),
+                    h('nav',{className:player['nav-bar-layer']+' '+navbar['horizontal-nav-bar-container'],style:{height:50}},h('h2',{id:'episode-title',className:navbar.title},'Squid Game – Episode (3x5)'),icon('top-icon','white'),h('div',{className:navbar['buttons-container']},h('button',{id:'fullscreen',title:fullscreen?'Exit fullscreen mode':'Enter fullscreen mode',className:navbar['button-container']},h(Icon,{className:navbar.icon,name:fullscreen?'minimize':'maximize'}))),h('span',{id:'stremio-fork-compatibility',style:{color:'orange'}},icon('warning','orange'))),
                     h('div',{className:player['control-bar-layer'],style:{height:100}},icon('bottom-icon','white'),h('div',{className:controls['control-bar-buttons-menu-container']}),
-                        h('div',{id:'seek',className:controls['seek-bar']+' '+seek['seek-bar-container'],style:{height:30}},
-                            h('span',{id:'seek-time',className:seek.label},'00:32'),h('span',{id:'seek-remaining',className:seek.label},'-21:00'),
-                            h('div',{className:seek.slider+' '+slider['slider-container']},...['track','track-before','track-after','thumb'].map(name=>h('div',{id:'seek-'+name,className:slider[name],style:{width:'50%'}})))),
+                        h('div',{id:'seek'},h(RealSeekBar,{className:controls['seek-bar'],time:604000,duration:3775000,buffered:804000,onSeekRequested:value=>{window.lastSeek=value;}})),
                         h('div',{id:'volume',className:controls['volume-slider'],style:{width:100}},h('div',{id:'volume-track',className:slider.track}),h('div',{id:'volume-fill',className:slider['track-after']}),h('div',{id:'volume-thumb',className:slider.thumb}))),
                     h('div',{id:'subtitle',style:{color:'white'}},'Subtitles stay white')));
         }
         ReactDOM.createRoot(document.getElementById('app')).render(h(App));
     });
+    await page.locator('#seek [class*="seek-bar-container"]').waitFor();
+    await page.locator('#seek').evaluate(el=>{
+        const labels=el.querySelectorAll('[class*="label"]');
+        if(labels.length!==2)throw Error('Expected both live SeekBar time labels');
+        labels[0].id='seek-time';labels[1].id='seek-remaining';
+        for(const name of ['track-after','thumb']) el.querySelector(`[class*="${name}-"]`).id='seek-'+name;
+    });
     await page.addScriptTag({content:script});
     await page.getByLabel('Control animation speed',{exact:true}).waitFor();
     const color = id => page.locator('#'+id).evaluate(el=>getComputedStyle(el).color);
     return {browser,page,errors,color};
+    } catch(error) {await browser.close();throw error;}
 }
 
 test('Dark Mode follows the shell toggle, restores normal colors, and scopes seek/icon colors without tinting subtitles or volume boost',async()=>{
@@ -141,12 +171,22 @@ test('Dark Mode follows the shell toggle, restores normal colors, and scopes see
                 }));
                 assert.ok(paints.length>0 && paints.every(color=>color===expected),`${selector} paints the same color as the other controls: ${paints}`);
             }
-            for (const id of ['seek-time','seek-remaining']) assert.equal(await color(id),expected);
+            for (const id of ['seek-time','seek-remaining','episode-title']) assert.equal(await color(id),expected);
+            assert.equal(await page.locator('#addon-loading-bar').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(114, 114, 194)');
             const volumeGradient=await page.locator('#volume-fill').evaluate(el=>getComputedStyle(el).backgroundImage);
             assert.ok(volumeGradient.includes(expected),'Volume normal range matches the controls');
             assert.equal(await page.locator('#volume-track').evaluate(el=>getComputedStyle(el).backgroundImage),volumeGradient,'Unfilled and filled volume ranges use the same threshold and colors');
         };
         await checkPlayer('rgb(133, 139, 153)');
+        assert.equal(await page.locator('#seek-remaining').innerText(),'01:02:55');
+        assert.equal(await page.locator('#seek-time').innerText(),'00:10:04');
+        assert.ok(await page.locator('#seek-remaining').evaluate(el=>el.parentElement!==el.closest('[class*="seek-bar-container"]')),'Exercise the nested runtime button');
+        await page.locator('#seek-remaining').evaluate(el=>el.click());
+        // The community formatter appends the sign; its RTL label displays it first.
+        assert.equal(await page.locator('#seek-remaining').textContent(),'00:52:51-');
+        await checkPlayer('rgb(133, 139, 153)');
+        await page.locator('#seek-remaining').evaluate(el=>el.click());
+        assert.equal(await page.locator('#seek-remaining').innerText(),'01:02:55');
         // The same real icon element is updated by the community on fullscreen exit.
         await page.evaluate(()=>window.setFullscreen(true));
         await page.waitForFunction(()=>document.getElementById('fullscreen').title==='Exit fullscreen mode');
@@ -160,6 +200,10 @@ test('Dark Mode follows the shell toggle, restores normal colors, and scopes see
         assert.ok(!(await background()).includes('rgb(34, 38, 53)'));
         assert.equal(await color('top-icon'),'rgb(255, 255, 255)');
         await checkPlayer('rgb(255, 255, 255)'); await checkAccent();
+        await page.locator('#seek-remaining').evaluate(el=>el.click());
+        assert.equal(await page.locator('#seek-remaining').textContent(),'00:52:51-');
+        await checkPlayer('rgb(255, 255, 255)');
+        await page.locator('#seek-remaining').evaluate(el=>el.click());
         await page.evaluate(()=>{window.native('mpv-prop-change',{name:'volume',data:100}); window.setFullscreen(false);});
         await page.waitForFunction(()=>getComputedStyle(document.getElementById('volume-thumb')).backgroundColor==='rgb(255, 255, 255)');
         await checkPlayer('rgb(255, 255, 255)');

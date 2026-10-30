@@ -23,7 +23,7 @@
 
 ## ✨ Made for your player
 
-Everything added to this fork, from the first mpv upgrade through **1.3.0**:
+Everything added to this fork, from the first mpv upgrade through **1.3.1**:
 
 | Feature | What you get |
 | --- | --- |
@@ -41,8 +41,8 @@ Everything added to this fork, from the first mpv upgrade through **1.3.0**:
 | 🙈 **Consistent spoiler protection** | Unwatched episode thumbnails stay blurred on show pages, in the episode drawer and in the next-episode popup, including alternate images and anime using absolute episode numbers. Watched-state and setting changes update existing images. |
 | 📚 **Readable library & add-on backup** | Export a dated ZIP with an offline HTML report, CSV lists and structured JSON, preserving saved titles, add-on order/configurations and available playback history. |
 | ⚙️ **Clearer settings & shortcuts** | Long labels wrap, options have more breathing room, narrow windows stack controls, and Player Shortcuts lists every shipped input.conf binding plus the fork controls. |
-| 🌑 **A calmer Dark Mode** | Turn on **Use Dark Theme** in the tray menu for a **#222635** app background and softer **#858B99** player icons, time labels and normal volume range. Normal mode uses white player controls. Changes apply immediately; turning it off restores the original background and white player controls. |
-| 🟣 **A matching playback bar** | The seek bar and its handle, selected navigation icons, episode-thumbnail progress and playback-source progress use **#7272c2** in both modes. Volume keeps its orange-to-red boost indicator. |
+| 🌑 **A calmer Dark Mode** | Turn on **Use Dark Theme** in the tray menu for a **#222635** app background and softer **#858B99** player icons, episode title, elapsed/total/remaining time labels and normal volume range. Normal mode uses white player controls. Changes apply immediately; turning it off restores the original background and white player controls. |
+| 🟣 **A matching playback bar** | The seek bar and its handle, selected navigation icons, episode-thumbnail progress and playback-source progress and the add-on loading bar use **#7272c2** in both modes. Volume keeps its orange-to-red boost indicator. |
 | 🎛️ **Polished settings dropdowns** | All settings dropdowns share the animation selector's rounded shape, purple border, dark surface and visible keyboard focus, with the existing single- and multiple-selection behavior preserved. |
 | 💜 **A consistent purple identity** | **#7272c2** across app, desktop and tray icons, splash, installer/uninstaller, web logos, return button and default Discord branding. |
 
@@ -59,9 +59,9 @@ Everything added to this fork, from the first mpv upgrade through **1.3.0**:
 
 | Download | How to use it |
 | --- | --- |
-| 📥 [**1.3.0 installer — recommended**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.0/Ezras-Stremio-1.3.0-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
-| 💼 [**1.3.0 portable ZIP**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.0/Ezras-Stremio-1.3.0-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
-| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.0/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
+| 📥 [**1.3.1 installer — recommended**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.1/Ezras-Stremio-1.3.1-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
+| 💼 [**1.3.1 portable ZIP**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.1/Ezras-Stremio-1.3.1-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
+| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.1/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
 
 Use files named **Ezras-Stremio** for this fork. Downloads marked **BUILD-ONLY** are archived build dependencies. Community package-manager listings install the upstream edition; use this fork's releases for these features.
 

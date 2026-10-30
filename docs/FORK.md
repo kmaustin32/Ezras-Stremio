@@ -8,7 +8,7 @@ D3D11 playback. Use Windows 10/11 x64.
 
 ## Install and use
 
-Download `Ezras-Stremio-1.3.0-x64.exe` from this fork's release. The installer
+Download `Ezras-Stremio-1.3.1-x64.exe` from this fork's release. The installer
 installs WebView2 when needed. The `.zip` is portable but requires the system
 WebView2 runtime. Extract the ZIP into its own directory and run `stremio.exe`.
 Use the installer whose filename starts with `Ezras-Stremio`; **BUILD-ONLY** downloads are
@@ -283,18 +283,22 @@ create the matching lightweight version tag at that tested SHA first. The
 publisher checks the run, tag, file names and checksums before uploading those
 exact artifacts. It no longer needs a publisher-only source commit.
 
-## Theme and settings appearance (1.3.0)
+## Theme and settings appearance (1.3.1)
 
-The tray's **Use Dark Theme** setting (`[General] UseDarkTheme`) now also controls the hosted app palette. When enabled, the app background uses `#222635` and player toolbar/episode-button icons, seek time labels and the normal volume range use `#858B99`. Normal-mode controls use white. Fullscreen/Picture-in-Picture icons use the same full opacity as the other player controls. Turning it off restores the hosted UI's original background and white player controls. The shell supplies its saved state on startup, answers `get-theme`, and sends `theme-changed` when toggled, including after navigation/reload. This does not follow the operating system's color preference or change the user's setting.
+The tray's **Use Dark Theme** setting (`[General] UseDarkTheme`) now also controls the hosted app palette. When enabled, the app background uses `#222635` and player toolbar/episode-button icons, the player episode title, elapsed/total/remaining time labels and the normal volume range use `#858B99`. Normal-mode controls use white. Fullscreen/Picture-in-Picture icons use the same full opacity as the other player controls. Turning it off restores the hosted UI's original background and white player controls. The shell supplies its saved state on startup, answers `get-theme`, and sends `theme-changed` when toggled, including after navigation/reload. This does not follow the operating system's color preference or change the user's setting.
 
-The playback seek bar/handle, selected sidebar navigation icons, episode-thumbnail progress and stream-source progress bars use `#7272c2` in both modes. Styling is scoped to the seek bar so subtitles, video and warning colors retain their existing behavior. Both volume tracks use the selected player color below 100% and keep the configured orange-to-red boost range above 100%. Settings dropdowns share rounded corners, purple borders, dark surfaces and keyboard focus outlines with the animation selector. Existing community React controls and their selection handlers remain intact.
+The playback seek bar/handle, selected sidebar navigation icons, episode-thumbnail progress and stream-source progress and add-on loading bars use `#7272c2` in both modes. Styling is scoped to the seek bar so subtitles, video and warning colors retain their existing behavior. Both volume tracks use the selected player color below 100% and keep the configured orange-to-red boost range above 100%. Settings dropdowns share rounded corners, purple borders, dark surfaces and keyboard focus outlines with the animation selector. Existing community React controls and their selection handlers remain intact.
 
 Theme styles live in `src/webview/fork-player.js`; shell notifications are in `src/ui/mainwindow.cpp`. `tests/theme.test.js` uses the live community CSS and Multiselect component to check theme toggling, color boundaries, clicks, keyboard selection, multiple selection and narrow layouts.
 
-## Paused control timeout (1.3.0)
+## Paused control timeout (1.3.1)
 
 **Settings → Player → Controls → Control player timeout**, immediately after animation speed, offers **0.5 sec**, **1 sec (default)**, **2 sec**, **5 sec** and **Never hide**. This changes the existing paused-control behavior only. Playing videos retain the community player's usual timeout. Menus, keyboard focus and slider interaction continue to protect visible controls, and mouse/keyboard activity restarts the selected paused delay. Never hide keeps paused controls visible and the cursor available.
 
 The setting is saved under the separate device/origin-local key `stremio-fork-control-timeout`, without rewriting the Stremio account/profile or mpv configuration. Changes apply immediately and synchronize other windows, including revealing already-hidden controls when Never hide is selected. Invalid/unavailable reads fall back to one second; unavailable writes apply for the session and show a status message.
 
 Tests cover each delay, Never hide, normal playing behavior, preference persistence and cross-window changes. The native blur rendering assertion waits up to five seconds for the actual rendered border pixels after enabling blur, preserving the original pixel threshold instead of assuming a GPU presents the new frame within a fixed 0.3 seconds.
+
+### Player label and add-on loading colors (1.3.1)
+
+The title in the player's upper-left header and both seek-bar time displays use the same control color: white in normal mode and `#858B99` in Dark Mode. The right-hand runtime is nested inside its total/remaining toggle button, so the style covers descendant labels as well as the direct elapsed-time label. Tests render the live community SeekBar and exercise its toggle in both modes. The add-on loading bar uses `#7272C2` in both modes; its text, size and loading behavior are preserved.
