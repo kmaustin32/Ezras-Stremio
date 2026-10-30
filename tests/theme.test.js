@@ -46,6 +46,7 @@ async function setup(dark = true, currentDark = dark) {
     await page.route('https://stremio.zarg.me/**', route => route.fulfill({contentType:'text/html',body:`<html><head><style>${css}</style></head><body><div id="app"></div></body></html>`}));
     await page.addInitScript(({dark, currentDark}) => {
         window.__stremioForkDarkTheme = dark;
+        localStorage.setItem('stremio-fork-control-timeout','never');
         window.messages=[]; window.handlers=[];
         window.native=(name,data)=>window.handlers.forEach(handler=>handler({data:JSON.stringify({args:[name,data]})}));
         window.chrome={webview:{postMessage:text=>{
@@ -93,9 +94,12 @@ async function setup(dark = true, currentDark = dark) {
         const episode=load(Object.values(window.modules).find(fn=>fn.toString().includes('"video-container":"video-container-') && fn.toString().includes('progress-bar-background')));
         const stream=load(Object.values(window.modules).find(fn=>fn.toString().includes('"stream-container":"stream-container-') && fn.toString().includes('progress-bar-background')));
         const navbar=load(find('"horizontal-nav-bar-container":"horizontal-nav-bar-container-'));
+        const poster=load(find('"watched-icon-layer":"watched-icon-layer-'));
+        const VolumeIndicator=load(find('displayName="VolumeChangeIndicator"'),{27708:()=>null});
         const Icon=req(4672).default;
         const h=React.createElement;
         function App(){
+            const [popupVolume,setPopupVolume]=React.useState(100); window.setPopupVolume=setPopupVolume;
             const [selected,setSelected]=React.useState(['en']);
             const [multi,setMulti]=React.useState(['en']);
             const [fullscreen,setFullscreen]=React.useState(false); window.setFullscreen=setFullscreen;
@@ -105,7 +109,12 @@ async function setup(dark = true, currentDark = dark) {
             const icon=(id,color)=>h('svg',{id,viewBox:'0 0 24 24',style:{color,width:32,height:32}},h('path',{fill:'currentColor',d:'M4 4h16v16H4z'}));
             return h(React.Fragment,null,
                 h('nav',{className:nav['vertical-nav-bar-container']},...['Library','Calendar','Discover'].map((text,index)=>h('button',{id:'nav-'+index,className:tab['nav-tab-button-container']+(index===0?' selected':'')},h(Icon,{className:tab.icon,name:'play'}),h('span',{className:tab.label},text)))),
-                h('div',{className:episode['video-container']},h('div',{className:episode['thumbnail-container']},h('div',{className:episode['progress-bar-container']},h('div',{id:'episode-progress',className:episode['progress-bar'],style:{width:'37%'}},null)))),
+                h('div',{className:episode['video-container']},
+                    h('div',{id:'episode-flags',className:episode['upcoming-watched-container']},
+                        h('div',{id:'watched-badge',className:episode['watched-container']},h(Icon,{name:'checkmark',className:episode['flag-icon']}),h('span',{className:episode['flag-label']},'Watched')),
+                        h('div',{id:'upcoming-badge',className:episode['upcoming-container']},'Upcoming')),
+                    h('div',{className:episode['thumbnail-container']},h('div',{className:episode['progress-bar-container']},h('div',{id:'episode-progress',className:episode['progress-bar'],style:{width:'37%'}},null)))),
+                h('div',{className:poster['meta-item-container']},h('div',{className:poster['poster-container']},h('div',{id:'watched-poster',className:poster['watched-icon-layer']},h(Icon,{name:'checkmark',className:poster['watched-icon']})))),
                 h('div',{id:'addon-loading',className:loading['streams-list-container']},h('div',{className:loading['addons-loading-container']},h('div',{id:'addon-loading-label',className:loading['addons-loading']},'1 addons are still loading'),h('div',{id:'addon-loading-bar',className:loading['addons-loading-bar']}))),
                 h('div',{className:stream['stream-container']},h('div',{className:stream['info-container']},h('div',{className:stream['progress-bar-container']},h('div',{id:'stream-progress',className:stream['progress-bar'],style:{width:'37%'}},null)))),
                 h('div',{id:'settings',className:settings['settings-container'],style:{height:650}},h('div',{className:settings['settings-content']},
@@ -116,6 +125,7 @@ async function setup(dark = true, currentDark = dark) {
                     h('div',{className:player['control-bar-layer'],style:{height:100}},icon('bottom-icon','white'),h('div',{className:controls['control-bar-buttons-menu-container']}),
                         h('div',{id:'seek'},h(RealSeekBar,{className:controls['seek-bar'],time:604000,duration:3775000,buffered:804000,onSeekRequested:value=>{window.lastSeek=value;}})),
                         h('div',{id:'volume',className:controls['volume-slider'],style:{width:100}},h('div',{id:'volume-track',className:slider.track}),h('div',{id:'volume-fill',className:slider['track-after']}),h('div',{id:'volume-thumb',className:slider.thumb}))),
+                    h(VolumeIndicator,{volume:popupVolume,muted:false}),
                     h('div',{id:'subtitle',style:{color:'white'}},'Subtitles stay white')));
         }
         ReactDOM.createRoot(document.getElementById('app')).render(h(App));
@@ -259,4 +269,24 @@ test('Live settings dropdowns share animation-selector styling and preserve clic
         }
         assert.deepEqual(errors,[]);
     }finally{await browser.close();}
+});
+
+
+test('Watched badges use warm peach in both themes; the real volume-change popup speaker follows Dark Mode only',async()=>{
+    const {browser,page,errors}=await setup(false);
+    const background=id=>page.locator('#'+id).evaluate(el=>getComputedStyle(el).backgroundColor);
+    try {
+        const popup=page.locator('[class*="volume-change-indicator"] [class*="volume-icon"]');
+        for(const dark of [false,true,false]) {
+            await page.evaluate(dark=>{window.native('theme-changed',{dark});window.setPopupVolume(dark?110:105);},dark);
+            await popup.waitFor();
+            assert.equal(await popup.evaluate(el=>getComputedStyle(el).color),dark?'rgb(133, 139, 153)':'rgba(255, 255, 255, 0.9)');
+            for(const id of ['watched-badge','watched-poster']) assert.equal(await background(id),'rgb(222, 160, 102)');
+            assert.notEqual(await background('upcoming-badge'),'rgb(222, 160, 102)','Upcoming is not a watched marker');
+            assert.notEqual(await background('episode-flags'),'rgb(222, 160, 102)','Do not color the combined flags wrapper');
+            assert.equal(await page.locator('#watched-badge span').textContent(),'Watched');
+            assert.notEqual(await page.locator('#watched-badge svg').evaluate(el=>getComputedStyle(el).color),'rgb(222, 160, 102)','Keep checkmark contrast');
+        }
+        assert.deepEqual(errors,[]);
+    } finally {await browser.close();}
 });

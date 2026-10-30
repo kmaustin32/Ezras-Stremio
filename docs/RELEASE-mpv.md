@@ -1,16 +1,17 @@
-## Ezra's Stremio 1.3.1
+## Ezra's Stremio 1.3.2
 
-A small theme-completeness update for the player labels and add-on loading bar.
+A consistent player timeout and two finishing touches to the theme.
 
 ### What's new
 
-- **Matching total runtime and episode title.** The runtime on the right side of the playback seek bar, including its remaining-time toggle, and the episode title at the upper left now match the player icons: **white in normal mode** and **#858B99 in Dark Mode**.
-- **Add-on loading bar: #7272C2.** The bar shown while add-ons are still loading now matches the fork accent in both modes.
-- **Real-component regression coverage.** Theme tests render the community SeekBar rather than a simplified pair of labels, cover its nested runtime button and total/remaining toggle, and check the episode title and add-on loading bar through theme changes. Other playback, loading and control behavior stays as before.
+- **One timeout during playback and pause.** Settings → Player → Controls → Control player timeout governs mouse and keyboard activity in both states: 0.5 sec, **1 sec by default**, 2 sec, 5 sec or Never hide. The community overlay cannot override the selected delay. Menus, keyboard focus and slider drags keep controls usable; pause/resume wakes them smoothly, and new videos start with visible controls.
+- **Warm watched markers: #DEA066.** Completed-episode badges and library watched markers use the new color in both modes. Checkmarks/text retain their contrast and upcoming indicators retain their existing color.
+- **Matching volume popup.** The speaker shown when changing volume uses **#858B99 in Dark Mode**, retaining white in normal mode. Volume and popup timing are unchanged.
+- **Regression coverage.** Every timeout is checked while playing and paused, after mouse and keyboard activity, with Never hide against upstream visibility changes, protected interactions, lifecycle and animation. Theme checks use the actual community volume popup and watched-marker styles.
 
 ### Existing control preferences
 
-The animation-speed setting still offers Off, 0.25 sec, 0.5 sec (default), 0.75 sec and 1 sec. It remains independent of the paused idle timeout, and system reduced-motion preferences take priority. Settings dropdowns keep their rounded style and keyboard focus outlines.
+Animation speed remains independent of the idle timeout: Off, 0.25 sec, 0.5 sec (default), 0.75 sec or 1 sec. System reduced-motion preferences take priority. Settings dropdowns keep their rounded style and keyboard focus outlines. Saved timeout and animation preferences carry over.
 
 ### Everything from the fork, in one stable release
 
@@ -31,9 +32,9 @@ The redesigned [README](../README.md) covers these features, installation, short
 
 ### Downloads
 
-- [Windows x64 installer](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.1/Ezras-Stremio-1.3.1-x64.exe)
-- [Portable Windows x64 ZIP](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.1/Ezras-Stremio-1.3.1-x64.zip)
-- [SHA256 checksums](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.1/SHA256SUMS.txt)
+- [Windows x64 installer](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.2/Ezras-Stremio-1.3.2-x64.exe)
+- [Portable Windows x64 ZIP](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.2/Ezras-Stremio-1.3.2-x64.zip)
+- [SHA256 checksums](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.2/SHA256SUMS.txt)
 
 Use Windows 10/11 x64. The installer sets up WebView2 when needed; the portable ZIP needs the system WebView2 Runtime. When upgrading, retain your configuration to keep custom mpv.conf, input.conf and other scripts. The fork's own black-bar script is updated. The original shell version and installation/profile paths are retained for upgrade compatibility.
 

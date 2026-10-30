@@ -42,10 +42,10 @@ async function setup() {
     await page.evaluate(() => window.activeVideo(true));
     const player = page.locator('#player');
     const wait = async (state, settled = true) => {
-        await page.waitForFunction(state => document.querySelector('#player')?.getAttribute('data-stremio-paused-controls') === state, state);
+        await page.waitForFunction(state => document.querySelector('#player')?.getAttribute('data-stremio-controls') === state, state);
         if (state === 'hidden') await page.locator('#bottom').waitFor({state: 'hidden'});
         if (state === 'visible' && settled) await page.waitForFunction(() =>
-            document.getElementById('player').getAttribute('data-stremio-paused-controls') === 'visible' &&
+            document.getElementById('player').getAttribute('data-stremio-controls') === 'visible' &&
             ['top', 'bottom'].every(id => {
                 const el = document.getElementById(id);
                 return Math.abs(new DOMMatrixReadOnly(getComputedStyle(el).transform).m42) < 0.1 &&
@@ -111,8 +111,8 @@ test('Pause hides all player chrome after one second, mouse motion restores it, 
         await page.screenshot({path: output + '/paused-frame-controls.png'});
         await wait('hidden');
         await page.evaluate(() => window.pauseState(false));
-        await page.waitForFunction(() => !document.querySelector('#player').hasAttribute('data-stremio-paused-controls'));
-        assert.ok(await page.locator('#bottom').isVisible(), 'Normal playing behavior restored');
+        await wait('visible');
+        await wait('hidden');
         assert.deepEqual(errors, []);
     } finally { await browser.close(); }
 });
@@ -126,7 +126,7 @@ test('Open menus, buffering/errors, pointer drags and keyboard focus protect con
         for (const layer of ['menu-layer', 'side-drawer-layer', 'buffering-layer', 'error-layer']) {
             await addLayer('popup', layer);
             await page.waitForTimeout(1100);
-            assert.equal(await page.locator('#player').getAttribute('data-stremio-paused-controls'), 'visible', layer + ' remains usable');
+            assert.equal(await page.locator('#player').getAttribute('data-stremio-controls'), 'visible', layer + ' remains usable');
             await page.locator('#popup').evaluate(el => el.remove());
             await wait('hidden');
             await page.mouse.move(mouseX++, 350);
@@ -135,13 +135,13 @@ test('Open menus, buffering/errors, pointer drags and keyboard focus protect con
         await page.locator('#seek').hover();
         await page.mouse.down();
         await page.waitForTimeout(1100);
-        assert.equal(await page.locator('#player').getAttribute('data-stremio-paused-controls'), 'visible', 'Do not hide during a drag');
+        assert.equal(await page.locator('#player').getAttribute('data-stremio-controls'), 'visible', 'Do not hide during a drag');
         await page.mouse.up();
         await wait('hidden');
         await page.keyboard.press('Tab');
         await page.locator('#fullscreen').focus();
         await page.waitForTimeout(1100);
-        assert.equal(await page.locator('#player').getAttribute('data-stremio-paused-controls'), 'visible', 'Keyboard focus remains accessible');
+        assert.equal(await page.locator('#player').getAttribute('data-stremio-controls'), 'visible', 'Keyboard focus remains accessible');
         await page.locator('#fullscreen').evaluate(el => el.blur());
         await wait('hidden');
         // A mouse click may leave focus on the pause button; it must still hide.
@@ -149,7 +149,7 @@ test('Open menus, buffering/errors, pointer drags and keyboard focus protect con
         await page.locator('#pause').click();
         await wait('hidden');
         await page.waitForTimeout(1100);
-        assert.equal(await page.locator('#player').getAttribute('data-stremio-paused-controls'), 'hidden', 'No focus-out flicker loop');
+        assert.equal(await page.locator('#player').getAttribute('data-stremio-controls'), 'hidden', 'No focus-out flicker loop');
         assert.deepEqual(errors, []);
     } finally { await browser.close(); }
 });
@@ -157,24 +157,23 @@ test('Open menus, buffering/errors, pointer drags and keyboard focus protect con
 test('Playback, navigation, new videos and repeated bootstrap cannot leave hidden or stale controls', async () => {
     const {browser, page, wait, body, errors} = await setup();
     try {
-        await page.waitForTimeout(1100);
-        assert.equal(await page.locator('#player').getAttribute('data-stremio-paused-controls'), null, 'Playing state is untouched');
+        await wait('hidden');
         await page.evaluate(() => window.pauseState(true));
         await wait('visible');
         await page.evaluate(() => window.activeVideo(false));
         await page.waitForTimeout(1100);
-        assert.equal(await page.locator('#player').getAttribute('data-stremio-paused-controls'), null, 'No hiding after video ends');
+        assert.equal(await page.locator('#player').getAttribute('data-stremio-controls'), null, 'No hiding after video ends');
         await page.evaluate(() => document.body.replaceChildren());
         await page.waitForTimeout(1100);
         await page.evaluate(body => document.body.innerHTML = body, body);
         await page.evaluate(() => {window.pauseState(false); window.activeVideo(true);});
-        await page.waitForTimeout(1100);
-        assert.equal(await page.locator('#player').getAttribute('data-stremio-paused-controls'), null, 'New video does not inherit hidden controls');
+        await wait('visible');
+        await wait('hidden');
         const before = await page.evaluate(() => window.handlers.length);
         await page.addScriptTag({content: source});
         assert.equal(await page.evaluate(() => window.handlers.length), before);
         await page.evaluate(() => window.pauseState('bad'));
-        assert.equal(await page.locator('#player').getAttribute('data-stremio-paused-controls'), null);
+        assert.equal(await page.locator('#player').getAttribute('data-stremio-controls'), 'hidden');
         assert.deepEqual(errors, []);
     } finally { await browser.close(); }
 });
@@ -188,7 +187,7 @@ test('Half-second slides move top and bottom controls off opposite edges and rev
             const frame = await page.locator('#frame').boundingBox();
             const drawerTransform = await page.locator('#drawer-button').evaluate(el => getComputedStyle(el).transform);
             await page.evaluate(() => window.pauseState(true));
-            await page.waitForFunction(() => document.querySelector('#player').getAttribute('data-stremio-paused-controls') === 'hidden');
+            await page.waitForFunction(() => document.querySelector('#player').getAttribute('data-stremio-controls') === 'hidden');
             // Freeze real CSS transitions halfway through, rather than relying
             // on a wall-clock screenshot landing on one particular frame.
             const halfway = await sampleSlides(page);
@@ -221,7 +220,7 @@ test('Half-second slides move top and bottom controls off opposite edges and rev
             assert.deepEqual(await page.locator('#frame').boundingBox(), frame, 'Video geometry remains fixed');
             assert.equal(await page.locator('#drawer-button').evaluate(el => getComputedStyle(el).transform), drawerTransform, 'Preserve the episode button positioning');
             await page.evaluate(() => window.pauseState(false));
-            await page.waitForFunction(() => !document.getElementById('player').hasAttribute('data-stremio-paused-controls'));
+            await wait('visible');
         }
         assert.deepEqual(errors, []);
     } finally { await browser.close(); }
@@ -245,18 +244,18 @@ test('Reduced motion hides paused controls without animation and mouse movement 
     } finally { await browser.close(); }
 });
 
-test('Playing controls slide on every upstream visibility change, reverse on mouse movement, and protect active sliders', async () => {
-    const {browser, page, player, name, errors} = await setup();
+test('Playing controls follow the selected timeout, ignore upstream hiding, reverse on mouse movement, and protect active sliders', async () => {
+    const {browser, page, player, wait, name, errors} = await setup();
     const overlay = hidden => player.evaluate((el, {hidden, className}) => el.classList.toggle(className, hidden), {hidden, className: name('overlayHidden')});
     try {
         await page.emulateMedia({reducedMotion: 'no-preference'});
-        // Match the hosted player's mouse-move visibility update. Its existing
-        // debounce owns the playing-video timing; the fork only supplies CSS.
+        // Upstream mouse updates must not replace the configured timer.
         await player.evaluate((el, className) => el.addEventListener('mousemove', () => el.classList.remove(className)), name('overlayHidden'));
         await waitForEntry(page);
         const frame = await page.locator('#frame').boundingBox();
         for (let cycle = 0; cycle < 3; cycle++) {
             await overlay(true);
+            await page.waitForFunction(() => document.getElementById('player').getAttribute('data-stremio-controls') === 'hidden');
             const exiting = await sampleSlides(page);
             assert.ok(exiting[0].y < 0 && exiting[1].y > 0);
             for (const control of exiting) assert.equal(control.duration, 500);
@@ -274,41 +273,36 @@ test('Playing controls slide on every upstream visibility change, reverse on mou
         assert.ok(await page.locator('#bottom').isVisible(), 'The upstream active-slider exception wins over overlayHidden');
         await page.evaluate(() => document.documentElement.classList.remove('active-slider-within-fixture'));
         await page.locator('#bottom').waitFor({state: 'hidden'});
-        assert.equal(await player.getAttribute('data-stremio-paused-controls'), null, 'No paused timer or state during playback');
+        assert.equal(await player.getAttribute('data-stremio-controls'), 'hidden', 'The same timer governs playing videos');
         assert.deepEqual(await page.locator('#frame').boundingBox(), frame);
         assert.ok(await page.locator('#subtitle').isVisible());
         await page.emulateMedia({reducedMotion: 'reduce'});
-        await overlay(false); await waitForEntry(page);
-        await overlay(true); await page.locator('#bottom').waitFor({state: 'hidden'});
+        await overlay(false); await page.mouse.move(650, 350); await waitForEntry(page);
+        await overlay(true); await wait('hidden');
         assert.equal(await page.locator('#bottom').evaluate(el => el.getAnimations().length), 0);
         assert.deepEqual(await page.evaluate(() => window.messages.filter(m => m.args[0] === 'mpv-command')), []);
         assert.deepEqual(errors, []);
     } finally { await browser.close(); }
 });
 
-test('Playing and paused visibility handoffs preserve hidden frames and animate returning controls', async () => {
+test('Pause and resume wake controls smoothly, redundant state updates do not reset inactivity', async () => {
     const {browser, page, player, wait, name, errors} = await setup();
     try {
         await page.emulateMedia({reducedMotion: 'no-preference'});
-        await page.evaluate(() => window.pauseState(true));
         await wait('hidden');
         await player.evaluate((el, className) => el.classList.add(className), name('overlayHidden'));
-        await page.evaluate(() => window.pauseState(false));
-        await page.waitForFunction(() => !document.getElementById('player').hasAttribute('data-stremio-paused-controls'));
-        assert.equal(await page.locator('#bottom').isVisible(), false, 'Resuming into hidden playback does not flash controls');
-        assert.equal(await page.locator('#bottom').evaluate(el => el.getAnimations().length), 0, 'Identical hidden states do not restart a transition');
-        await page.evaluate(() => window.pauseState(true));
-        await wait('visible', false);
-        await page.locator('#fullscreen').focus();
-        const returning = await sampleSlides(page);
-        assert.ok(returning[0].y < 0 && returning[1].y > 0);
-        for (const control of returning) assert.equal(control.duration, 500);
-        await finishSlides(page); await waitForEntry(page);
-        assert.ok(await page.locator('#top').isVisible(), 'Paused visibility wins while the upstream class is catching up');
-        await player.evaluate((el, className) => el.classList.remove(className), name('overlayHidden'));
-        await page.evaluate(() => window.pauseState(false));
-        await page.waitForFunction(() => !document.getElementById('player').hasAttribute('data-stremio-paused-controls'));
-        assert.ok(await page.locator('#bottom').isVisible());
+        for (const paused of [true, false]) {
+            await page.evaluate(paused => window.pauseState(paused), paused);
+            await wait('visible', false);
+            const returning = await sampleSlides(page);
+            assert.ok(returning[0].y < 0 && returning[1].y > 0);
+            for (const control of returning) assert.equal(control.duration, 500);
+            await finishSlides(page); await waitForEntry(page);
+            assert.ok(await page.locator('#top').isVisible(), 'Configured visibility overrides the upstream class');
+            await wait('hidden');
+            await page.evaluate(paused => window.pauseState(paused), paused);
+            assert.equal(await player.getAttribute('data-stremio-controls'), 'hidden', 'Repeated native notifications do not wake controls');
+        }
         assert.deepEqual(errors, []);
     } finally { await browser.close(); }
 });
