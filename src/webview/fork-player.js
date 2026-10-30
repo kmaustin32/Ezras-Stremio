@@ -599,9 +599,11 @@
                 [class*="nav-bar-layer"], [class*="horizontal-nav-bar-container"],
                 [class*="control-bar-layer"], [class*="control-bar-container"], [class*="side-drawer-button-layer"]
             ) svg:not(#stremio-fork-compatibility svg),
-            [class*="player-container"] [class*="seek-bar-container"] > [class*="label"] {
+            [class*="player-container"] [class*="seek-bar-container"] [class*="label"],
+            [class*="player-container"] [class*="horizontal-nav-bar-container"] [class*="title"] {
                 color:var(--stremio-player-control-color)!important;
             }
+            [class*="addons-loading-bar"] {background-color:#7272c2!important}
             [class*="player-container"] [class*="horizontal-nav-bar-container"] svg:not(#stremio-fork-compatibility svg) {
                 opacity:1!important;
             }
