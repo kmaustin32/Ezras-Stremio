@@ -1,17 +1,17 @@
-## Ezra's Stremio 1.3.2
+## Ezra's Stremio 1.3.3
 
-A consistent player timeout and two finishing touches to the theme.
+Dark Mode defaults, a matching volume popup, and a faster control animation option.
 
 ### What's new
 
-- **One timeout during playback and pause.** Settings → Player → Controls → Control player timeout governs mouse and keyboard activity in both states: 0.5 sec, **1 sec by default**, 2 sec, 5 sec or Never hide. The community overlay cannot override the selected delay. Menus, keyboard focus and slider drags keep controls usable; pause/resume wakes them smoothly, and new videos start with visible controls.
-- **Warm watched markers: #DEA066.** Completed-episode badges and library watched markers use the new color in both modes. Checkmarks/text retain their contrast and upcoming indicators retain their existing color.
-- **Matching volume popup.** The speaker shown when changing volume uses **#858B99 in Dark Mode**, retaining white in normal mode. Volume and popup timing are unchanged.
-- **Regression coverage.** Every timeout is checked while playing and paused, after mouse and keyboard activity, with Never hide against upstream visibility changes, protected interactions, lifecycle and animation. Theme checks use the actual community volume popup and watched-marker styles.
+- **Dark Mode by default.** New configurations and startup fallbacks use Dark Mode. Existing saved theme choices are preserved, including normal mode, and the tray toggle remains available.
+- **Matching translucent volume popup.** In Dark Mode, the rounded background behind the volume-change speaker uses **#222635 at 10% opacity**. The speaker stays **#858B99**; normal-mode popup appearance and timing are preserved.
+- **0.1 animation speed.** Control animation speed now offers **Off, 0.1, 0.25, 0.5 (default), 0.75 and 1**. The `sec` suffix is removed from both timing dropdowns, with seconds explained in their help text. Timeout choices remain **0.5, 1 (default), 2, 5 and Never hide**.
+- **Regression coverage.** Real community-popup styling, all animation choices including 100 ms, theme fallback and saved normal mode are covered. A native configuration test checks fresh defaults, save/reload and unrelated-setting preservation against an isolated profile.
 
 ### Existing control preferences
 
-Animation speed remains independent of the idle timeout: Off, 0.25 sec, 0.5 sec (default), 0.75 sec or 1 sec. System reduced-motion preferences take priority. Settings dropdowns keep their rounded style and keyboard focus outlines. Saved timeout and animation preferences carry over.
+Control timeout continues to apply during playback and pause after mouse or keyboard activity. Never hide keeps controls available in both states; menus, keyboard focus and slider drags remain protected. Animation duration stays independent of timeout, system reduced-motion preferences take priority, and existing saved timing preferences carry over.
 
 ### Everything from the fork, in one stable release
 
@@ -32,9 +32,9 @@ The redesigned [README](../README.md) covers these features, installation, short
 
 ### Downloads
 
-- [Windows x64 installer](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.2/Ezras-Stremio-1.3.2-x64.exe)
-- [Portable Windows x64 ZIP](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.2/Ezras-Stremio-1.3.2-x64.zip)
-- [SHA256 checksums](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.2/SHA256SUMS.txt)
+- [Windows x64 installer](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.3/Ezras-Stremio-1.3.3-x64.exe)
+- [Portable Windows x64 ZIP](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.3/Ezras-Stremio-1.3.3-x64.zip)
+- [SHA256 checksums](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.3/SHA256SUMS.txt)
 
 Use Windows 10/11 x64. The installer sets up WebView2 when needed; the portable ZIP needs the system WebView2 Runtime. When upgrading, retain your configuration to keep custom mpv.conf, input.conf and other scripts. The fork's own black-bar script is updated. The original shell version and installation/profile paths are retained for upgrade compatibility.
 

@@ -8,7 +8,7 @@ D3D11 playback. Use Windows 10/11 x64.
 
 ## Install and use
 
-Download `Ezras-Stremio-1.3.2-x64.exe` from this fork's release. The installer
+Download `Ezras-Stremio-1.3.3-x64.exe` from this fork's release. The installer
 installs WebView2 when needed. The `.zip` is portable but requires the system
 WebView2 runtime. Extract the ZIP into its own directory and run `stremio.exe`.
 Use the installer whose filename starts with `Ezras-Stremio`; **BUILD-ONLY** downloads are
@@ -123,8 +123,8 @@ delay or override Never hide. Active-slider protection remains in place. Newly m
 also slide into place. Changing pause state retains the animation rather than
 removing its styles partway through. Reduced-motion preferences apply in both
 playing and paused states.
-Settings → Player → Controls → **Control animation speed** offers Off, 0.25 sec,
-0.5 sec (default), 0.75 sec and 1 sec. Off makes showing and hiding instantaneous;
+Settings → Player → Controls → **Control animation speed** offers Off, 0.1, 0.25,
+0.5 (default), 0.75 and 1 (seconds). Off makes showing and hiding instantaneous;
 the inactivity delays are unchanged. The preference applies immediately and is
 saved on this device in the fork's own local-storage entry, separate from the
 community profile. If storage is unavailable it still applies for the session.
@@ -292,7 +292,7 @@ Theme styles live in `src/webview/fork-player.js`; shell notifications are in `s
 
 ## Unified control timeout (1.3.2)
 
-**Settings → Player → Controls → Control player timeout**, immediately after animation speed, offers **0.5 sec**, **1 sec (default)**, **2 sec**, **5 sec** and **Never hide**. The selected delay applies while playing and paused, after mouse, keyboard, touch/pen movement or wheel activity. Menus, keyboard focus and slider interaction continue to protect visible controls, and mouse/keyboard activity restarts the selected delay. Never hide keeps all player controls visible and the cursor available.
+**Settings → Player → Controls → Control player timeout**, immediately after animation speed, offers **0.5**, **1 (default)**, **2**, **5** and **Never hide**. The selected delay applies while playing and paused, after mouse, keyboard, touch/pen movement or wheel activity. Menus, keyboard focus and slider interaction continue to protect visible controls, and mouse/keyboard activity restarts the selected delay. Never hide keeps all player controls visible and the cursor available.
 
 The setting is saved under the separate device/origin-local key `stremio-fork-control-timeout`, without rewriting the Stremio account/profile or mpv configuration. Changes apply immediately and synchronize other windows, including revealing already-hidden controls when Never hide is selected. Invalid/unavailable reads fall back to one second; unavailable writes apply for the session and show a status message.
 
@@ -306,3 +306,12 @@ The title in the player's upper-left header and both seek-bar time displays use 
 ### Watched markers and volume popup (1.3.2)
 
 Completed-episode badges and library watched markers use `#DEA066` in both modes. Checkmark/text contrast is retained; upcoming labels and the combined upcoming/watched wrapper are not recolored. The community volume-change popup speaker uses `#858B99` in Dark Mode and retains white in normal mode. Watched flags, playback state, volume commands and popup timing are unchanged.
+
+
+### Dark defaults and control labels (1.3.3)
+
+Dark Mode is the startup default in the native shell and in the hosted player when no valid shell snapshot is available. The shipped `UseDarkTheme=1` configuration and missing-preference fallback agree. An explicit saved `UseDarkTheme=0` still restores normal mode; tray toggles and save/reload preserve that choice. The native settings test exercises the real loader/saver against an isolated configuration rather than the user's profile.
+
+In Dark Mode, the volume-change popup background is `rgba(34,38,53,0.1)` (`#222635` at 10% opacity). Opacity is applied to the background color, keeping the speaker at `#858B99` with its existing opacity. Normal-mode popup styling, rounded corners, padding and popup timing remain unchanged.
+
+Control animation speed adds 0.1 seconds. Both timing dropdowns display numeric choices without a `sec` suffix, with units described in their help text. The animation default remains 0.5 seconds and the timeout default remains 1 second; stored values and cross-window preferences are compatible with earlier releases.

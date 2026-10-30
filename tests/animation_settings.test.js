@@ -74,9 +74,9 @@ test('Player animation setting offers every requested speed, changes real transi
     const {browser, page, select, boot, show, overlay, settled, errors} = await setup();
     try {
         assert.equal(await select.inputValue(), '0.5');
-        assert.deepEqual(await select.locator('option').allTextContents(), ['Off', '0.25 sec', '0.5 sec (default)', '0.75 sec', '1 sec']);
+        assert.deepEqual(await select.locator('option').allTextContents(), ['Off', '0.1', '0.25', '0.5 (default)', '0.75', '1']);
         assert.equal(await select.locator('xpath=ancestor::*[@id="player-section"]').count(), 1);
-        for (const value of ['0', '0.25', '0.5', '0.75', '1']) {
+        for (const value of ['0', '0.1', '0.25', '0.5', '0.75', '1']) {
             await select.selectOption(value);
             assert.equal(await page.evaluate(key => localStorage.getItem(key), key), value);
             await show(true); await settled();
@@ -122,8 +122,8 @@ test('Animation setting follows the localized Player section, survives UI recrea
         });
         await select.waitFor();
         await select.focus(); await page.keyboard.press('Home'); await page.keyboard.press('ArrowDown');
-        await page.waitForFunction(() => document.getElementById('stremio-fork-animation-duration').value === '0.25');
-        assert.equal(await page.evaluate(key => localStorage.getItem(key), key), '0.25');
+        await page.waitForFunction(() => document.getElementById('stremio-fork-animation-duration').value === '0.1');
+        assert.equal(await page.evaluate(key => localStorage.getItem(key), key), '0.1');
         await page.addScriptTag({content: source});
         assert.equal(await page.locator('#stremio-fork-animation-setting').count(), 1);
         assert.deepEqual(await page.locator('[data-native-row]').evaluateAll(rows => rows.map(row => row.outerHTML)), original);
@@ -175,7 +175,7 @@ test('Control timeout honors every choice during playing and paused playback aft
     const timeout=page.getByLabel('Control player timeout',{exact:true});
     try {
         assert.equal(await timeout.inputValue(),'1');
-        assert.deepEqual(await timeout.locator('option').allTextContents(),['0.5 sec','1 sec (default)','2 sec','5 sec','Never hide']);
+        assert.deepEqual(await timeout.locator('option').allTextContents(),['0.5','1 (default)','2','5','Never hide']);
         assert.ok(await timeout.evaluate(el=>Boolean(document.getElementById('stremio-fork-animation-duration').compareDocumentPosition(el)&Node.DOCUMENT_POSITION_FOLLOWING)));
         await select.selectOption('0');
         await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+1000));

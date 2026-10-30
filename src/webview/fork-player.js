@@ -27,7 +27,7 @@
     let pointerHeld = false;
     let keyboardFocus = true;
     const animationStorageKey = 'stremio-fork-control-animation-duration';
-    const animationDurations = ['0', '0.25', '0.5', '0.75', '1'];
+    const animationDurations = ['0', '0.1', '0.25', '0.5', '0.75', '1'];
     let animationDuration = '0.5';
     let animationStatus = '';
     const timeoutStorageKey = 'stremio-fork-control-timeout';
@@ -211,7 +211,7 @@
                 title.htmlFor = 'stremio-fork-animation-duration'; title.textContent = 'Control animation speed';
                 const help = document.createElement('p'); help.className = 'stremio-fork-shortcuts-note';
                 help.id = 'stremio-fork-animation-help';
-                help.textContent = 'Choose how quickly player controls slide in and out. Off shows and hides them instantly. Reduced motion follows your system preference.';
+                help.textContent = 'Choose how quickly player controls slide in and out, in seconds. Off shows and hides them instantly. Reduced motion follows your system preference.';
                 description.append(title, help);
                 const controls = document.createElement('div');
                 controls.className = input.className.split(/\s+/).filter(value => value.includes('option-input-container')).join(' ');
@@ -219,7 +219,7 @@
                 select.setAttribute('aria-describedby', help.id);
                 animationDurations.forEach((value, index) => {
                     const option = document.createElement('option'); option.value = value;
-                    option.textContent = ['Off', '0.25 sec', '0.5 sec (default)', '0.75 sec', '1 sec'][index];
+                    option.textContent = ['Off', '0.1', '0.25', '0.5 (default)', '0.75', '1'][index];
                     select.append(option);
                 });
                 select.addEventListener('change', () => {
@@ -239,14 +239,14 @@
                 timeoutLabel.htmlFor = 'stremio-fork-control-timeout'; timeoutLabel.textContent = 'Control player timeout';
                 const timeoutHelp = document.createElement('p'); timeoutHelp.className = help.className;
                 timeoutHelp.id = 'stremio-fork-timeout-help';
-                timeoutHelp.textContent = 'Choose how long controls stay visible after mouse or keyboard activity, while playing or paused. Never hide keeps controls visible. Open menus, keyboard focus and slider interaction keep controls available.';
+                timeoutHelp.textContent = 'Choose how long controls stay visible after mouse or keyboard activity, in seconds, while playing or paused. Never hide keeps controls visible. Open menus, keyboard focus and slider interaction keep controls available.';
                 timeoutName.append(timeoutLabel, timeoutHelp);
                 const timeoutControls = document.createElement('div'); timeoutControls.className = controls.className;
                 const timeoutSelect = document.createElement('select'); timeoutSelect.id = timeoutLabel.htmlFor;
                 timeoutSelect.setAttribute('aria-describedby', timeoutHelp.id);
                 controlTimeouts.forEach((value, index) => {
                     const option = document.createElement('option'); option.value = value;
-                    option.textContent = ['0.5 sec', '1 sec (default)', '2 sec', '5 sec', 'Never hide'][index];
+                    option.textContent = ['0.5', '1 (default)', '2', '5', 'Never hide'][index];
                     timeoutSelect.append(option);
                 });
                 timeoutSelect.addEventListener('change', () => {
@@ -612,6 +612,7 @@
             [class*="addons-loading-bar"] {background-color:#7272c2!important}
             [class*="video-container"] [class*="watched-container"]:not([class*="upcoming-watched-container"]),
             [class*="meta-item-container"] [class*="watched-icon-layer"] {background-color:#DEA066!important}
+            html[data-stremio-dark-theme] [class*="volume-change-indicator"] {background-color:rgba(34,38,53,.1)!important}
             html[data-stremio-dark-theme] [class*="volume-change-indicator"] [class*="volume-icon"] {
                 color:#858B99!important;
             }
@@ -624,7 +625,8 @@
             }
         `;
         document.head.append(style);
-        applyTheme(window.__stremioForkDarkTheme);
+        // Use the shell's saved choice when available; otherwise start in Dark Mode.
+        applyTheme(typeof window.__stremioForkDarkTheme === 'boolean' ? window.__stremioForkDarkTheme : true);
     }
 
     function recolorLogos() {
