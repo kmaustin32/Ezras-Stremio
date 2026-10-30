@@ -1,16 +1,19 @@
-## Ezra's Stremio 1.2.0
+## Ezra's Stremio 1.3.0
 
-A calmer Dark Mode, a matching playback bar and consistent settings dropdowns, with all existing fork features retained.
+A more consistent player palette and a configurable paused-control timeout, with the existing playback and fork features retained.
 
 ### What's new
 
-- **Dark Mode background: #292D3E.** Enable **Use Dark Theme** in the tray menu. The saved setting applies on startup and updates the app immediately when toggled. Turning it off restores the original background.
-- **Softer player icons: #858B99 in Dark Mode.** Applies to the top and bottom player controls, including Picture-in-Picture and Fit/Crop/Stretch. Normal mode retains its existing icon colors.
-- **Purple playback bar: #7272c2 in both modes.** The played track and seek handle match the fork's theme. The volume slider retains its separate orange-to-red boost range.
-- **Consistent settings dropdowns.** Rounded corners, purple borders, dark surfaces and clear keyboard focus match the animation-speed selector. Existing single/multiple selections, keyboard controls and narrow layouts remain supported.
-- **Updated feature guide.** The README includes these additions alongside the complete fork feature list.
+- **Selected navigation icons: #7272C2.** Library, Calendar and the other selected sidebar icons now match the fork's theme in both modes.
+- **Matching episode/source progress.** Progress on episode thumbnails and on the playback-source selection page now uses #7272C2, matching the playback seek bar.
+- **Darker Dark Mode: #222635.** Controlled by the existing saved **Use Dark Theme** tray setting; turning it off restores the original background.
+- **Consistent player controls.** Fullscreen entry/exit and Picture-in-Picture match the other icons, including opacity. Icons, both playback time labels and the normal volume range use white in normal mode and #858B99 in Dark Mode. The seek bar remains #7272C2; volume above 100% retains the orange-to-red boost range, using the configured maximum on both tracks.
+- **Control player timeout.** Immediately after animation speed in **Settings → Player → Controls**: **0.5 sec**, **1 sec (default)**, **2 sec**, **5 sec** or **Never hide**. It applies to paused controls, as before; playing videos retain their usual timeout. The choice is saved on this device and applies immediately, with menus, keyboard use and sliders kept usable.
+- **README and tests updated.** Added real navigation/progress/icon/volume color checks and timeout persistence, cross-window and delay checks. The native blur assertion now waits for actual rendered border pixels within a fixed deadline while retaining its original threshold.
 
-Video, subtitles, framing, playback behavior and animation-speed preferences retain their existing behavior. System reduced-motion preferences still take priority.
+### Existing control preferences
+
+The animation-speed setting still offers Off, 0.25 sec, 0.5 sec (default), 0.75 sec and 1 sec. It remains independent of the paused idle timeout, and system reduced-motion preferences take priority. Settings dropdowns keep their rounded style and keyboard focus outlines.
 
 ### Everything from the fork, in one stable release
 
@@ -31,14 +34,14 @@ The redesigned [README](../README.md) covers these features, installation, short
 
 ### Downloads
 
-- [Windows x64 installer](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.2.0/Ezras-Stremio-1.2.0-x64.exe)
-- [Portable Windows x64 ZIP](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.2.0/Ezras-Stremio-1.2.0-x64.zip)
-- [SHA256 checksums](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.2.0/SHA256SUMS.txt)
+- [Windows x64 installer](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.0/Ezras-Stremio-1.3.0-x64.exe)
+- [Portable Windows x64 ZIP](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.0/Ezras-Stremio-1.3.0-x64.zip)
+- [SHA256 checksums](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.0/SHA256SUMS.txt)
 
 Use Windows 10/11 x64. The installer sets up WebView2 when needed; the portable ZIP needs the system WebView2 Runtime. When upgrading, retain your configuration to keep custom mpv.conf, input.conf and other scripts. The fork's own black-bar script is updated. The original shell version and installation/profile paths are retained for upgrade compatibility.
 
 ### Validation and upstream compatibility
 
-GitHub Actions builds the installer and portable archive and runs the native configuration, blur/framing/rendering, black-bar/seam, shader, streaming/transcoding, live player compatibility, real community slider, episode-image blur, settings/shortcuts, animation preference, theme switching, live dropdown interaction, backup, WebView2 and installer-branding checks before publication.
+GitHub Actions builds the installer and portable archive and runs the native configuration, blur/framing/rendering, black-bar/seam, shader, streaming/transcoding, live player compatibility, real community slider, episode-image blur, settings/shortcuts, animation and timeout preferences, theme switching, live dropdown interaction, backup, WebView2 and installer-branding checks before publication.
 
 Theme and settings styling are isolated in the fork script; they do not rewrite the hosted community bundle or profile. Automatic upstream binary updates remain disabled. Source history is preserved for future upstream merges; incompatible hosted UI changes are reported rather than silently discarding other compatible fixes.

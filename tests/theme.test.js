@@ -65,25 +65,35 @@ async function setup(dark = true, currentDark = dark) {
         const seek=load(find('"seek-bar-container":"seek-bar-container-'));
         const slider=load(find('"track-after":"track-after-'));
         const player=load(find('"nav-bar-layer":"nav-bar-layer-'));
+        const nav=load(find('"vertical-nav-bar-container":"vertical-nav-bar-container-'));
+        const tab=load(find('"nav-tab-button-container":"nav-tab-button-container-'));
+        const episode=load(Object.values(window.modules).find(fn=>fn.toString().includes('"video-container":"video-container-') && fn.toString().includes('progress-bar-background')));
+        const stream=load(Object.values(window.modules).find(fn=>fn.toString().includes('"stream-container":"stream-container-') && fn.toString().includes('progress-bar-background')));
+        const navbar=load(find('"horizontal-nav-bar-container":"horizontal-nav-bar-container-'));
+        const Icon=req(4672).default;
         const h=React.createElement;
         function App(){
             const [selected,setSelected]=React.useState(['en']);
             const [multi,setMulti]=React.useState(['en']);
+            const [fullscreen,setFullscreen]=React.useState(false); window.setFullscreen=setFullscreen;
             const row=(title,extra={})=>h('div',{className:settings['option-container']},
                 h('div',{className:settings['option-name-container']},h('div',{className:settings.label},title)),
                 h(Multiselect,{className:settings['option-input-container']+' '+settings['multiselect-container'],title,options:[{value:'en',label:'English'},{value:'ja',label:'Japanese'}],selected, onSelect:e=>{window.changes=e.value;setSelected([e.value]);},...extra}));
             const icon=(id,color)=>h('svg',{id,viewBox:'0 0 24 24',style:{color,width:32,height:32}},h('path',{fill:'currentColor',d:'M4 4h16v16H4z'}));
             return h(React.Fragment,null,
+                h('nav',{className:nav['vertical-nav-bar-container']},...['Library','Calendar','Discover'].map((text,index)=>h('button',{id:'nav-'+index,className:tab['nav-tab-button-container']+(index===0?' selected':'')},h(Icon,{className:tab.icon,name:'play'}),h('span',{className:tab.label},text)))),
+                h('div',{className:episode['video-container']},h('div',{className:episode['thumbnail-container']},h('div',{className:episode['progress-bar-container']},h('div',{id:'episode-progress',className:episode['progress-bar'],style:{width:'37%'}},null)))),
+                h('div',{className:stream['stream-container']},h('div',{className:stream['info-container']},h('div',{className:stream['progress-bar-container']},h('div',{id:'stream-progress',className:stream['progress-bar'],style:{width:'37%'}},null)))),
                 h('div',{id:'settings',className:settings['settings-container'],style:{height:650}},h('div',{className:settings['settings-content']},
                     h('div',{className:settings['side-menu-container']},h('button',{'data-section':'player'},'Player')),
                     h('div',{className:settings['sections-container']},h('div',{className:settings['section-container']},h('div',{className:settings['section-title']},'Player'),row('Audio language'),row('Subtitle languages',{multiSelect:true,selected:multi,onSelect:e=>{window.multi=e.value;setMulti([...new Set([...multi,e.value])]);}}))))),
                 h('div',{id:'player',className:player['player-container'],style:{position:'relative',height:150}},
-                    h('div',{className:player['nav-bar-layer'],style:{height:50}},icon('top-icon','white'),h('span',{id:'stremio-fork-compatibility',style:{color:'orange'}},icon('warning','orange'))),
+                    h('nav',{className:player['nav-bar-layer']+' '+navbar['horizontal-nav-bar-container'],style:{height:50}},icon('top-icon','white'),h('div',{className:navbar['buttons-container']},h('button',{id:'fullscreen',title:fullscreen?'Exit fullscreen mode':'Enter fullscreen mode',className:navbar['button-container']},h(Icon,{className:navbar.icon,name:fullscreen?'minimize':'maximize'}))),h('span',{id:'stremio-fork-compatibility',style:{color:'orange'}},icon('warning','orange'))),
                     h('div',{className:player['control-bar-layer'],style:{height:100}},icon('bottom-icon','white'),h('div',{className:controls['control-bar-buttons-menu-container']}),
                         h('div',{id:'seek',className:controls['seek-bar']+' '+seek['seek-bar-container'],style:{height:30}},
-                            h('span',{id:'seek-time',className:seek.label},'00:32'),
+                            h('span',{id:'seek-time',className:seek.label},'00:32'),h('span',{id:'seek-remaining',className:seek.label},'-21:00'),
                             h('div',{className:seek.slider+' '+slider['slider-container']},...['track','track-before','track-after','thumb'].map(name=>h('div',{id:'seek-'+name,className:slider[name],style:{width:'50%'}})))),
-                        h('div',{id:'volume',className:controls['volume-slider'],style:{width:100}},h('div',{id:'volume-fill',className:slider['track-after']}),h('div',{className:slider.thumb}))),
+                        h('div',{id:'volume',className:controls['volume-slider'],style:{width:100}},h('div',{id:'volume-track',className:slider.track}),h('div',{id:'volume-fill',className:slider['track-after']}),h('div',{id:'volume-thumb',className:slider.thumb}))),
                     h('div',{id:'subtitle',style:{color:'white'}},'Subtitles stay white')));
         }
         ReactDOM.createRoot(document.getElementById('app')).render(h(App));
@@ -99,30 +109,69 @@ test('Dark Mode follows the shell toggle, restores normal colors, and scopes see
     try{
         assert.ok(await page.evaluate(()=>window.messages.some(m=>m.args[0]==='get-theme')));
         const background=()=>page.evaluate(()=>getComputedStyle(document.body).backgroundImage);
-        assert.ok((await background()).includes('rgb(41, 45, 62)'));
+        assert.ok((await background()).includes('rgb(34, 38, 53)'));
         for(const id of ['top-icon','bottom-icon']) assert.equal(await color(id),'rgb(133, 139, 153)');
         assert.equal(await color('warning'),'rgb(255, 165, 0)');
         assert.equal(await color('subtitle'),'rgb(255, 255, 255)');
-        assert.equal(await color('seek-time'),'rgba(255, 255, 255, 0.9)');
+        assert.equal(await color('seek-time'),'rgb(133, 139, 153)');
         const fill=id=>page.locator('#'+id).evaluate(el=>getComputedStyle(el).backgroundColor);
+        const checkAccent = async () => {
+            for (const id of ['episode-progress','stream-progress']) {
+                assert.equal(await fill(id),'rgb(114, 114, 194)');
+                assert.equal(await page.locator('#'+id).evaluate(el=>el.style.width),'37%');
+            }
+            assert.equal(await page.locator('#nav-0 svg').evaluate(el=>getComputedStyle(el).color),'rgb(114, 114, 194)');
+            assert.notEqual(await page.locator('#nav-1 svg').evaluate(el=>getComputedStyle(el).color),'rgb(114, 114, 194)');
+        };
+        await checkAccent();
+        await page.evaluate(()=>{document.getElementById('nav-0').classList.remove('selected');document.getElementById('nav-1').classList.add('selected');});
+        assert.equal(await page.locator('#nav-1 svg').evaluate(el=>getComputedStyle(el).color),'rgb(114, 114, 194)');
+        await page.evaluate(()=>{document.getElementById('nav-1').classList.remove('selected');document.getElementById('nav-0').classList.add('selected');});
+        assert.equal(await fill('volume-thumb'),'rgb(133, 139, 153)');
         assert.equal(await fill('seek-track-after'),'rgb(114, 114, 194)');
         assert.equal(await fill('seek-thumb'),'rgb(114, 114, 194)');
         await page.evaluate(()=>{window.native('display-mode-changed',{mode:'fit',active:true});window.native('mpv-prop-change',{name:'volume',data:120});});
         await page.waitForFunction(()=>document.querySelector('#volume-fill').style.backgroundImage.length > 0);
+        const checkPlayer = async expected => {
+            for (const selector of ['#fullscreen svg','#stremio-fork-pip svg','#stremio-fork-display-mode svg']) {
+                assert.equal(await page.locator(selector).evaluate(el=>getComputedStyle(el).color),expected);
+                assert.equal(await page.locator(selector).evaluate(el=>getComputedStyle(el).opacity),'1','Player icons share the same opacity');
+                const paints=await page.locator(selector).evaluate(el=>Array.from(el.querySelectorAll('path,rect,circle,line,polyline,polygon')).flatMap(node=>{
+                    const s=getComputedStyle(node);return [s.fill,s.stroke].filter(color=>color!=='none'&&color!=='rgba(0, 0, 0, 0)');
+                }));
+                assert.ok(paints.length>0 && paints.every(color=>color===expected),`${selector} paints the same color as the other controls: ${paints}`);
+            }
+            for (const id of ['seek-time','seek-remaining']) assert.equal(await color(id),expected);
+            const volumeGradient=await page.locator('#volume-fill').evaluate(el=>getComputedStyle(el).backgroundImage);
+            assert.ok(volumeGradient.includes(expected),'Volume normal range matches the controls');
+            assert.equal(await page.locator('#volume-track').evaluate(el=>getComputedStyle(el).backgroundImage),volumeGradient,'Unfilled and filled volume ranges use the same threshold and colors');
+        };
+        await checkPlayer('rgb(133, 139, 153)');
+        // The same real icon element is updated by the community on fullscreen exit.
+        await page.evaluate(()=>window.setFullscreen(true));
+        await page.waitForFunction(()=>document.getElementById('fullscreen').title==='Exit fullscreen mode');
+        await checkPlayer('rgb(133, 139, 153)');
         const gradient=await page.locator('#volume-fill').evaluate(el=>getComputedStyle(el).backgroundImage);
         assert.ok(gradient.includes('255, 165, 0'));
         assert.equal(await page.locator('#stremio-fork-display-mode svg').evaluate(el=>getComputedStyle(el).color),'rgb(133, 139, 153)');
         fs.mkdirSync('.build-cache/ui-test-evidence',{recursive:true});
         await page.screenshot({path:'.build-cache/ui-test-evidence/theme-dark.png'});
         await page.evaluate(()=>window.native('theme-changed',{dark:false}));
-        assert.ok(!(await background()).includes('rgb(41, 45, 62)'));
+        assert.ok(!(await background()).includes('rgb(34, 38, 53)'));
         assert.equal(await color('top-icon'),'rgb(255, 255, 255)');
+        await checkPlayer('rgb(255, 255, 255)'); await checkAccent();
+        await page.evaluate(()=>{window.native('mpv-prop-change',{name:'volume',data:100}); window.setFullscreen(false);});
+        await page.waitForFunction(()=>getComputedStyle(document.getElementById('volume-thumb')).backgroundColor==='rgb(255, 255, 255)');
+        await checkPlayer('rgb(255, 255, 255)');
+        assert.equal(await fill('volume-thumb'),'rgb(255, 255, 255)');
         assert.equal(await fill('seek-track-after'),'rgb(114, 114, 194)');
         await page.screenshot({path:'.build-cache/ui-test-evidence/theme-normal.png'});
         await page.evaluate(()=>window.native('theme-changed',{dark:'true'}));
         assert.equal(await page.locator('html').getAttribute('data-stremio-dark-theme'),null);
         await page.evaluate(()=>window.native('theme-changed',{dark:true}));
         assert.equal(await color('bottom-icon'),'rgb(133, 139, 153)');
+        assert.equal(await fill('volume-thumb'),'rgb(133, 139, 153)');
+        await checkPlayer('rgb(133, 139, 153)');
         assert.deepEqual(errors,[]);
     }finally{await browser.close();}
 });

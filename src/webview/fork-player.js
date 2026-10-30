@@ -30,6 +30,10 @@
     const animationDurations = ['0', '0.25', '0.5', '0.75', '1'];
     let animationDuration = '0.5';
     let animationStatus = '';
+    const timeoutStorageKey = 'stremio-fork-control-timeout';
+    const controlTimeouts = ['0.5', '1', '2', '5', 'never'];
+    let controlTimeout = '1';
+    let timeoutStatus = '';
     const appliedStyles = new WeakMap();
     const playerShortcuts = [
         {key: 'CTRL+b', keys: ['Ctrl', 'B'], label: 'Toggle ambient border blur'},
@@ -131,7 +135,7 @@
         if (!slider) return;
         const threshold = Math.min(100 / maximum * 100, 100);
         const gradient = maximum > 100 ? `linear-gradient(to right, var(--primary-foreground-color,#fff) 0%, var(--primary-foreground-color,#fff) ${threshold}%, #ffa500 ${threshold}%, #ff0000 100%)` : '';
-        for (const track of slider.querySelectorAll('[class*="track-after"], [class*="Slider__track__"]')) {
+        for (const track of slider.querySelectorAll('[class*="track-after"], [class*="Slider__track__"], [class*="track-"]:not([class*="track-before"]):not([class*="track-after"])')) {
             setStyle(track, 'background-image', gradient);
         }
         const fraction = maximum > 100 && !muted ? Math.max(0, Math.min((volume - 100) / (maximum - 100), 1)) : 0;
@@ -164,7 +168,21 @@
         root.toggleAttribute('data-stremio-control-animation-off', animationDuration === '0');
     }
 
-    function updateAnimationSetting() {
+    function readControlTimeout() {
+        try {
+            const saved = localStorage.getItem(timeoutStorageKey);
+            return controlTimeouts.includes(saved) ? saved : '1';
+        } catch { return '1'; }
+    }
+
+    function applyControlTimeout(value) {
+        controlTimeout = controlTimeouts.includes(value) ? value : '1';
+        // Apply immediately to an already paused video, including revealing
+        // controls when Never hide is selected in another window.
+        pausedActivity();
+    }
+
+    function updateControlSettings() {
         for (const settings of document.querySelectorAll('[class*="settings-container"]')) {
             const playerLabel = settings.querySelector('[data-section="player"]')?.textContent.trim();
             if (!playerLabel) continue;
@@ -215,6 +233,34 @@
                 controls.append(select); entry.append(description, controls); group.append(entry);
                 const status = document.createElement('p'); status.setAttribute('role', 'status');
                 status.className = 'stremio-fork-shortcuts-note'; group.append(status);
+                const timeoutEntry = document.createElement('div'); timeoutEntry.className = row.className;
+                const timeoutName = document.createElement('div'); timeoutName.className = name.className;
+                const timeoutLabel = document.createElement('label'); timeoutLabel.className = label.className;
+                timeoutLabel.htmlFor = 'stremio-fork-control-timeout'; timeoutLabel.textContent = 'Control player timeout';
+                const timeoutHelp = document.createElement('p'); timeoutHelp.className = help.className;
+                timeoutHelp.id = 'stremio-fork-timeout-help';
+                timeoutHelp.textContent = 'Choose how long controls stay visible while paused after mouse or keyboard activity. Never hide keeps paused controls visible. Playing videos keep their usual control timeout.';
+                timeoutName.append(timeoutLabel, timeoutHelp);
+                const timeoutControls = document.createElement('div'); timeoutControls.className = controls.className;
+                const timeoutSelect = document.createElement('select'); timeoutSelect.id = timeoutLabel.htmlFor;
+                timeoutSelect.setAttribute('aria-describedby', timeoutHelp.id);
+                controlTimeouts.forEach((value, index) => {
+                    const option = document.createElement('option'); option.value = value;
+                    option.textContent = ['0.5 sec', '1 sec (default)', '2 sec', '5 sec', 'Never hide'][index];
+                    timeoutSelect.append(option);
+                });
+                timeoutSelect.addEventListener('change', () => {
+                    if (!controlTimeouts.includes(timeoutSelect.value)) return;
+                    applyControlTimeout(timeoutSelect.value);
+                    timeoutStatus = '';
+                    try { localStorage.setItem(timeoutStorageKey, controlTimeout); }
+                    catch { timeoutStatus = 'Applied for this session. This device could not save the preference.'; }
+                    schedule();
+                });
+                timeoutControls.append(timeoutSelect); timeoutEntry.append(timeoutName, timeoutControls);
+                const timeoutNote = document.createElement('p'); timeoutNote.id = 'stremio-fork-timeout-status';
+                timeoutNote.setAttribute('role', 'status'); timeoutNote.className = help.className;
+                group.append(timeoutEntry, timeoutNote);
                 // Append only fork-owned nodes; React retains all native rows.
                 section.querySelector(':scope > [class*="section-title"]').after(group);
             }
@@ -223,6 +269,11 @@
             const status = group.querySelector('[role="status"]');
             if (status.textContent !== animationStatus) status.textContent = animationStatus;
             status.hidden = !animationStatus;
+            const timeoutSelect = group.querySelector('#stremio-fork-control-timeout');
+            if (timeoutSelect.value !== controlTimeout) timeoutSelect.value = controlTimeout;
+            const timeoutNote = group.querySelector('#stremio-fork-timeout-status');
+            if (timeoutNote.textContent !== timeoutStatus) timeoutNote.textContent = timeoutStatus;
+            timeoutNote.hidden = !timeoutStatus;
         }
     }
 
@@ -253,12 +304,12 @@
 
     function armPausedTimer() {
         clearPausedTimer();
-        if (!pausedEligible || pausedControlsBlocked()) return;
+        if (!pausedEligible || controlTimeout === 'never' || pausedControlsBlocked()) return;
         pausedTimer = setTimeout(() => {
             pausedTimer = null;
             if (pausedEligible && pausedPlayer?.isConnected && !pausedControlsBlocked())
                 pausedPlayer.setAttribute('data-stremio-paused-controls', 'hidden');
-        }, 1000);
+        }, Number(controlTimeout) * 1000);
     }
 
     function pausedActivity() {
@@ -529,9 +580,9 @@
         style.id = 'stremio-fork-theme';
         style.textContent = `
             html[data-stremio-dark-theme] {
-                --primary-background-color:#292D3E!important;
-                --secondary-background-color:#292D3E!important;
-                --modal-background-color:#292D3E!important;
+                --primary-background-color:#222635!important;
+                --secondary-background-color:#222635!important;
+                --modal-background-color:#222635!important;
             }
             html[data-stremio-dark-theme] [class*="intro-container"] > [class*="background-container"] {
                 background-image:none!important;
@@ -539,9 +590,25 @@
             [class*="player-container"] [class*="seek-bar"] {
                 --primary-accent-color:#7272c2;
             }
-            html[data-stremio-dark-theme] [class*="player-container"] :is(
-                [class*="nav-bar-layer"], [class*="control-bar-layer"], [class*="side-drawer-button-layer"]
-            ) svg:not(#stremio-fork-compatibility svg) {color:#858B99!important}
+            [class*="vertical-nav-bar-container"], [class*="video-container"], [class*="stream-container"] {
+                --primary-accent-color:#7272c2;
+            }
+            [class*="player-container"] {--stremio-player-control-color:#fff}
+            html[data-stremio-dark-theme] [class*="player-container"] {--stremio-player-control-color:#858B99}
+            [class*="player-container"] :is(
+                [class*="nav-bar-layer"], [class*="horizontal-nav-bar-container"],
+                [class*="control-bar-layer"], [class*="control-bar-container"], [class*="side-drawer-button-layer"]
+            ) svg:not(#stremio-fork-compatibility svg),
+            [class*="player-container"] [class*="seek-bar-container"] > [class*="label"] {
+                color:var(--stremio-player-control-color)!important;
+            }
+            [class*="player-container"] [class*="horizontal-nav-bar-container"] svg:not(#stremio-fork-compatibility svg) {
+                opacity:1!important;
+            }
+            [class*="player-container"] [class*="volume-slider"] {
+                --primary-foreground-color:var(--stremio-player-control-color);
+                --primary-accent-color:var(--stremio-player-control-color);
+            }
         `;
         document.head.append(style);
         applyTheme(window.__stremioForkDarkTheme);
@@ -569,7 +636,7 @@
         scheduled = false;
         recolorLogos();
         updatePlayerShortcuts();
-        updateAnimationSetting();
+        updateControlSettings();
         const player = document.querySelector('[class*="player-container"]');
         updatePausedControls(player);
         updateVolume(player);
@@ -657,6 +724,7 @@
         startTheme();
         adjustSettingsLayout();
         applyAnimationDuration(readAnimationDuration());
+        applyControlTimeout(readControlTimeout());
         startPausedControls();
         try { applyVolumeLimit(JSON.parse(localStorage.getItem('localProfile') || '{}').maxVolume ?? 130); }
         catch { applyVolumeLimit(130); }
@@ -670,9 +738,15 @@
     window.addEventListener('stremio-fork-volume-limit', event => applyVolumeLimit(event.detail));
     window.addEventListener('stremio-fork-compatibility', event => receiveCompatibility(event.detail));
     window.addEventListener('storage', event => {
-        if (event.key !== animationStorageKey && event.key !== null) return;
-        animationStatus = '';
-        applyAnimationDuration(readAnimationDuration());
+        if (event.key !== animationStorageKey && event.key !== timeoutStorageKey && event.key !== null) return;
+        if (event.key === animationStorageKey || event.key === null) {
+            animationStatus = '';
+            applyAnimationDuration(readAnimationDuration());
+        }
+        if (event.key === timeoutStorageKey || event.key === null) {
+            timeoutStatus = '';
+            applyControlTimeout(readControlTimeout());
+        }
         schedule();
     });
     // Ask on every document before DOM readiness, so a reload uses the latest
