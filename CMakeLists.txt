@@ -132,6 +132,9 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE STREMIO_PLAYER_PATCH_REVISION
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(config-tests tests/config_test.cpp src/utils/config.cpp src/core/globals.cpp)
+    target_link_libraries(config-tests PRIVATE nlohmann_json::nlohmann_json unofficial::webview2::webview2 ole32.lib)
+    add_test(NAME theme-default-and-preferences COMMAND config-tests)
     add_executable(player-bundle-tests tests/player_bundle_test.cpp src/webview/player_bundle_patch.cpp)
     add_test(NAME player-autoplay-guard COMMAND player-bundle-tests)
     add_executable(player-bundle-patch tests/player_bundle_patch.cpp src/webview/player_bundle_patch.cpp)

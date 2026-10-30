@@ -45,7 +45,7 @@ async function setup(dark = true, currentDark = dark) {
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.route('https://stremio.zarg.me/**', route => route.fulfill({contentType:'text/html',body:`<html><head><style>${css}</style></head><body><div id="app"></div></body></html>`}));
     await page.addInitScript(({dark, currentDark}) => {
-        window.__stremioForkDarkTheme = dark;
+        if (dark !== null) window.__stremioForkDarkTheme = dark;
         localStorage.setItem('stremio-fork-control-timeout','never');
         window.messages=[]; window.handlers=[];
         window.native=(name,data)=>window.handlers.forEach(handler=>handler({data:JSON.stringify({args:[name,data]})}));
@@ -281,6 +281,8 @@ test('Watched badges use warm peach in both themes; the real volume-change popup
             await page.evaluate(dark=>{window.native('theme-changed',{dark});window.setPopupVolume(dark?110:105);},dark);
             await popup.waitFor();
             assert.equal(await popup.evaluate(el=>getComputedStyle(el).color),dark?'rgb(133, 139, 153)':'rgba(255, 255, 255, 0.9)');
+            assert.equal(await popup.evaluate(el=>getComputedStyle(el.parentElement).backgroundColor),dark?'rgba(34, 38, 53, 0.1)':'rgba(255, 255, 255, 0.05)');
+            assert.equal(await popup.evaluate(el=>getComputedStyle(el.parentElement).opacity),'1','Only the background is translucent; speaker opacity is unchanged');
             for(const id of ['watched-badge','watched-poster']) assert.equal(await background(id),'rgb(222, 160, 102)');
             assert.notEqual(await background('upcoming-badge'),'rgb(222, 160, 102)','Upcoming is not a watched marker');
             assert.notEqual(await background('episode-flags'),'rgb(222, 160, 102)','Do not color the combined flags wrapper');
@@ -289,4 +291,19 @@ test('Watched badges use warm peach in both themes; the real volume-change popup
         }
         assert.deepEqual(errors,[]);
     } finally {await browser.close();}
+});
+
+
+test('Dark Mode is the fallback without a shell snapshot and an explicit saved normal-mode choice takes priority',async()=>{
+    const {browser,page,errors,color}=await setup(null,null);
+    try {
+        assert.equal(await page.locator('html').getAttribute('data-stremio-dark-theme'),'');
+        assert.equal(await color('top-icon'),'rgb(133, 139, 153)');
+        await page.evaluate(()=>window.native('theme-changed',{dark:false}));
+        assert.equal(await page.locator('html').getAttribute('data-stremio-dark-theme'),null);
+        assert.equal(await color('top-icon'),'rgb(255, 255, 255)');
+        await page.evaluate(()=>window.native('theme-changed',{dark:'invalid'}));
+        assert.equal(await page.locator('html').getAttribute('data-stremio-dark-theme'),null,'Malformed messages do not replace the saved choice');
+        assert.deepEqual(errors,[]);
+    }finally{await browser.close();}
 });

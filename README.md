@@ -23,7 +23,7 @@
 
 ## ✨ Made for your player
 
-Everything added to this fork, from the first mpv upgrade through **1.3.2**:
+Everything added to this fork, from the first mpv upgrade through **1.3.3**:
 
 | Feature | What you get |
 | --- | --- |
@@ -34,15 +34,15 @@ Everything added to this fork, from the first mpv upgrade through **1.3.2**:
 | 🖼️ **Picture-in-Picture button** | Toggle the shell's borderless, always-on-top mode beside fullscreen, with an icon matching the other controls. Player and tray states stay synchronized. |
 | 🎬 **A clean video frame** | Controls and cursor hide after one second of inactivity while playing or paused by default, with a choice of timeout or Never hide. Mouse movement brings them back; subtitles remain visible and open menus, keyboard focus and slider use stay usable. |
 | 🫧 **Smooth controls everywhere** | The top bar slides upward and bottom controls slide downward whenever they hide, during playback or pause. They slide back in when shown, including newly mounted toolbars. Interrupted slides reverse smoothly. |
-| ⏱️ **Your animation speed** | **Settings → Player → Controls → Control animation speed:** Off, 0.25 sec, **0.5 sec by default**, 0.75 sec or 1 sec. Saved on this device and applied immediately. Off makes transitions instant; system reduced motion takes priority. |
-| ⏲️ **One control timeout everywhere** | Immediately after animation speed, **Settings → Player → Controls → Control player timeout** offers **0.5 sec**, **1 sec by default**, **2 sec**, **5 sec** and **Never hide**. Saved on this device and applied immediately during playback and pause, after mouse or keyboard activity. Never hide keeps controls and the pointer available in both states. |
+| ⏱️ **Your animation speed** | **Settings → Player → Controls → Control animation speed:** Off, **0.1**, 0.25, **0.5 by default**, 0.75 or 1 (seconds). Saved on this device and applied immediately. Off makes transitions instant; system reduced motion takes priority. |
+| ⏲️ **One control timeout everywhere** | Immediately after animation speed, **Settings → Player → Controls → Control player timeout** offers **0.5**, **1 by default**, **2**, **5** and **Never hide**. Saved on this device and applied immediately during playback and pause, after mouse or keyboard activity. Never hide keeps controls and the pointer available in both states. |
 | 🔊 **Volume that follows your settings** | New videos start at 100%, or a lower selected maximum. Changing Maximum Volume rescales the slider and updates mpv's actual boost limit, including above the old 130% cap. The normal range matches the player controls; the boosted range fades from orange to red. |
 | ⏭️ **Reliable autoplay control** | Turning off Auto play next episode stops automatic advancement and cancels its countdown. Manual Next and watch-progress handling remain available. |
 | 🙈 **Consistent spoiler protection** | Unwatched episode thumbnails stay blurred on show pages, in the episode drawer and in the next-episode popup, including alternate images and anime using absolute episode numbers. Watched-state and setting changes update existing images. |
 | ✅ **Warmer watched markers** | Completed-episode badges and library watched markers use **#DEA066** in both modes, with checkmarks and labels retaining their contrast. |
 | 📚 **Readable library & add-on backup** | Export a dated ZIP with an offline HTML report, CSV lists and structured JSON, preserving saved titles, add-on order/configurations and available playback history. |
 | ⚙️ **Clearer settings & shortcuts** | Long labels wrap, options have more breathing room, narrow windows stack controls, and Player Shortcuts lists every shipped input.conf binding plus the fork controls. |
-| 🌑 **A calmer Dark Mode** | Turn on **Use Dark Theme** in the tray menu for a **#222635** app background and softer **#858B99** player icons, episode title, elapsed/total/remaining time labels and normal volume range, including the speaker in the volume-change popup. Normal mode uses white player controls. Changes apply immediately; turning it off restores the original background and white player controls. |
+| 🌑 **A calmer Dark Mode** | **Dark Mode is the default** for new configurations, with a **#222635** app background and softer **#858B99** player icons, episode title, elapsed/total/remaining time labels and normal volume range, including the speaker in the volume-change popup. Its rounded background uses **#222635 at 10% opacity** in Dark Mode. The tray toggle and saved theme choices remain available. Normal mode uses white player controls. Changes apply immediately; turning it off restores the original background and white player controls. |
 | 🟣 **A matching playback bar** | The seek bar and its handle, selected navigation icons, episode-thumbnail progress and playback-source progress and the add-on loading bar use **#7272c2** in both modes. Volume keeps its orange-to-red boost indicator. |
 | 🎛️ **Polished settings dropdowns** | All settings dropdowns share the animation selector's rounded shape, purple border, dark surface and visible keyboard focus, with the existing single- and multiple-selection behavior preserved. |
 | 💜 **A consistent purple identity** | **#7272c2** across app, desktop and tray icons, splash, installer/uninstaller, web logos, return button and default Discord branding. |
@@ -60,9 +60,9 @@ Everything added to this fork, from the first mpv upgrade through **1.3.2**:
 
 | Download | How to use it |
 | --- | --- |
-| 📥 [**1.3.2 installer — recommended**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.2/Ezras-Stremio-1.3.2-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
-| 💼 [**1.3.2 portable ZIP**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.2/Ezras-Stremio-1.3.2-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
-| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.2/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
+| 📥 [**1.3.3 installer — recommended**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.3/Ezras-Stremio-1.3.3-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
+| 💼 [**1.3.3 portable ZIP**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.3/Ezras-Stremio-1.3.3-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
+| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.3/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
 
 Use files named **Ezras-Stremio** for this fork. Downloads marked **BUILD-ONLY** are archived build dependencies. Community package-manager listings install the upstream edition; use this fork's releases for these features.
 
@@ -73,7 +73,7 @@ The fork's own black-bar script is updated by the installer even when retaining 
 1. **Start a video.** Use the toolbar's display button to choose Fit, Crop or Stretch.
 2. **Fill the borders.** Press **Ctrl+B** for ambient blur. For bars encoded into the picture, press **Ctrl+Shift+C** during a clear, playing scene first.
 3. **Choose your motion.** Open **Settings → Player → Controls** and pick the animation speed. The new **Control player timeout** setting chooses how long controls stay visible during playback and pause, including Never hide.
-4. **Try the calmer palette.** Enable **Use Dark Theme** in the tray menu for the slate background and softer player icons. The purple seek bar and refreshed settings dropdowns appear in both modes.
+4. **Try the calmer palette.** Dark Mode starts enabled for new configurations. Use the **Use Dark Theme** tray toggle to choose the slate background and softer player icons or normal mode; saved choices carry over. The purple seek bar and refreshed settings dropdowns appear in both modes.
 5. **Make a backup.** Open Library and Add-ons while online, then use **Settings → Library & add-on backup → Export library & add-ons**.
 
 ### 🌫️ Ambient blur & encoded bars
