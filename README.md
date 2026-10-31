@@ -186,7 +186,7 @@ Fork features are kept in separate native code, scripts and carefully checked in
 - Dependency versions and checksums are pinned, archived build dependencies have mirrors, and GitHub builds/tests the installer and portable package before publication.
 - Release checks cover native blur/framing, no-bar and seam safety, FSR/Anime4K interactions, streaming/transcoding, real community sliders and episode images, settings/shortcuts/animation and timeout preferences, theme switching and live dropdown interaction, backup archives, WebView2 reloads and installer branding.
 
-For development, start from **`webview-windows`** in this fork. **`master`** is kept in sync with tested release snapshots; its legacy history is retained. Merge upstream changes into a feature branch, run the checks and review the result before merging back. The integration checks help detect upstream changes; future compatibility still needs verification.
+For development and current releases, start from the **`webview-windows`** default branch in this fork. Merge upstream changes into a feature branch, run the checks and review the result before merging back. The integration checks help detect upstream changes; future compatibility still needs verification.
 
 📖 [Fork setup, build commands and upstream merge instructions](docs/FORK.md) · [Release notes](docs/RELEASE-mpv.md) · [Build workflow](.github/workflows/windows-release.yml)
 

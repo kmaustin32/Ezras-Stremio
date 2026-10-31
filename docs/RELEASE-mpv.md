@@ -7,7 +7,6 @@ Library shows open their details page so you can choose the episode and source b
 - **Details first for Library shows.** Selecting a show in Library opens episode details instead of automatically starting its cached stream. Poster/title clicks and Enter follow the same native details link. You can choose an episode and then a playback source.
 - **Existing shortcuts preserved.** Movies and Continue Watching retain their current navigation. The context menu's explicit Play action still intentionally uses the cached player; watched/remove actions and library/account data are preserved.
 - **Independent compatibility safeguards.** Library navigation is checked separately from the four playback fixes. Tests cover all 32 combinations, native link forwarding and V3/V4 cache upgrades. Original-bundle tests reproduce the old automatic-player target.
-- **Branches brought up to date.** The maintained webview-windows default branch and master receive the same tested release snapshot. Legacy master history is retained without replacing the maintained application with obsolete files or force-rewriting history.
 
 ### Player preferences retained
 

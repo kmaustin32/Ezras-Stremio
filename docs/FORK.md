@@ -1,9 +1,8 @@
 # Ezra's Stremio
 
 The project repository is [Ezra's Stremio](https://github.com/kmaustin32/Ezras-Stremio).
-Use the `webview-windows` default branch for development. The `master` branch is
-synchronized to tested release snapshots, with its original history preserved. To update an existing
-checkout to the renamed repository:
+Use the `webview-windows` default branch for development and current releases.
+To update an existing checkout to the renamed repository:
 
 ```powershell
 git remote set-url origin https://github.com/kmaustin32/Ezras-Stremio.git
@@ -344,6 +343,6 @@ Selecting a `series` card in the Library model now opens its existing `metaDetai
 
 Tests render the actual Library page body, LibItem, MetaItem, episode and source components. They cover a cached show opening details, choosing an episode and a different source before any playback, keyboard activation, alternate IDs/query strings, route/card reuse, missing details, context menus and unchanged account/library storage. An original-bundle negative control reproduces the old cached-player target.
 
-Library navigation has its own compatibility check, separate from the four playback fixes. CI covers all 32 combinations. Unknown renderer or href-forwarding structures are left intact; V3 and V4 cached patches migrate to V5 metadata without duplicating successful edits. The legacy master branch is joined through a history-preserving merge that retains the maintained application tree, then fast-forwarded to the same final release snapshot as webview-windows; no branch history is force-rewritten.
+Library navigation has its own compatibility check, separate from the four playback fixes. CI covers all 32 combinations. Unknown renderer or href-forwarding structures are left intact; V3 and V4 cached patches migrate to V5 metadata without duplicating successful edits.
 
 The Windows dependency/build cache includes the repository identity because generated CMake files contain absolute checkout paths. Renaming the repository starts a fresh cache namespace, and failed builds do not save partial caches. Pinned dependency versions and checksums remain unchanged.
