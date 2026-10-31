@@ -26,7 +26,10 @@ int main()
             "localStorage.setItem(\"localProfile\",JSON.stringify(i));"
             "l.useLayoutEffect(function(){return function(){window.removeEventListener(\"wheel\",onWheel)}},[Oe.state.volume]);";
         const std::string feedback = "null!==Oe.state.volume&&At?l.createElement(G,{muted:Oe.state.muted,volume:Oe.state.volume}):null";
-        std::string script = autoplay + volume + episodes + feedback;
+        const std::string libraryCard = "r.createElement(L,i({},e,{notifications:A,removable:\"library\"===t,key:a}))";
+        const std::string hrefForwarder = "createElement(I,o({title:r,href:G},s(g),{className:T(t,c[\"meta-item-container\"]";
+        const std::string library = libraryCard + ";" + hrefForwarder;
+        std::string script = autoplay + volume + episodes + feedback + library;
         std::string error;
         require(PatchCommunityPlayer(script).AllApplied(), "Apply all known fixes");
         require(script.find("re(),Te.bingeWatching&&null!==te.nextVideo?Qt():window.history.back()") != std::string::npos,
@@ -50,11 +53,15 @@ int main()
             "Changing setting or season refreshes the episode label");
         require(script.find("null!==Oe.state.volume?l.createElement(G,{muted:Oe.state.muted,volume:Oe.state.volume}):null") != std::string::npos,
             "Native indicator stays mounted independently of pause and hidden controls");
+        require(script.find("\"library\"===t&&e&&\"series\"===e.type?{href:") != std::string::npos,
+            "Only Library series-card links prefer details");
+        require(script.find("e.deepLinks.metaDetailsVideos.length>0?e.deepLinks.metaDetailsVideos") != std::string::npos,
+            "Prefer nonempty episode details before source details without modifying cached player links");
         const auto patched = script;
         require(PatchCommunityPlayer(script).AllApplied() && script == patched, "Patch is idempotent");
         std::string unknown = "new unknown upstream implementation";
         const auto unknownReport = PatchCommunityPlayer(unknown);
-        require(!unknownReport.autoplay && !unknownReport.volume && !unknownReport.episodeBlur && !unknownReport.volumeFeedback &&
+        require(!unknownReport.autoplay && !unknownReport.volume && !unknownReport.episodeBlur && !unknownReport.volumeFeedback && !unknownReport.libraryDetails &&
             unknown.starts_with("new unknown upstream implementation\n;"), "Unknown code stays intact with honest status metadata");
         std::string partial = "pt=l.useCallback(function(){te.nextVideo=Ot.current,Lt.current||(re(),null!==te.nextVideo?Qt():window.history.back())},[te.nextVideo,Qt]);"
             "l.useEffect(function(){Te.bingeWatching&&null!==te.nextVideo&&!ut.current&&(time?it():ot())},[te.nextVideo]);";
@@ -62,27 +69,39 @@ int main()
         const auto partialReport = PatchCommunityPlayer(partial);
         require(partialReport.autoplay && !partialReport.volume && !partialReport.episodeBlur && partial != unchanged,
             "Autoplay works independently of missing volume and blur");
-        for (unsigned mask = 0; mask < 16; ++mask) {
+        for (unsigned mask = 0; mask < 32; ++mask) {
             std::string candidate = (mask & 1 ? autoplay : "/* unknown autoplay */") +
                 (mask & 2 ? volume : "/* unknown volume */") +
                 (mask & 4 ? episodes : "/* unknown episode images */") +
-                (mask & 8 ? feedback : "/* unknown indicator mount */");
+                (mask & 8 ? feedback : "/* unknown indicator mount */") +
+                (mask & 16 ? library : "/* unknown Library renderer */");
             const auto report = PatchCommunityPlayer(candidate);
             require(report.autoplay == bool(mask & 1) && report.volume == bool(mask & 2) &&
-                report.episodeBlur == bool(mask & 4) && report.volumeFeedback == bool(mask & 8), "Every compatibility combination is independent");
-            require(report.warning.empty() == (mask == 15), "Report unavailable fixes");
+                report.episodeBlur == bool(mask & 4) && report.volumeFeedback == bool(mask & 8) && report.libraryDetails == bool(mask & 16), "Every compatibility combination is independent");
+            require(report.warning.empty() == (mask == 31), "Report unavailable fixes");
             const auto once = candidate;
             const auto again = PatchCommunityPlayer(candidate);
             require(candidate == once && again.autoplay == report.autoplay && again.volume == report.volume &&
-                again.episodeBlur == report.episodeBlur && again.volumeFeedback == report.volumeFeedback, "Partial patches are idempotent too");
+                again.episodeBlur == report.episodeBlur && again.volumeFeedback == report.volumeFeedback && again.libraryDetails == report.libraryDetails, "Partial patches are idempotent too");
         }
         const auto footer = patched.rfind("\n;window.__stremioForkAutoplayPatched=");
-        auto legacy = patched.substr(0, footer);
-        const std::string newFeedback = "null!==Oe.state.volume?l.createElement(G,{muted:Oe.state.muted,volume:Oe.state.volume}):null";
-        legacy.replace(legacy.find(newFeedback), newFeedback.size(), feedback);
-        legacy += "\n;window.__stremioForkAutoplayPatched=true;window.__stremioForkVolumePatched=true;window.__stremioForkEpisodeBlurPatched=true;/* StremioForkPlayerCompatibilityV3 */";
-        require(PatchCommunityPlayer(legacy).AllApplied() && legacy == patched,
-            "Upgrade an existing V3 patched cache without duplicating successful edits");
+        for (const bool v4 : {false, true}) {
+            auto legacy = patched.substr(0, footer);
+            const auto start = legacy.find("r.createElement(L,i({},e,{notifications:");
+            legacy.replace(start, legacy.find(';', start) - start, libraryCard);
+            if (!v4) {
+                const std::string newFeedback = "null!==Oe.state.volume?l.createElement(G,{muted:Oe.state.muted,volume:Oe.state.volume}):null";
+                legacy.replace(legacy.find(newFeedback), newFeedback.size(), feedback);
+            }
+            legacy += "\n;window.__stremioForkAutoplayPatched=true;window.__stremioForkVolumePatched=true;window.__stremioForkEpisodeBlurPatched=true;";
+            legacy += v4 ? "window.__stremioForkVolumeFeedbackPatched=true;/* StremioForkPlayerCompatibilityV4 */" : "/* StremioForkPlayerCompatibilityV3 */";
+            require(PatchCommunityPlayer(legacy).AllApplied() && legacy == patched,
+                "Upgrade V3 and V4 caches without duplicating successful edits");
+        }
+        auto badLibrary = autoplay + volume + episodes + feedback + library + libraryCard;
+        const auto badLibraryReport = PatchCommunityPlayer(badLibrary);
+        require(badLibraryReport.autoplay && badLibraryReport.volume && badLibraryReport.episodeBlur && badLibraryReport.volumeFeedback && !badLibraryReport.libraryDetails,
+            "Ambiguous Library renderer fails independently of playback fixes");
         auto ambiguous = autoplay + volume + episodes + feedback + feedback;
         const auto ambiguousReport = PatchCommunityPlayer(ambiguous);
         require(ambiguousReport.autoplay && ambiguousReport.volume && ambiguousReport.episodeBlur && !ambiguousReport.volumeFeedback &&

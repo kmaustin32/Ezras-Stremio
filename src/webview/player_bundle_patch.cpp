@@ -235,18 +235,48 @@ static bool PatchVolumeFeedback(std::string& script, std::string& error)
     return true;
 }
 
+static bool PatchLibraryDetails(std::string& script, std::string& error)
+{
+    // MetaItem forwards explicit href props after its cached-player default.
+    // Validate that ordering before overriding only Library series-card links.
+    const std::regex forwardsHref(R"(createElement\([\w$]+,[\w$]+\(\{title:[\w$]+,href:[\w$]+\},[\w$]+\([\w$]+\),\{className:[\w$]+\([\w$]+,[\w$]+\["meta-item-container"\])");
+    if (!std::regex_search(script, forwardsHref)) {
+        error = "Unsupported community card href forwarding";
+        return false;
+    }
+    const std::regex card(R"(([\w$]+)\.createElement\(([\w$]+),([\w$]+)\(\{\},([\w$]+),\{notifications:([\w$]+),removable:"library"===([\w$]+),key:([\w$]+)\}\)\))");
+    const auto begin = std::sregex_iterator(script.begin(), script.end(), card);
+    if (std::distance(begin, std::sregex_iterator()) != 1) {
+        error = "Unsupported community Library card renderer";
+        return false;
+    }
+    const auto match = *begin;
+    const auto item = match[4].str(), model = match[6].str();
+    const auto details = item + ".deepLinks";
+    const auto video = details + ".metaDetailsVideos", streams = details + ".metaDetailsStreams";
+    const auto href = details + "&&\"string\"==typeof " + video + "&&" + video + ".length>0?" + video +
+        ":" + details + "&&\"string\"==typeof " + streams + "&&" + streams + ".length>0?" + streams + ":null";
+    auto text = match.str();
+    // Preserve the original deepLinks object and context-menu Play action.
+    text.insert(text.size() - 2, ",\"library\"===" + model + "&&" + item + "&&\"series\"===" + item + ".type?{href:" + href + "}:{}");
+    script.replace(static_cast<size_t>(match.position()), static_cast<size_t>(match.length()), text);
+    return true;
+}
+
 PlayerPatchReport PatchCommunityPlayer(std::string& script)
 {
-    constexpr const char* marker = "/* StremioForkPlayerCompatibilityV4 */";
+    constexpr const char* marker = "/* StremioForkPlayerCompatibilityV5 */";
+    constexpr const char* priorMarker = "/* StremioForkPlayerCompatibilityV4 */";
     constexpr const char* legacyMarker = "/* StremioForkPlayerCompatibilityV3 */";
     PlayerPatchReport report;
     const auto statusStart = script.rfind("\n;window.__stremioForkAutoplayPatched=");
-    if ((script.ends_with(marker) || script.ends_with(legacyMarker)) && statusStart != std::string::npos) {
+    if ((script.ends_with(marker) || script.ends_with(priorMarker) || script.ends_with(legacyMarker)) && statusStart != std::string::npos) {
         const auto status = script.substr(statusStart);
         report.autoplay = status.find("__stremioForkAutoplayPatched=true;") != std::string::npos;
         report.volume = status.find("__stremioForkVolumePatched=true;") != std::string::npos;
         report.episodeBlur = status.find("__stremioForkEpisodeBlurPatched=true;") != std::string::npos;
         report.volumeFeedback = status.find("__stremioForkVolumeFeedbackPatched=true;") != std::string::npos;
+        report.libraryDetails = status.find("__stremioForkLibraryDetailsPatched=true;") != std::string::npos;
         if (script.ends_with(marker)) {
             if (!report.AllApplied()) report.warning = "Some community player fixes are unavailable";
             return report;
@@ -270,13 +300,15 @@ PlayerPatchReport PatchCommunityPlayer(std::string& script)
     report.autoplay = report.autoplay || apply("Autoplay", PatchAutoplay);
     report.volume = report.volume || apply("Maximum volume", PatchVolume);
     report.episodeBlur = report.episodeBlur || apply("Episode blur", PatchEpisodeSpoilerBlur);
-    report.volumeFeedback = apply("Volume popup", PatchVolumeFeedback);
+    report.volumeFeedback = report.volumeFeedback || apply("Volume popup", PatchVolumeFeedback);
+    report.libraryDetails = apply("Library details", PatchLibraryDetails);
     const auto boolean = [](bool value) { return value ? "true" : "false"; };
     script += std::string("\n;window.__stremioForkAutoplayPatched=") + boolean(report.autoplay) +
         ";window.__stremioForkVolumePatched=" + boolean(report.volume) +
         ";window.__stremioForkEpisodeBlurPatched=" + boolean(report.episodeBlur) +
-        ";window.__stremioForkVolumeFeedbackPatched=" + boolean(report.volumeFeedback) + ";";
-    script += "window.__stremioForkCompatibility={autoplay:window.__stremioForkAutoplayPatched,volume:window.__stremioForkVolumePatched,episodeBlur:window.__stremioForkEpisodeBlurPatched,volumeFeedback:window.__stremioForkVolumeFeedbackPatched};";
+        ";window.__stremioForkVolumeFeedbackPatched=" + boolean(report.volumeFeedback) +
+        ";window.__stremioForkLibraryDetailsPatched=" + boolean(report.libraryDetails) + ";";
+    script += "window.__stremioForkCompatibility={autoplay:window.__stremioForkAutoplayPatched,volume:window.__stremioForkVolumePatched,episodeBlur:window.__stremioForkEpisodeBlurPatched,volumeFeedback:window.__stremioForkVolumeFeedbackPatched,libraryDetails:window.__stremioForkLibraryDetailsPatched};";
     script += "window.dispatchEvent(new CustomEvent('stremio-fork-compatibility',{detail:window.__stremioForkCompatibility}));";
     script += marker;
     return report;

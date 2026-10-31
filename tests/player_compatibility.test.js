@@ -42,16 +42,26 @@ test('Every combination of upstream changes preserves other fixes and unrelated 
     const feedback = original.match(/null!==([\w$]+)\.state\.volume&&[\w$]+\?[\w$]+\.createElement\([\w$]+,\{muted:\1\.state\.muted,volume:\1\.state\.volume\}\):null/)[0];
     const feedbackPair = [feedback, feedback.replace(/&&[\w$]+\?/, '?')];
     assert.ok(fullBody.includes(feedbackPair[1]));
+    function librarySource(bundle) {
+        const context = {window: {}};
+        const anchor = '(()=>{var e;o.g.importScripts';
+        vm.runInNewContext(bundle.replace(anchor, 'window.libraryModules=a;return;' + anchor), context);
+        return Object.values(context.window.libraryModules).map(factory => factory.toString())
+            .find(source => source.includes('removable:"library"===') && source.includes('catalog.map'));
+    }
+    const library = [librarySource(original), librarySource(fullBody)];
+    assert.ok(library[0] && library[1] && library[0] !== library[1]);
     const features = [
         {key: 'autoplay', edits: [autoplay, countdown], break: [autoplay[0], autoplay[0].replace('function(){', 'function (){')]},
         {key: 'volume', edits: [volume, keyboard, storagePair], break: [volume[0], volume[0].replace('function(', 'function (')]},
         {key: 'episodeBlur', edits: beforeEpisodes.map((source, index) => [source, afterEpisodes[index]]),
             break: [beforeEpisodes[0], beforeEpisodes[0].replaceAll('.blurred,', '.blurred /* upstream changed */,')]},
-        {key: 'volumeFeedback', edits: [feedbackPair], break: [feedback, feedback.replace('volume&&', 'volume /* upstream changed */&&')]}
+        {key: 'volumeFeedback', edits: [feedbackPair], break: [feedback, feedback.replace('volume&&', 'volume /* upstream changed */&&')]},
+        {key: 'libraryDetails', edits: [library], break: [library[0], library[0].replace('removable:"library"===', 'removable:/* upstream changed */"library"===')]}
     ];
-    for (let mask = 0; mask < 16; mask++) {
+    for (let mask = 0; mask < 32; mask++) {
         let input = original, expectedBody = fullBody;
-        for (let index = 0; index < 4; index++) if (!(mask & (1 << index))) {
+        for (let index = 0; index < 5; index++) if (!(mask & (1 << index))) {
             const feature = features[index];
             input = input.replace(...feature.break);
             for (const [before, after] of feature.edits) expectedBody = expectedBody.replace(after, before);
@@ -69,13 +79,13 @@ test('Every combination of upstream changes preserves other fixes and unrelated 
         const context = {window: {dispatchEvent: event => events.push(event)},
             CustomEvent: function(type, data) { this.type = type; this.detail = data.detail; }};
         vm.runInNewContext(output.slice(start), context);
-        for (let index = 0; index < 4; index++)
+        for (let index = 0; index < 5; index++)
             assert.equal(context.window.__stremioForkCompatibility[features[index].key], Boolean(mask & (1 << index)));
         assert.equal(events.length, 1);
         assert.equal(events[0].type, 'stremio-fork-compatibility');
         execFileSync(executable, [outputFile, outputFile + '.again', '--allow-partial']);
         assert.equal(fs.readFileSync(outputFile + '.again', 'utf8'), output, 'Reloading must not apply edits twice');
-        if (mask !== 15)
+        if (mask !== 31)
             assert.throws(() => execFileSync(executable, [inputFile, outputFile + '.strict'], {stdio: 'pipe'}),
                 'Release verification must still reject an incompatible current upstream interface');
     }

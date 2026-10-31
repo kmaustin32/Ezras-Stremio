@@ -120,7 +120,16 @@ test('Live community player respects autoplay without losing completion or manua
     const oldFeedback = original.match(/null!==([\w$]+)\.state\.volume&&[\w$]+\?[\w$]+\.createElement\([\w$]+,\{muted:\1\.state\.muted,volume:\1\.state\.volume\}\):null/)[0];
     const newFeedback = oldFeedback.replace(/&&[\w$]+\?/, '?');
     assert.ok(script.includes(newFeedback), 'Keep the real volume indicator mounted independently of upstream overlay state');
-    let restored = script.replace(newFeedback, oldFeedback);
+    function librarySource(bundle) {
+        const context = {window: {}};
+        const anchor = '(()=>{var e;o.g.importScripts';
+        vm.runInNewContext(bundle.replace(anchor, 'window.libraryModules=a;return;' + anchor), context);
+        return Object.values(context.window.libraryModules).map(factory => factory.toString())
+            .find(source => source.includes('removable:"library"===') && source.includes('catalog.map'));
+    }
+    const originalLibrary = librarySource(original), patchedLibrary = librarySource(script);
+    assert.ok(originalLibrary && patchedLibrary && originalLibrary !== patchedLibrary);
+    let restored = script.replace(newFeedback, oldFeedback).replace(patchedLibrary, originalLibrary);
     for (let i = 0; i < 2; i++) {
         assert.notEqual(newEpisodes[i], oldEpisodes[i]);
         restored = restored.replace(newEpisodes[i], oldEpisodes[i]);
@@ -132,5 +141,5 @@ test('Live community player respects autoplay without losing completion or manua
     assert.equal(restored.replace(target[0], originalTarget[0]).replace(popup[0], originalPopup[0])
         .replace(volume[0], originalVolume[0]).replace(storagePatched, storageOriginal[0])
         .replace(patchedKeyboard[0], original.match(keyboardPattern)[0])
-        .replace(/\n;window\.__stremioForkAutoplayPatched=[\s\S]*\/\* StremioForkPlayerCompatibilityV4 \*\/$/, ''), original);
+        .replace(/\n;window\.__stremioForkAutoplayPatched=[\s\S]*\/\* StremioForkPlayerCompatibilityV5 \*\/$/, ''), original);
 });

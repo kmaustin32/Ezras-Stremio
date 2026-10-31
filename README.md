@@ -23,7 +23,7 @@
 
 ## ✨ Made for your player
 
-Everything added to this fork, from the first mpv upgrade through **1.3.4**:
+Everything added to this fork, from the first mpv upgrade through **1.3.5**:
 
 | Feature | What you get |
 | --- | --- |
@@ -42,6 +42,7 @@ Everything added to this fork, from the first mpv upgrade through **1.3.4**:
 | ⏭️ **Reliable autoplay control** | Turning off Auto play next episode stops automatic advancement and cancels its countdown. Manual Next and watch-progress handling remain available. |
 | 🙈 **Consistent spoiler protection** | Unwatched episode thumbnails stay blurred on show pages, in the episode drawer and in the next-episode popup, including alternate images and anime using absolute episode numbers. Watched-state and setting changes update existing images. |
 | ✅ **Warmer watched markers** | Completed-episode badges and library watched markers use **#DEA066** in both modes, with checkmarks and labels retaining their contrast. |
+| 🎟️ **Library shows open details** | Selecting a show in **Library** opens its episode details instead of immediately resuming a cached stream, so you can choose an episode and playback source. Movies, Continue Watching and explicit Play actions keep their behavior. |
 | 📚 **Readable library & add-on backup** | Export a dated ZIP with an offline HTML report, CSV lists and structured JSON, preserving saved titles, add-on order/configurations and available playback history. |
 | ⚙️ **Clearer settings & shortcuts** | Long labels wrap, options have more breathing room, narrow windows stack controls, and Player Shortcuts lists every shipped input.conf binding plus the fork controls. |
 | 🌑 **A calmer Dark Mode** | **Dark Mode is the default** for new configurations, with a **#222635** app background and softer **#858B99** player icons, episode title, elapsed/total/remaining time labels and normal volume range, including the speaker in the volume-change popup. Its rounded background uses **#222635 at 10% opacity** in Dark Mode. The tray toggle and saved theme choices remain available. Normal mode uses white player controls. Changes apply immediately; turning it off restores the original background and white player controls. |
@@ -62,9 +63,9 @@ Everything added to this fork, from the first mpv upgrade through **1.3.4**:
 
 | Download | How to use it |
 | --- | --- |
-| 📥 [**1.3.4 installer — recommended**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.4/Ezras-Stremio-1.3.4-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
-| 💼 [**1.3.4 portable ZIP**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.4/Ezras-Stremio-1.3.4-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
-| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.4/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
+| 📥 [**1.3.5 installer — recommended**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.5/Ezras-Stremio-1.3.5-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
+| 💼 [**1.3.5 portable ZIP**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.5/Ezras-Stremio-1.3.5-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
+| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.5/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
 
 Use files named **Ezras-Stremio** for this fork. Downloads marked **BUILD-ONLY** are archived build dependencies. Community package-manager listings install the upstream edition; use this fork's releases for these features.
 
@@ -180,12 +181,12 @@ Anime4K and FSR are included. Other mpv filters, shaders and optional upscalers 
 Fork features are kept in separate native code, scripts and carefully checked integration patches. Upstream source history is retained so community updates can be merged and reviewed.
 
 - **Upstream binary auto-updates are disabled by default**, so an original community installer cannot silently replace this fork. Install new Ezra's Stremio releases from this repository.
-- Autoplay, maximum-volume, episode-blur and volume-popup patches validate independently. If the hosted UI changes incompatibly, an amber player indicator names the unavailable fixes while other compatible fixes remain active.
+- Autoplay, maximum-volume, episode-blur, volume-popup and Library show-navigation patches validate independently. If the hosted UI changes incompatibly, an amber player indicator names the unavailable fixes while other compatible fixes remain active.
 - Changed compatibility patches refresh the hosted UI's script cache once while preserving login storage, preferences and player configuration.
 - Dependency versions and checksums are pinned, archived build dependencies have mirrors, and GitHub builds/tests the installer and portable package before publication.
 - Release checks cover native blur/framing, no-bar and seam safety, FSR/Anime4K interactions, streaming/transcoding, real community sliders and episode images, settings/shortcuts/animation and timeout preferences, theme switching and live dropdown interaction, backup archives, WebView2 reloads and installer branding.
 
-For development, start from **`webview-windows`** in this fork. Merge upstream changes into a feature branch, run the checks and review the result before merging back. The integration checks help detect upstream changes; future compatibility still needs verification.
+For development, start from **`webview-windows`** in this fork. **`master`** is kept in sync with tested release snapshots; its legacy history is retained. Merge upstream changes into a feature branch, run the checks and review the result before merging back. The integration checks help detect upstream changes; future compatibility still needs verification.
 
 📖 [Fork setup, build commands and upstream merge instructions](docs/FORK.md) · [Release notes](docs/RELEASE-mpv.md) · [Build workflow](.github/workflows/windows-release.yml)
 

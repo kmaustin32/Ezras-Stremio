@@ -1,7 +1,8 @@
 # Ezra's Stremio
 
 The project repository is [Ezra's Stremio](https://github.com/kmaustin32/Ezras-Stremio).
-Use the `webview-windows` default branch for development. To update an existing
+Use the `webview-windows` default branch for development. The `master` branch is
+synchronized to tested release snapshots, with its original history preserved. To update an existing
 checkout to the renamed repository:
 
 ```powershell
@@ -19,7 +20,7 @@ D3D11 playback. Use Windows 10/11 x64.
 
 ## Install and use
 
-Download `Ezras-Stremio-1.3.4-x64.exe` from this fork's release. The installer
+Download `Ezras-Stremio-1.3.5-x64.exe` from this fork's release. The installer
 installs WebView2 when needed. The `.zip` is portable but requires the system
 WebView2 runtime. Extract the ZIP into its own directory and run `stremio.exe`.
 Use the installer whose filename starts with `Ezras-Stremio`; **BUILD-ONLY** downloads are
@@ -149,13 +150,13 @@ video ends and cancels an open next-episode countdown. Manual Next still works, 
 remains intact. A scoped compatibility patch applies this setting check to the
 hosted community player's end handler and refreshes it when the setting changes.
 The original community UI and its other features remain hosted upstream. The
-patch validates and applies autoplay, maximum-volume, episode-blur and volume-popup fixes
+patch validates and applies autoplay, maximum-volume, episode-blur, volume-popup and Library-navigation fixes
 independently. If upstream changes one feature, its code stays intact while the
 other compatible fixes still apply. Every feature validates all of its edits
 before committing them. A small amber indicator in the player lists unavailable
 fixes, and the log records the compatibility failure. This is a compatibility
 fallback, not a guarantee that future upstream implementations retain those fixes.
-CI requires all four fixes to work against the live upstream bundle and checks
+CI requires all five fixes to work against the live upstream bundle and checks
 every combination of changed feature code before publishing, so source
 updates that change this integration require review.
 On the first launch of a changed compatibility patch, the app refreshes the
@@ -335,3 +336,12 @@ During active native playback, plain Up/Down retains the community player's orig
 The original community VolumeChangeIndicator is kept mounted while volume is available. It no longer depends on the community overlay-hidden flag, which can disagree with the fork's control timeout. The existing effect shows it only on a real volume change and resets its own 1500 ms timer, including while paused or with Never hide enabled. No initial popup or duplicate custom indicator is added. Mouse movement, control visibility and pause changes do not interrupt that timer. The read-only popup and its descendants ignore pointer input, preserving video pause clicks and preventing feedback from starting a slider drag. Both toolbar and popup volume sliders receive the same theme/boost styling and current maximum.
 
 Volume feedback has its own compatibility check and amber warning, independent of autoplay, amplification and episode blur. Unknown or ambiguous mount code remains untouched. Version 3 patched caches can migrate to version 4 metadata without applying previous successful edits twice; the normal patch-revision cache refresh still preserves account storage and configuration. Tests exercise all 16 compatibility combinations, original-behavior negative controls, the real spatial-navigation polyfill, real keyboard effect, Button/Slider/VolumeChangeIndicator components, menu/form navigation, limits/repeats, timer reset and theme boundaries.
+
+
+### Library show details and source choice (1.3.5)
+
+Selecting a `series` card in the Library model now opens its existing `metaDetailsVideos` link, with `metaDetailsStreams` as a fallback, rather than the remembered player URL. The native anchor is changed at the Library renderer, so poster/title clicks and Enter use the same destination. Empty or malformed details links never silently fall through to cached playback. The original deepLinks object remains intact: explicit context-menu Play, watched/remove actions, movies and Continue Watching keep their upstream behavior. No library/profile data is rewritten and no additional network request is made per card.
+
+Tests render the actual Library page body, LibItem, MetaItem, episode and source components. They cover a cached show opening details, choosing an episode and a different source before any playback, keyboard activation, alternate IDs/query strings, route/card reuse, missing details, context menus and unchanged account/library storage. An original-bundle negative control reproduces the old cached-player target.
+
+Library navigation has its own compatibility check, separate from the four playback fixes. CI covers all 32 combinations. Unknown renderer or href-forwarding structures are left intact; V3 and V4 cached patches migrate to V5 metadata without duplicating successful edits. The legacy master branch is joined through a history-preserving merge that retains the maintained application tree, then fast-forwarded to the same final release snapshot as webview-windows; no branch history is force-rewritten.
