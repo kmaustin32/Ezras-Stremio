@@ -123,7 +123,8 @@ test('Live community player respects autoplay without losing completion or manua
     function librarySource(bundle) {
         const context = {window: {}};
         const anchor = '(()=>{var e;o.g.importScripts';
-        vm.runInNewContext(bundle.replace(anchor, 'window.libraryModules=a;return;' + anchor), context);
+        const body = bundle.split('\n;window.__stremioForkAutoplayPatched=')[0];
+        vm.runInNewContext(body.replace(anchor, 'window.libraryModules=a;return;' + anchor), context);
         return Object.values(context.window.libraryModules).map(factory => factory.toString())
             .find(source => source.includes('removable:"library"===') && source.includes('catalog.map'));
     }
