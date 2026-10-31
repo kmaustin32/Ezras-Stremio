@@ -1,17 +1,17 @@
-## Ezra's Stremio 1.3.4
+## Ezra's Stremio 1.3.5
 
-Restores volume keys and feedback while preserving the player controls and timing preferences.
+Library shows open their details page so you can choose the episode and source before playback.
 
-### What's fixed
+### What's new
 
-- **Up/Down stays on volume.** During native playback, plain Up/Down changes volume by 5% without moving focus among toolbar buttons. Repeats, live maximum volume, paused playback and the lower limit are preserved. Menus, editors, focused sliders, Tab/Enter, seeking and existing shortcuts keep their behavior.
-- **The speaker popup returns.** The existing community indicator stays mounted independently of control visibility, so it works while playing or paused, with visible controls and with Never hide. Its own 1.5-second timer resets on each volume change, and moving the mouse no longer removes it. It does not flash on startup. Read-only feedback lets video pause clicks pass through and cannot start a slider drag.
-- **Synchronized volume styling.** Toolbar and popup sliders both follow the configured maximum, normal theme colors and orange-to-red boost range.
-- **Independent compatibility safeguards.** The popup fix validates separately from autoplay, amplification and episode blur. Unknown or ambiguous upstream code retains its original behavior and shows an amber compatibility warning. Existing version 3 patched caches upgrade without duplicating successful edits.
+- **Details first for Library shows.** Selecting a show in Library opens episode details instead of automatically starting its cached stream. Poster/title clicks and Enter follow the same native details link. You can choose an episode and then a playback source.
+- **Existing shortcuts preserved.** Movies and Continue Watching retain their current navigation. The context menu's explicit Play action still intentionally uses the cached player; watched/remove actions and library/account data are preserved.
+- **Independent compatibility safeguards.** Library navigation is checked separately from the four playback fixes. Tests cover all 32 combinations, native link forwarding and V3/V4 cache upgrades. Original-bundle tests reproduce the old automatic-player target.
+- **Branches brought up to date.** The maintained webview-windows default branch and master receive the same tested release snapshot. Legacy master history is retained without replacing the maintained application with obsolete files or force-rewriting history.
 
-### Control preferences retained
+### Player preferences retained
 
-Dark Mode remains the default for new configurations, with saved theme choices respected. The volume popup uses #222635 at 10% background opacity and a #858B99 speaker in Dark Mode. Animation speed remains Off, 0.1, 0.25, 0.5 (default), 0.75 or 1; timeout remains 0.5, 1 (default), 2, 5 or Never hide. Reduced motion, protected menu/slider interactions and saved timing preferences continue to apply.
+Up/Down volume keys, click-through volume feedback, source selection and existing framing/blur shortcuts remain available. Dark Mode defaults and saved theme choices, 0.1–1 second control animations, the unified timeout including Never hide, subtitles, volume boost and account-preserving cache refresh are retained.
 
 ### Everything from the fork, in one stable release
 
@@ -32,14 +32,14 @@ The redesigned [README](../README.md) covers these features, installation, short
 
 ### Downloads
 
-- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.4/Ezras-Stremio-1.3.4-x64.exe)
-- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.4/Ezras-Stremio-1.3.4-x64.zip)
-- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.4/SHA256SUMS.txt)
+- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.5/Ezras-Stremio-1.3.5-x64.exe)
+- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.5/Ezras-Stremio-1.3.5-x64.zip)
+- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.5/SHA256SUMS.txt)
 
 Use Windows 10/11 x64. The installer sets up WebView2 when needed; the portable ZIP needs the system WebView2 Runtime. When upgrading, retain your configuration to keep custom mpv.conf, input.conf and other scripts. The fork's own black-bar script is updated. The original shell version and installation/profile paths are retained for upgrade compatibility.
 
 ### Validation and upstream compatibility
 
-GitHub Actions builds the installer and portable archive and runs the native configuration, blur/framing/rendering, black-bar/seam, shader, streaming/transcoding, all 16 live player compatibility combinations, real keyboard/spatial-navigation and popup interactions, real community slider, episode-image blur, settings/shortcuts, animation and timeout preferences, theme switching, live dropdown interaction, backup, WebView2 and installer-branding checks before publication.
+GitHub Actions builds the installer and portable archive and runs the native configuration, blur/framing/rendering, black-bar/seam, shader, streaming/transcoding, all 32 live compatibility combinations, actual Library/details/episode/source navigation, real keyboard/spatial-navigation and popup interactions, real community slider, episode-image blur, settings/shortcuts, animation and timeout preferences, theme switching, live dropdown interaction, backup, WebView2 and installer-branding checks before publication.
 
 Theme and settings styling are isolated in the fork script; they do not rewrite the hosted community bundle or profile. Automatic upstream binary updates remain disabled. Source history is preserved for future upstream merges; incompatible hosted UI changes are reported rather than silently discarding other compatible fixes.

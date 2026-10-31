@@ -492,13 +492,13 @@
     }
 
     function receiveCompatibility(value) {
-        if (!value || !['autoplay', 'volume', 'episodeBlur', 'volumeFeedback'].every(key => typeof value[key] === 'boolean')) return;
-        compatibility = {autoplay: value.autoplay, volume: value.volume, episodeBlur: value.episodeBlur, volumeFeedback: value.volumeFeedback};
+        if (!value || !['autoplay', 'volume', 'episodeBlur', 'volumeFeedback', 'libraryDetails'].every(key => typeof value[key] === 'boolean')) return;
+        compatibility = {autoplay: value.autoplay, volume: value.volume, episodeBlur: value.episodeBlur, volumeFeedback: value.volumeFeedback, libraryDetails: value.libraryDetails};
         schedule();
     }
 
     function updateCompatibility(player) {
-        const names = {autoplay: 'Autoplay setting fix', volume: 'Maximum volume fix', episodeBlur: 'Unwatched thumbnail blur fix', volumeFeedback: 'Volume popup fix'};
+        const names = {autoplay: 'Autoplay setting fix', volume: 'Maximum volume fix', episodeBlur: 'Unwatched thumbnail blur fix', volumeFeedback: 'Volume popup fix', libraryDetails: 'Library show details fix'};
         const missing = compatibility && Object.keys(names).filter(key => !compatibility[key]);
         const fullscreen = player?.querySelector('[class*="horizontal-nav-bar-container"] #stremio-fork-pip') ||
             player?.querySelector('[class*="horizontal-nav-bar-container"] [class*="buttons-container"] > [class*="button-container"][title]:not([class*="menu-button-container"]):not(#stremio-fork-compatibility)');

@@ -8,8 +8,9 @@ struct PlayerPatchReport {
     bool volume = false;
     bool episodeBlur = false;
     bool volumeFeedback = false;
+    bool libraryDetails = false;
     std::string warning;
-    bool AllApplied() const { return autoplay && volume && episodeBlur && volumeFeedback; }
+    bool AllApplied() const { return autoplay && volume && episodeBlur && volumeFeedback && libraryDetails; }
 };
 // Each feature commits only after its own validation. Unknown features retain
 // upstream behavior; status metadata describes what was actually applied.
