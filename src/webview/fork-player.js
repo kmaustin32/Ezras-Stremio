@@ -131,18 +131,19 @@
     }
 
     function updateVolume(player) {
-        const slider = player?.querySelector('[class*="volume-slider"]');
-        if (!slider) return;
+        const sliders = player?.querySelectorAll('[class*="volume-slider"]') || [];
         const threshold = Math.min(100 / maximum * 100, 100);
         const gradient = maximum > 100 ? `linear-gradient(to right, var(--primary-foreground-color,#fff) 0%, var(--primary-foreground-color,#fff) ${threshold}%, #ffa500 ${threshold}%, #ff0000 100%)` : '';
-        for (const track of slider.querySelectorAll('[class*="track-after"], [class*="Slider__track__"], [class*="track-"]:not([class*="track-before"]):not([class*="track-after"])')) {
-            setStyle(track, 'background-image', gradient);
+        for (const slider of sliders) {
+            for (const track of slider.querySelectorAll('[class*="track-after"], [class*="Slider__track__"], [class*="track-"]:not([class*="track-before"]):not([class*="track-after"])')) {
+                setStyle(track, 'background-image', gradient);
+            }
+            const fraction = maximum > 100 && !muted ? Math.max(0, Math.min((volume - 100) / (maximum - 100), 1)) : 0;
+            const color = !muted && volume > 100 && maximum > 100 ?
+                `rgb(255, ${Math.round(165 * (1 - fraction))}, 0)` : 'var(--primary-foreground-color,#fff)';
+            setStyle(slider.querySelector('[class*="thumb"]'), 'background-color', color);
+            slider.setAttribute('aria-label', muted ? 'Volume muted' : `Volume ${Math.round(volume)}%`);
         }
-        const fraction = maximum > 100 && !muted ? Math.max(0, Math.min((volume - 100) / (maximum - 100), 1)) : 0;
-        const color = !muted && volume > 100 && maximum > 100 ?
-            `rgb(255, ${Math.round(165 * (1 - fraction))}, 0)` : 'var(--primary-foreground-color,#fff)';
-        setStyle(slider.querySelector('[class*="thumb"]'), 'background-color', color);
-        slider.setAttribute('aria-label', muted ? 'Volume muted' : `Volume ${Math.round(volume)}%`);
     }
 
     function send(event, args = []) {
@@ -286,6 +287,10 @@
         if (pointerHeld || document.documentElement.className.includes('active-slider-within')) return true;
         const controls = '[class*="nav-bar-layer"], [class*="control-bar-layer"], [class*="side-drawer-button-layer"]';
         if (keyboardFocus && controlPlayer?.contains(document.activeElement) && document.activeElement.closest(controls)) return true;
+        return playerOverlayOpen();
+    }
+
+    function playerOverlayOpen() {
         // Never hide a settings/subtitle/speed menu, episode drawer, popup,
         // error or loading state. These elements are owned by the hosted UI.
         const selectors = '[class*="menu-layer"], [class*="side-drawer-layer"], [class*="error-layer"], [class*="buffering-layer"], [class*="context-menu-container"], [role="dialog"], [role="menu"]';
@@ -295,6 +300,16 @@
             return rect.width > 0 && rect.height > 0 && style.display !== 'none' &&
                 style.visibility !== 'hidden' && Number(style.opacity) > 0;
         });
+    }
+
+    function volumeArrow(event) {
+        if (!state.active || !controlPlayer || !['ArrowUp', 'ArrowDown'].includes(event.code) ||
+            event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || pointerHeld ||
+            document.documentElement.className.includes('active-slider-within')) return false;
+        const target = event.target;
+        if (!(target instanceof Element) || (target !== document.body && !controlPlayer.contains(target))) return false;
+        if (target.isContentEditable || target.closest('input, textarea, select, [contenteditable="true"], [role="slider"], [role="spinbutton"], [role="listbox"], [role="combobox"], [class*="slider-container"], [class*="volume-slider"], [class*="seek-bar"]')) return false;
+        return !playerOverlayOpen();
     }
 
     function showControls() {
@@ -403,7 +418,12 @@
         window.addEventListener('pointercancel', release, true);
         window.addEventListener('blur', release);
         document.addEventListener('keydown', event => {
-            keyboardFocus = true;
+            if (volumeArrow(event)) {
+                // The community player still handles volume exactly once. Stop
+                // only default scrolling and its spatial-navigation polyfill.
+                event.preventDefault();
+                event.spatialNavigationPrevented = true;
+            } else keyboardFocus = true;
             if (controlPlayer?.contains(event.target) || event.target === document.body) controlActivity();
         }, true);
         document.addEventListener('focusin', event => {
@@ -472,13 +492,13 @@
     }
 
     function receiveCompatibility(value) {
-        if (!value || !['autoplay', 'volume', 'episodeBlur'].every(key => typeof value[key] === 'boolean')) return;
-        compatibility = {autoplay: value.autoplay, volume: value.volume, episodeBlur: value.episodeBlur};
+        if (!value || !['autoplay', 'volume', 'episodeBlur', 'volumeFeedback'].every(key => typeof value[key] === 'boolean')) return;
+        compatibility = {autoplay: value.autoplay, volume: value.volume, episodeBlur: value.episodeBlur, volumeFeedback: value.volumeFeedback};
         schedule();
     }
 
     function updateCompatibility(player) {
-        const names = {autoplay: 'Autoplay setting fix', volume: 'Maximum volume fix', episodeBlur: 'Unwatched thumbnail blur fix'};
+        const names = {autoplay: 'Autoplay setting fix', volume: 'Maximum volume fix', episodeBlur: 'Unwatched thumbnail blur fix', volumeFeedback: 'Volume popup fix'};
         const missing = compatibility && Object.keys(names).filter(key => !compatibility[key]);
         const fullscreen = player?.querySelector('[class*="horizontal-nav-bar-container"] #stremio-fork-pip') ||
             player?.querySelector('[class*="horizontal-nav-bar-container"] [class*="buttons-container"] > [class*="button-container"][title]:not([class*="menu-button-container"]):not(#stremio-fork-compatibility)');
@@ -495,7 +515,7 @@
             compatibilityStatus.innerHTML = '<svg viewBox="0 0 512 512" aria-hidden="true" style="width:2.5rem;height:2.5rem"><path d="M256 60L480 440H32Z" fill="none" stroke="currentColor" stroke-width="32" stroke-linejoin="round"/><path d="M256 185v120" stroke="currentColor" stroke-width="36" stroke-linecap="round"/><circle cx="256" cy="370" r="20" fill="currentColor"/></svg>';
         }
         if (compatibilityStatus.className !== fullscreen.className) compatibilityStatus.className = fullscreen.className;
-        const title = `The web interface changed. Unavailable: ${missing.map(key => names[key]).join(', ')}. ${missing.length === 3 ? 'Upstream player behavior is in use.' : 'Other compatible fixes remain active.'}`;
+        const title = `The web interface changed. Unavailable: ${missing.map(key => names[key]).join(', ')}. ${missing.length === Object.keys(names).length ? 'Upstream player behavior is in use.' : 'Other compatible fixes remain active.'}`;
         if (compatibilityStatus.title !== title) {
             compatibilityStatus.title = title;
             compatibilityStatus.setAttribute('aria-label', title);

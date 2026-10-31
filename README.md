@@ -23,7 +23,7 @@
 
 ## ✨ Made for your player
 
-Everything added to this fork, from the first mpv upgrade through **1.3.3**:
+Everything added to this fork, from the first mpv upgrade through **1.3.4**:
 
 | Feature | What you get |
 | --- | --- |
@@ -36,7 +36,9 @@ Everything added to this fork, from the first mpv upgrade through **1.3.3**:
 | 🫧 **Smooth controls everywhere** | The top bar slides upward and bottom controls slide downward whenever they hide, during playback or pause. They slide back in when shown, including newly mounted toolbars. Interrupted slides reverse smoothly. |
 | ⏱️ **Your animation speed** | **Settings → Player → Controls → Control animation speed:** Off, **0.1**, 0.25, **0.5 by default**, 0.75 or 1 (seconds). Saved on this device and applied immediately. Off makes transitions instant; system reduced motion takes priority. |
 | ⏲️ **One control timeout everywhere** | Immediately after animation speed, **Settings → Player → Controls → Control player timeout** offers **0.5**, **1 by default**, **2**, **5** and **Never hide**. Saved on this device and applied immediately during playback and pause, after mouse or keyboard activity. Never hide keeps controls and the pointer available in both states. |
-| 🔊 **Volume that follows your settings** | New videos start at 100%, or a lower selected maximum. Changing Maximum Volume rescales the slider and updates mpv's actual boost limit, including above the old 130% cap. The normal range matches the player controls; the boosted range fades from orange to red. |
+| 🔊 **Volume that follows your settings** | New videos start at 100%, or a lower selected maximum. Changing Maximum Volume rescales the slider and updates mpv's actual boost limit, including above the old 130% cap. The normal range matches the player controls; the boosted range fades from orange to red. Toolbar and popup sliders stay synchronized. |
+| ⌨ **Volume keys that stay on volume** | **Up / Down** change volume in 5% steps during playback and pause without moving focus into the toolbar. Menus, editors and focused sliders keep their own keyboard behavior; Tab/Enter and existing shortcuts remain available. |
+| 🔈 **Reliable volume feedback** | The original speaker popup appears on volume changes even while paused, with visible controls or with Never hide enabled. Its own 1.5-second timer resets on each change; moving the mouse does not dismiss it. |
 | ⏭️ **Reliable autoplay control** | Turning off Auto play next episode stops automatic advancement and cancels its countdown. Manual Next and watch-progress handling remain available. |
 | 🙈 **Consistent spoiler protection** | Unwatched episode thumbnails stay blurred on show pages, in the episode drawer and in the next-episode popup, including alternate images and anime using absolute episode numbers. Watched-state and setting changes update existing images. |
 | ✅ **Warmer watched markers** | Completed-episode badges and library watched markers use **#DEA066** in both modes, with checkmarks and labels retaining their contrast. |
@@ -60,9 +62,9 @@ Everything added to this fork, from the first mpv upgrade through **1.3.3**:
 
 | Download | How to use it |
 | --- | --- |
-| 📥 [**1.3.3 installer — recommended**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.3/Ezras-Stremio-1.3.3-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
-| 💼 [**1.3.3 portable ZIP**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.3/Ezras-Stremio-1.3.3-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
-| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.3/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
+| 📥 [**1.3.4 installer — recommended**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.4/Ezras-Stremio-1.3.4-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
+| 💼 [**1.3.4 portable ZIP**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.4/Ezras-Stremio-1.3.4-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
+| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.4/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
 
 Use files named **Ezras-Stremio** for this fork. Downloads marked **BUILD-ONLY** are archived build dependencies. Community package-manager listings install the upstream edition; use this fork's releases for these features.
 
@@ -105,6 +107,7 @@ The same list is available in **Settings → Player Shortcuts**. These are the s
 | **F1** | Toggle audio normalization |
 | **F2** | Cycle subtitle overrides: Force → Strip → No |
 | **K** or **left click** | Play / pause |
+| **Up / Down** | Raise / lower volume by 5% during native playback; menus and focused editing controls retain their normal keys |
 | **J / L** | Seek backward / forward 10 seconds |
 | **[ / ]** | Decrease / increase playback speed by 0.25 |
 | **Tab** | Use the bundled anime-intro skip script after the intro starts |
@@ -177,7 +180,7 @@ Anime4K and FSR are included. Other mpv filters, shaders and optional upscalers 
 Fork features are kept in separate native code, scripts and carefully checked integration patches. Upstream source history is retained so community updates can be merged and reviewed.
 
 - **Upstream binary auto-updates are disabled by default**, so an original community installer cannot silently replace this fork. Install new Ezra's Stremio releases from this repository.
-- Autoplay, volume and episode-blur patches validate independently. If the hosted UI changes incompatibly, an amber player indicator names the unavailable fixes while other compatible fixes remain active.
+- Autoplay, maximum-volume, episode-blur and volume-popup patches validate independently. If the hosted UI changes incompatibly, an amber player indicator names the unavailable fixes while other compatible fixes remain active.
 - Changed compatibility patches refresh the hosted UI's script cache once while preserving login storage, preferences and player configuration.
 - Dependency versions and checksums are pinned, archived build dependencies have mirrors, and GitHub builds/tests the installer and portable package before publication.
 - Release checks cover native blur/framing, no-bar and seam safety, FSR/Anime4K interactions, streaming/transcoding, real community sliders and episode images, settings/shortcuts/animation and timeout preferences, theme switching and live dropdown interaction, backup archives, WebView2 reloads and installer branding.

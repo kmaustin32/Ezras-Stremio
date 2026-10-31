@@ -39,15 +39,19 @@ test('Every combination of upstream changes preserves other fixes and unrelated 
     const beforeEpisodes = episodeSources(original), afterEpisodes = episodeSources(fullBody);
     assert.equal(beforeEpisodes.length, 2);
     assert.equal(afterEpisodes.length, 2);
+    const feedback = original.match(/null!==([\w$]+)\.state\.volume&&[\w$]+\?[\w$]+\.createElement\([\w$]+,\{muted:\1\.state\.muted,volume:\1\.state\.volume\}\):null/)[0];
+    const feedbackPair = [feedback, feedback.replace(/&&[\w$]+\?/, '?')];
+    assert.ok(fullBody.includes(feedbackPair[1]));
     const features = [
         {key: 'autoplay', edits: [autoplay, countdown], break: [autoplay[0], autoplay[0].replace('function(){', 'function (){')]},
         {key: 'volume', edits: [volume, keyboard, storagePair], break: [volume[0], volume[0].replace('function(', 'function (')]},
         {key: 'episodeBlur', edits: beforeEpisodes.map((source, index) => [source, afterEpisodes[index]]),
-            break: [beforeEpisodes[0], beforeEpisodes[0].replaceAll('.blurred,', '.blurred /* upstream changed */,')]}
+            break: [beforeEpisodes[0], beforeEpisodes[0].replaceAll('.blurred,', '.blurred /* upstream changed */,')]},
+        {key: 'volumeFeedback', edits: [feedbackPair], break: [feedback, feedback.replace('volume&&', 'volume /* upstream changed */&&')]}
     ];
-    for (let mask = 0; mask < 8; mask++) {
+    for (let mask = 0; mask < 16; mask++) {
         let input = original, expectedBody = fullBody;
-        for (let index = 0; index < 3; index++) if (!(mask & (1 << index))) {
+        for (let index = 0; index < 4; index++) if (!(mask & (1 << index))) {
             const feature = features[index];
             input = input.replace(...feature.break);
             for (const [before, after] of feature.edits) expectedBody = expectedBody.replace(after, before);
@@ -65,13 +69,13 @@ test('Every combination of upstream changes preserves other fixes and unrelated 
         const context = {window: {dispatchEvent: event => events.push(event)},
             CustomEvent: function(type, data) { this.type = type; this.detail = data.detail; }};
         vm.runInNewContext(output.slice(start), context);
-        for (let index = 0; index < 3; index++)
+        for (let index = 0; index < 4; index++)
             assert.equal(context.window.__stremioForkCompatibility[features[index].key], Boolean(mask & (1 << index)));
         assert.equal(events.length, 1);
         assert.equal(events[0].type, 'stremio-fork-compatibility');
         execFileSync(executable, [outputFile, outputFile + '.again', '--allow-partial']);
         assert.equal(fs.readFileSync(outputFile + '.again', 'utf8'), output, 'Reloading must not apply edits twice');
-        if (mask !== 7)
+        if (mask !== 15)
             assert.throws(() => execFileSync(executable, [inputFile, outputFile + '.strict'], {stdio: 'pipe'}),
                 'Release verification must still reject an incompatible current upstream interface');
     }
