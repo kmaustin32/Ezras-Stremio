@@ -15,7 +15,7 @@
   <img src="https://img.shields.io/badge/🪟%20Windows-x64-7272c2?style=for-the-badge" alt="Windows x64" />
 </p>
 <p align="center">
-  <a href="https://github.com/kmaustin32/stremio-community-v5-upd/releases/latest"><img src="https://img.shields.io/github/v/release/kmaustin32/stremio-community-v5-upd?style=for-the-badge&amp;color=7272c2&amp;label=Download" alt="Latest stable release" /></a>
+  <a href="https://github.com/kmaustin32/Ezras-Stremio/releases/latest"><img src="https://img.shields.io/github/v/release/kmaustin32/Ezras-Stremio?style=for-the-badge&amp;color=7272c2&amp;label=Download" alt="Latest stable release" /></a>
 </p>
 <p align="center">
   <a href="#-made-for-your-player">Features</a> · <a href="#-installation">Installation</a> · <a href="#-player-shortcuts">Shortcuts</a> · <a href="#-keep-your-library">Library backup</a> · <a href="docs/FORK.md">Configuration &amp; development</a>
@@ -58,13 +58,13 @@ Everything added to this fork, from the first mpv upgrade through **1.3.4**:
 
 ## 🔧 Installation
 
-**Windows 10/11 x64** · [All releases](https://github.com/kmaustin32/stremio-community-v5-upd/releases)
+**Windows 10/11 x64** · [All releases](https://github.com/kmaustin32/Ezras-Stremio/releases)
 
 | Download | How to use it |
 | --- | --- |
-| 📥 [**1.3.4 installer — recommended**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.4/Ezras-Stremio-1.3.4-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
-| 💼 [**1.3.4 portable ZIP**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.4/Ezras-Stremio-1.3.4-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
-| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.4/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
+| 📥 [**1.3.4 installer — recommended**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.4/Ezras-Stremio-1.3.4-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
+| 💼 [**1.3.4 portable ZIP**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.4/Ezras-Stremio-1.3.4-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
+| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.4/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
 
 Use files named **Ezras-Stremio** for this fork. Downloads marked **BUILD-ONLY** are archived build dependencies. Community package-manager listings install the upstream edition; use this fork's releases for these features.
 

@@ -24,7 +24,7 @@ foreach ($entry in $lock.assets.PSObject.Properties) {
             # New releases label mirrored installers BUILD-ONLY so users cannot
             # mistake the original application's installer for the fork build.
             foreach ($mirrorName in @($asset.name, "BUILD-ONLY-$($asset.name)")) {
-                $mirror = "https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/$($lock.mirrorRelease)/$mirrorName"
+                $mirror = "https://github.com/kmaustin32/Ezras-Stremio/releases/download/$($lock.mirrorRelease)/$mirrorName"
                 try {
                     Invoke-WebRequest $mirror -OutFile $archive
                     $downloaded = $true

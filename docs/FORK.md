@@ -1,5 +1,16 @@
 # Ezra's Stremio
 
+The project repository is [Ezra's Stremio](https://github.com/kmaustin32/Ezras-Stremio).
+Use the `webview-windows` default branch for development. To update an existing
+checkout to the renamed repository:
+
+```powershell
+git remote set-url origin https://github.com/kmaustin32/Ezras-Stremio.git
+```
+
+The original project remains available through the `upstream` remote; merge its
+updates into a feature branch and run the compatibility checks before merging.
+
 This fork bundles mpv **0.41.0-1101-g5d85ba5fb**, libplacebo **7.374.0** and
 FFmpeg **N-127213-g2da55bf59** from zhongfly's 2026-10-05 build. The standard
 x86_64 build works without the newer CPU requirements of x86_64-v3.
