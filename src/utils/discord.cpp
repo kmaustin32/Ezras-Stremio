@@ -130,7 +130,7 @@ static void SetDiscordDiscoverPresence(const char *const details, const char *co
     discordPresence.type = DISCORD_ACTIVITY_TYPE_WATCHING;
     discordPresence.state = state;
     discordPresence.details = details;
-    discordPresence.largeImageKey = "https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v5.0.22-mpv.3/stremio-icon.png";
+    discordPresence.largeImageKey = "https://github.com/kmaustin32/Ezras-Stremio/releases/download/v5.0.22-mpv.3/stremio-icon.png";
     discordPresence.largeImageText = "Stremio";
     Discord_UpdatePresence(&discordPresence);
 }
