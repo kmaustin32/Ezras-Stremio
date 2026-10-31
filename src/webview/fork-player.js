@@ -632,6 +632,8 @@
             [class*="addons-loading-bar"] {background-color:#7272c2!important}
             [class*="video-container"] [class*="watched-container"]:not([class*="upcoming-watched-container"]),
             [class*="meta-item-container"] [class*="watched-icon-layer"] {background-color:#DEA066!important}
+            [class*="player-container"] [class*="volume-change-indicator"],
+            [class*="player-container"] [class*="volume-change-indicator"] * {pointer-events:none!important}
             html[data-stremio-dark-theme] [class*="volume-change-indicator"] {background-color:rgba(34,38,53,.1)!important}
             html[data-stremio-dark-theme] [class*="volume-change-indicator"] [class*="volume-icon"] {
                 color:#858B99!important;

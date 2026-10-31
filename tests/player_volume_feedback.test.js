@@ -67,7 +67,7 @@ async function setup(clock = false) {
             const runtime = {state: {volume: 100, muted: false, paused: false, time: 20000, subtitlesTracks: [], extraSubtitlesTracks: [], audioTracks: []}, setProp: (name, value) => {
                 window.volumeCommands.push([name, value]); window.setVolume(value);
             }};
-            window.volumeCommands = []; window.seeks = []; window.buttonClicks = 0;
+            window.volumeCommands = []; window.seeks = []; window.buttonClicks = 0; window.frameClicks = 0;
             const scope = {Oe: runtime, le: preferences, l: React, G: Indicator, de: true, lt: false, at: false, At: false,
                 Te: {seekTimeDuration: 10000, seekShortTimeDuration: 1000, escExitFullscreen: true},
                 te: {metaItem: null}, Ae: {statistics: null}, De: () => {}, kt: value => window.seeks.push(value),
@@ -87,7 +87,7 @@ async function setup(clock = false) {
                 React.useLayoutEffect(() => new Function('scope', 'with(scope){return (' + effect + ')();}')(scope), [volume, paused, menu, maximum]);
                 const button = (id, label) => h(Button, {id, onClick: () => window.buttonClicks++, style: {width: 80, height: 50}}, label);
                 return h('div', {id: 'player', className: player['player-container'] + (hidden ? ' ' + player.overlayHidden : ''), onMouseMove: () => setHidden(false)},
-                    h('div', {id: 'frame'}), h('div', {id: 'subtitle'}, 'Subtitles stay visible'),
+                    h('div', {id: 'frame', onClick: () => window.frameClicks++}), h('div', {id: 'subtitle'}, 'Subtitles stay visible'),
                     mountIndicator(scope),
                     h('div', {id: 'top', className: player.layer + ' ' + player['nav-bar-layer']}, button('back', 'Back'), button('fullscreen', 'Fullscreen')),
                     h('div', {id: 'bottom', className: player.layer + ' ' + player['control-bar-layer']}, button('pause', 'Pause'),
@@ -220,6 +220,24 @@ test('Toolbar dragging and boosted maximum changes stay synchronized with the re
         assert.equal(await page.locator('#player').getAttribute('data-stremio-controls'), 'visible', 'Do not hide a dragged slider');
         await page.mouse.move(bounds.x + bounds.width, bounds.y + bounds.height / 2); await page.mouse.up();
         assert.ok(Math.abs(await page.evaluate(() => window.snapshot().volume) - 300) < 2);
+        assert.deepEqual(errors, []);
+    } finally {await browser.close();}
+});
+
+
+test('Read-only volume feedback lets video clicks pass through without starting another slider drag', async () => {
+    const {browser, page, errors, tick, popup} = await setup(true);
+    try {
+        await page.keyboard.press('ArrowUp'); await tick(32);
+        assert.equal(await popup.count(), 1);
+        const box = await popup.boundingBox();
+        await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+        assert.equal(await page.evaluate(() => window.frameClicks), 1, 'The speaker overlay must not swallow video pause clicks');
+        const level = await popup.locator('[class*="volume-slider"]').boundingBox();
+        await page.mouse.move(level.x + level.width / 2, level.y + level.height / 2); await page.mouse.down();
+        assert.equal(await page.evaluate(() => document.documentElement.className.includes('active-slider-within')), false, 'Read-only feedback cannot start a hidden slider drag');
+        await page.mouse.up();
+        assert.equal(await page.evaluate(() => window.volumeCommands.length), 1, 'Only the volume key changes volume');
         assert.deepEqual(errors, []);
     } finally {await browser.close();}
 });

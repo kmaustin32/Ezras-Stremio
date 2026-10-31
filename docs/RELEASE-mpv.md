@@ -5,7 +5,7 @@ Restores volume keys and feedback while preserving the player controls and timin
 ### What's fixed
 
 - **Up/Down stays on volume.** During native playback, plain Up/Down changes volume by 5% without moving focus among toolbar buttons. Repeats, live maximum volume, paused playback and the lower limit are preserved. Menus, editors, focused sliders, Tab/Enter, seeking and existing shortcuts keep their behavior.
-- **The speaker popup returns.** The existing community indicator stays mounted independently of control visibility, so it works while playing or paused, with visible controls and with Never hide. Its own 1.5-second timer resets on each volume change, and moving the mouse no longer removes it. It does not flash on startup.
+- **The speaker popup returns.** The existing community indicator stays mounted independently of control visibility, so it works while playing or paused, with visible controls and with Never hide. Its own 1.5-second timer resets on each volume change, and moving the mouse no longer removes it. It does not flash on startup. Read-only feedback lets video pause clicks pass through and cannot start a slider drag.
 - **Synchronized volume styling.** Toolbar and popup sliders both follow the configured maximum, normal theme colors and orange-to-red boost range.
 - **Independent compatibility safeguards.** The popup fix validates separately from autoplay, amplification and episode blur. Unknown or ambiguous upstream code retains its original behavior and shows an amber compatibility warning. Existing version 3 patched caches upgrade without duplicating successful edits.
 
