@@ -85,17 +85,18 @@ test('Player control uses native acknowledgments, survives UI updates, and prese
         await pip.waitFor();
         const status = page.locator('#stremio-fork-compatibility');
         assert.equal(await status.count(), 0, 'No compatibility warning on a healthy player');
-        for (let mask = 0; mask < 8; mask++) {
-            const flags = {autoplay: Boolean(mask & 1), volume: Boolean(mask & 2), episodeBlur: Boolean(mask & 4)};
+        for (let mask = 0; mask < 16; mask++) {
+            const flags = {autoplay: Boolean(mask & 1), volume: Boolean(mask & 2), episodeBlur: Boolean(mask & 4), volumeFeedback: Boolean(mask & 8)};
             await page.evaluate(detail => window.dispatchEvent(new CustomEvent('stremio-fork-compatibility', {detail})), flags);
-            if (mask === 7) {
+            if (mask === 15) {
                 await page.waitForFunction(() => !document.querySelector('#stremio-fork-compatibility'));
             } else {
                 await page.waitForFunction(mask => {
                     const title = document.querySelector('#stremio-fork-compatibility')?.title || '';
                     return title.includes('Autoplay setting fix') === !(mask & 1) &&
                         title.includes('Maximum volume fix') === !(mask & 2) &&
-                        title.includes('Unwatched thumbnail blur fix') === !(mask & 4);
+                        title.includes('Unwatched thumbnail blur fix') === !(mask & 4) &&
+                        title.includes('Volume popup fix') === !(mask & 8);
                 }, mask);
                 assert.equal(await status.getAttribute('role'), 'status');
                 assert.equal(await status.getAttribute('aria-label'), await status.getAttribute('title'));
@@ -107,7 +108,7 @@ test('Player control uses native acknowledgments, survives UI updates, and prese
         await page.evaluate(() => window.dispatchEvent(new CustomEvent('stremio-fork-compatibility', {detail: {autoplay: false}})));
         assert.equal(await status.count(), 0, 'Ignore incomplete compatibility messages');
         await page.evaluate(() => {
-            window.dispatchEvent(new CustomEvent('stremio-fork-compatibility', {detail: {autoplay: true, volume: true, episodeBlur: false}}));
+            window.dispatchEvent(new CustomEvent('stremio-fork-compatibility', {detail: {autoplay: true, volume: true, episodeBlur: false, volumeFeedback: true}}));
         });
         await status.waitFor();
         await page.evaluate(() => {
@@ -120,7 +121,7 @@ test('Player control uses native acknowledgments, survives UI updates, and prese
         await status.waitFor();
         assert.equal(await status.count(), 1, 'Restore one status indicator after upstream navbar rerender');
         assert.equal(await pip.count(), 1, 'Restore one PiP button alongside status');
-        await page.evaluate(() => window.dispatchEvent(new CustomEvent('stremio-fork-compatibility', {detail: {autoplay: true, volume: true, episodeBlur: true}})));
+        await page.evaluate(() => window.dispatchEvent(new CustomEvent('stremio-fork-compatibility', {detail: {autoplay: true, volume: true, episodeBlur: true, volumeFeedback: true}})));
         await page.waitForFunction(() => !document.querySelector('#stremio-fork-compatibility'));
         assert.equal(await pip.evaluate(element => element.nextElementSibling.id), 'fullscreen');
         const pipBounds = await pip.boundingBox(), fullBounds = await page.locator('#fullscreen').boundingBox();

@@ -1,17 +1,17 @@
-## Ezra's Stremio 1.3.3
+## Ezra's Stremio 1.3.4
 
-Dark Mode defaults, a matching volume popup, and a faster control animation option.
+Restores volume keys and feedback while preserving the player controls and timing preferences.
 
-### What's new
+### What's fixed
 
-- **Dark Mode by default.** New configurations and startup fallbacks use Dark Mode. Existing saved theme choices are preserved, including normal mode, and the tray toggle remains available.
-- **Matching translucent volume popup.** In Dark Mode, the rounded background behind the volume-change speaker uses **#222635 at 10% opacity**. The speaker stays **#858B99**; normal-mode popup appearance and timing are preserved.
-- **0.1 animation speed.** Control animation speed now offers **Off, 0.1, 0.25, 0.5 (default), 0.75 and 1**. The `sec` suffix is removed from both timing dropdowns, with seconds explained in their help text. Timeout choices remain **0.5, 1 (default), 2, 5 and Never hide**.
-- **Regression coverage.** Real community-popup styling, all animation choices including 100 ms, theme fallback and saved normal mode are covered. A native configuration test checks fresh defaults, save/reload and unrelated-setting preservation against an isolated profile.
+- **Up/Down stays on volume.** During native playback, plain Up/Down changes volume by 5% without moving focus among toolbar buttons. Repeats, live maximum volume, paused playback and the lower limit are preserved. Menus, editors, focused sliders, Tab/Enter, seeking and existing shortcuts keep their behavior.
+- **The speaker popup returns.** The existing community indicator stays mounted independently of control visibility, so it works while playing or paused, with visible controls and with Never hide. Its own 1.5-second timer resets on each volume change, and moving the mouse no longer removes it. It does not flash on startup. Read-only feedback lets video pause clicks pass through and cannot start a slider drag.
+- **Synchronized volume styling.** Toolbar and popup sliders both follow the configured maximum, normal theme colors and orange-to-red boost range.
+- **Independent compatibility safeguards.** The popup fix validates separately from autoplay, amplification and episode blur. Unknown or ambiguous upstream code retains its original behavior and shows an amber compatibility warning. Existing version 3 patched caches upgrade without duplicating successful edits.
 
-### Existing control preferences
+### Control preferences retained
 
-Control timeout continues to apply during playback and pause after mouse or keyboard activity. Never hide keeps controls available in both states; menus, keyboard focus and slider drags remain protected. Animation duration stays independent of timeout, system reduced-motion preferences take priority, and existing saved timing preferences carry over.
+Dark Mode remains the default for new configurations, with saved theme choices respected. The volume popup uses #222635 at 10% background opacity and a #858B99 speaker in Dark Mode. Animation speed remains Off, 0.1, 0.25, 0.5 (default), 0.75 or 1; timeout remains 0.5, 1 (default), 2, 5 or Never hide. Reduced motion, protected menu/slider interactions and saved timing preferences continue to apply.
 
 ### Everything from the fork, in one stable release
 
@@ -32,14 +32,14 @@ The redesigned [README](../README.md) covers these features, installation, short
 
 ### Downloads
 
-- [Windows x64 installer](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.3/Ezras-Stremio-1.3.3-x64.exe)
-- [Portable Windows x64 ZIP](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.3/Ezras-Stremio-1.3.3-x64.zip)
-- [SHA256 checksums](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.3/SHA256SUMS.txt)
+- [Windows x64 installer](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.4/Ezras-Stremio-1.3.4-x64.exe)
+- [Portable Windows x64 ZIP](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.4/Ezras-Stremio-1.3.4-x64.zip)
+- [SHA256 checksums](https://github.com/kmaustin32/stremio-community-v5-upd/releases/download/v1.3.4/SHA256SUMS.txt)
 
 Use Windows 10/11 x64. The installer sets up WebView2 when needed; the portable ZIP needs the system WebView2 Runtime. When upgrading, retain your configuration to keep custom mpv.conf, input.conf and other scripts. The fork's own black-bar script is updated. The original shell version and installation/profile paths are retained for upgrade compatibility.
 
 ### Validation and upstream compatibility
 
-GitHub Actions builds the installer and portable archive and runs the native configuration, blur/framing/rendering, black-bar/seam, shader, streaming/transcoding, live player compatibility, real community slider, episode-image blur, settings/shortcuts, animation and timeout preferences, theme switching, live dropdown interaction, backup, WebView2 and installer-branding checks before publication.
+GitHub Actions builds the installer and portable archive and runs the native configuration, blur/framing/rendering, black-bar/seam, shader, streaming/transcoding, all 16 live player compatibility combinations, real keyboard/spatial-navigation and popup interactions, real community slider, episode-image blur, settings/shortcuts, animation and timeout preferences, theme switching, live dropdown interaction, backup, WebView2 and installer-branding checks before publication.
 
 Theme and settings styling are isolated in the fork script; they do not rewrite the hosted community bundle or profile. Automatic upstream binary updates remain disabled. Source history is preserved for future upstream merges; incompatible hosted UI changes are reported rather than silently discarding other compatible fixes.

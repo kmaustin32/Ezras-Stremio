@@ -8,7 +8,7 @@ D3D11 playback. Use Windows 10/11 x64.
 
 ## Install and use
 
-Download `Ezras-Stremio-1.3.3-x64.exe` from this fork's release. The installer
+Download `Ezras-Stremio-1.3.4-x64.exe` from this fork's release. The installer
 installs WebView2 when needed. The `.zip` is portable but requires the system
 WebView2 runtime. Extract the ZIP into its own directory and run `stremio.exe`.
 Use the installer whose filename starts with `Ezras-Stremio`; **BUILD-ONLY** downloads are
@@ -138,13 +138,13 @@ video ends and cancels an open next-episode countdown. Manual Next still works, 
 remains intact. A scoped compatibility patch applies this setting check to the
 hosted community player's end handler and refreshes it when the setting changes.
 The original community UI and its other features remain hosted upstream. The
-patch validates and applies autoplay, maximum-volume, and episode-blur fixes
+patch validates and applies autoplay, maximum-volume, episode-blur and volume-popup fixes
 independently. If upstream changes one feature, its code stays intact while the
 other compatible fixes still apply. Every feature validates all of its edits
 before committing them. A small amber indicator in the player lists unavailable
 fixes, and the log records the compatibility failure. This is a compatibility
 fallback, not a guarantee that future upstream implementations retain those fixes.
-CI requires all three fixes to work against the live upstream bundle and checks
+CI requires all four fixes to work against the live upstream bundle and checks
 every combination of changed feature code before publishing, so source
 updates that change this integration require review.
 On the first launch of a changed compatibility patch, the app refreshes the
@@ -315,3 +315,12 @@ Dark Mode is the startup default in the native shell and in the hosted player wh
 In Dark Mode, the volume-change popup background is `rgba(34,38,53,0.1)` (`#222635` at 10% opacity). Opacity is applied to the background color, keeping the speaker at `#858B99` with its existing opacity. Normal-mode popup styling, rounded corners, padding and popup timing remain unchanged.
 
 Control animation speed adds 0.1 seconds. Both timing dropdowns display numeric choices without a `sec` suffix, with units described in their help text. The animation default remains 0.5 seconds and the timeout default remains 1 second; stored values and cross-window preferences are compatible with earlier releases.
+
+
+### Volume keys and persistent feedback (1.3.4)
+
+During active native playback, plain Up/Down retains the community player's original 5% volume steps, repeat behavior and live maximum. The fork prevents default scrolling and spatial navigation for those keys on the playback surface and toolbar; it leaves the original volume listener in charge, avoiding duplicate commands. Menus, dialogs, editors, focused sliders, modified keys, pointer drags and other app pages retain their existing input handling. Tab/Enter, Left/Right seeking and the fork shortcuts are preserved.
+
+The original community VolumeChangeIndicator is kept mounted while volume is available. It no longer depends on the community overlay-hidden flag, which can disagree with the fork's control timeout. The existing effect shows it only on a real volume change and resets its own 1500 ms timer, including while paused or with Never hide enabled. No initial popup or duplicate custom indicator is added. Mouse movement, control visibility and pause changes do not interrupt that timer. The read-only popup and its descendants ignore pointer input, preserving video pause clicks and preventing feedback from starting a slider drag. Both toolbar and popup volume sliders receive the same theme/boost styling and current maximum.
+
+Volume feedback has its own compatibility check and amber warning, independent of autoplay, amplification and episode blur. Unknown or ambiguous mount code remains untouched. Version 3 patched caches can migrate to version 4 metadata without applying previous successful edits twice; the normal patch-revision cache refresh still preserves account storage and configuration. Tests exercise all 16 compatibility combinations, original-behavior negative controls, the real spatial-navigation polyfill, real keyboard effect, Button/Slider/VolumeChangeIndicator components, menu/form navigation, limits/repeats, timer reset and theme boundaries.

@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cctype>
 #include <regex>
+#include <iterator>
 #include <utility>
 #include <vector>
 
@@ -216,18 +217,42 @@ static bool PatchVolume(std::string& script, std::string& error)
     return true;
 }
 
+static bool PatchVolumeFeedback(std::string& script, std::string& error)
+{
+    // Keep the existing component mounted. Its own volume-change effect and
+    // 1500ms timer own visibility, independently of pause and overlay hiding.
+    const std::regex indicator(R"(null!==([\w$]+)\.state\.volume&&([\w$]+)\?([\w$]+)\.createElement\(([\w$]+),\{muted:\1\.state\.muted,volume:\1\.state\.volume\}\):null)");
+    const auto begin = std::sregex_iterator(script.begin(), script.end(), indicator);
+    if (std::distance(begin, std::sregex_iterator()) != 1) {
+        error = "Unsupported community volume indicator mount";
+        return false;
+    }
+    const auto match = *begin;
+    auto text = match.str();
+    const auto gate = "&&" + match[2].str();
+    text.erase(text.find(gate), gate.size());
+    script.replace(static_cast<size_t>(match.position()), static_cast<size_t>(match.length()), text);
+    return true;
+}
+
 PlayerPatchReport PatchCommunityPlayer(std::string& script)
 {
-    constexpr const char* marker = "/* StremioForkPlayerCompatibilityV3 */";
+    constexpr const char* marker = "/* StremioForkPlayerCompatibilityV4 */";
+    constexpr const char* legacyMarker = "/* StremioForkPlayerCompatibilityV3 */";
     PlayerPatchReport report;
     const auto statusStart = script.rfind("\n;window.__stremioForkAutoplayPatched=");
-    if (script.ends_with(marker) && statusStart != std::string::npos) {
+    if ((script.ends_with(marker) || script.ends_with(legacyMarker)) && statusStart != std::string::npos) {
         const auto status = script.substr(statusStart);
         report.autoplay = status.find("__stremioForkAutoplayPatched=true;") != std::string::npos;
         report.volume = status.find("__stremioForkVolumePatched=true;") != std::string::npos;
         report.episodeBlur = status.find("__stremioForkEpisodeBlurPatched=true;") != std::string::npos;
-        if (!report.AllApplied()) report.warning = "Some community player fixes are unavailable";
-        return report;
+        report.volumeFeedback = status.find("__stremioForkVolumeFeedbackPatched=true;") != std::string::npos;
+        if (script.ends_with(marker)) {
+            if (!report.AllApplied()) report.warning = "Some community player fixes are unavailable";
+            return report;
+        }
+        // Upgrade an old patched cache without reapplying its successful edits.
+        script.erase(statusStart);
     }
     const auto apply = [&](const char* name, auto patch) {
         std::string error;
@@ -242,14 +267,16 @@ PlayerPatchReport PatchCommunityPlayer(std::string& script)
         report.warning += std::string(name) + ": " + error;
         return false;
     };
-    report.autoplay = apply("Autoplay", PatchAutoplay);
-    report.volume = apply("Maximum volume", PatchVolume);
-    report.episodeBlur = apply("Episode blur", PatchEpisodeSpoilerBlur);
+    report.autoplay = report.autoplay || apply("Autoplay", PatchAutoplay);
+    report.volume = report.volume || apply("Maximum volume", PatchVolume);
+    report.episodeBlur = report.episodeBlur || apply("Episode blur", PatchEpisodeSpoilerBlur);
+    report.volumeFeedback = apply("Volume popup", PatchVolumeFeedback);
     const auto boolean = [](bool value) { return value ? "true" : "false"; };
     script += std::string("\n;window.__stremioForkAutoplayPatched=") + boolean(report.autoplay) +
         ";window.__stremioForkVolumePatched=" + boolean(report.volume) +
-        ";window.__stremioForkEpisodeBlurPatched=" + boolean(report.episodeBlur) + ";";
-    script += "window.__stremioForkCompatibility={autoplay:window.__stremioForkAutoplayPatched,volume:window.__stremioForkVolumePatched,episodeBlur:window.__stremioForkEpisodeBlurPatched};";
+        ";window.__stremioForkEpisodeBlurPatched=" + boolean(report.episodeBlur) +
+        ";window.__stremioForkVolumeFeedbackPatched=" + boolean(report.volumeFeedback) + ";";
+    script += "window.__stremioForkCompatibility={autoplay:window.__stremioForkAutoplayPatched,volume:window.__stremioForkVolumePatched,episodeBlur:window.__stremioForkEpisodeBlurPatched,volumeFeedback:window.__stremioForkVolumeFeedbackPatched};";
     script += "window.dispatchEvent(new CustomEvent('stremio-fork-compatibility',{detail:window.__stremioForkCompatibility}));";
     script += marker;
     return report;
