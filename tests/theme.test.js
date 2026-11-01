@@ -137,19 +137,21 @@ async function setup(dark = true, currentDark = dark) {
         labels[0].id='seek-time';labels[1].id='seek-remaining';
         for(const name of ['track-after','thumb']) el.querySelector(`[class*="${name}-"]`).id='seek-'+name;
     });
+    const originalBackground = await page.evaluate(()=>getComputedStyle(document.body).backgroundImage);
     await page.addScriptTag({content:script});
     await page.getByLabel('Control animation speed',{exact:true}).waitFor();
     const color = id => page.locator('#'+id).evaluate(el=>getComputedStyle(el).color);
-    return {browser,page,errors,color};
+    return {browser,page,errors,color,originalBackground};
     } catch(error) {await browser.close();throw error;}
 }
 
 test('Dark Mode follows the shell toggle, restores normal colors, and scopes seek/icon colors without tinting subtitles or volume boost',async()=>{
-    const {browser,page,errors,color}=await setup();
+    const {browser,page,errors,color,originalBackground}=await setup();
     try{
         assert.ok(await page.evaluate(()=>window.messages.some(m=>m.args[0]==='get-theme')));
         const background=()=>page.evaluate(()=>getComputedStyle(document.body).backgroundImage);
-        assert.ok((await background()).includes('rgb(34, 38, 53)'));
+        const darkGradient='linear-gradient(to right, rgb(22, 26, 38) 0%, rgb(24, 28, 41) 100%)';
+        assert.equal(await background(),darkGradient,'Dark Mode spans the screen from the darker left endpoint to the lighter right endpoint');
         for(const id of ['top-icon','bottom-icon']) assert.equal(await color(id),'rgb(133, 139, 153)');
         assert.equal(await color('warning'),'rgb(255, 165, 0)');
         assert.equal(await color('subtitle'),'rgb(255, 255, 255)');
@@ -207,7 +209,7 @@ test('Dark Mode follows the shell toggle, restores normal colors, and scopes see
         fs.mkdirSync('.build-cache/ui-test-evidence',{recursive:true});
         await page.screenshot({path:'.build-cache/ui-test-evidence/theme-dark.png'});
         await page.evaluate(()=>window.native('theme-changed',{dark:false}));
-        assert.ok(!(await background()).includes('rgb(34, 38, 53)'));
+        assert.equal(await background(),originalBackground,'Turning Dark Mode off restores the original hosted background');
         assert.equal(await color('top-icon'),'rgb(255, 255, 255)');
         await checkPlayer('rgb(255, 255, 255)'); await checkAccent();
         await page.locator('#seek-remaining').evaluate(el=>el.click());
@@ -223,6 +225,7 @@ test('Dark Mode follows the shell toggle, restores normal colors, and scopes see
         await page.evaluate(()=>window.native('theme-changed',{dark:'true'}));
         assert.equal(await page.locator('html').getAttribute('data-stremio-dark-theme'),null);
         await page.evaluate(()=>window.native('theme-changed',{dark:true}));
+        assert.equal(await background(),darkGradient);
         assert.equal(await color('bottom-icon'),'rgb(133, 139, 153)');
         assert.equal(await fill('volume-thumb'),'rgb(133, 139, 153)');
         await checkPlayer('rgb(133, 139, 153)');
