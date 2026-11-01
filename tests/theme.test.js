@@ -310,3 +310,68 @@ test('Dark Mode is the fallback without a shell snapshot and an explicit saved n
         assert.deepEqual(errors,[]);
     }finally{await browser.close();}
 });
+
+test('Actual ShellVideo leaves the page transparent during native playback and restores the gradient on unload',async()=>{
+    const {browser,page,errors}=await setup();
+    try {
+        const before=await page.evaluate(()=>getComputedStyle(document.body).backgroundImage);
+        await page.evaluate(()=>{
+            const entry=Object.entries(window.modules).find(([,factory])=>factory.toString().includes('mpv-observe-prop')&&factory.toString().includes('name:"ShellVideo"'));
+            if(!entry)throw Error('Current native video implementation not found');
+            const ShellVideo=window.req(Number(entry[0]));
+            const handlers={};window.videoMessages=[];
+            const transport={send:(...args)=>window.videoMessages.push(args),on:(name,callback)=>{(handlers[name]||=[]).push(callback);}};
+            window.emitVideo=(name,data)=>handlers[name]?.forEach(callback=>callback(data));
+            const surface=document.createElement('div');surface.id='native-video-surface';
+            document.getElementById('player').append(surface);
+            window.shellVideo=new ShellVideo({containerElement:surface,shellTransport:transport});
+            window.emitVideo('mpv-prop-change',{name:'mpv-version',data:'0.41.0'});
+            window.shellVideo.dispatch({type:'command',commandName:'load',commandArgs:{stream:{url:'https://example.invalid/isolated-test.mp4'}}});
+        });
+        await page.waitForFunction(()=>window.videoMessages.some(([name,args])=>name==='mpv-command'&&args[0]==='loadfile'));
+        const checkTransparent=async()=>{
+            const layers=await page.evaluate(()=>{
+                const result=[];
+                for(let e=document.getElementById('native-video-surface');e;e=e.parentElement){
+                    const s=getComputedStyle(e);result.push({tag:e.id||e.tagName,image:s.backgroundImage,color:s.backgroundColor});
+                }
+                return result;
+            });
+            for(const layer of layers){
+                assert.equal(layer.image,'none',`${layer.tag} must not paint a background over native video`);
+                assert.equal(layer.color,'rgba(0, 0, 0, 0)',`${layer.tag} must stay transparent`);
+            }
+            const shot=await page.screenshot({omitBackground:true});
+            const alpha=await page.evaluate(async data=>{
+                const img=new Image();img.src='data:image/png;base64,'+data;await img.decode();
+                const canvas=document.createElement('canvas');canvas.width=canvas.height=1;
+                const ctx=canvas.getContext('2d');ctx.drawImage(img,0,0);return ctx.getImageData(0,0,1,1).data[3];
+            },shot.toString('base64'));
+            assert.equal(alpha,0,'Rendered page pixels must reveal the native video layer below the web view');
+        };
+        for(let episode=0;episode<2;episode++){
+            await page.evaluate(()=>window.emitVideo('mpv-prop-change',{name:'duration',data:120}));
+            await checkTransparent();
+            for(const dark of [false,true]){
+                await page.evaluate(dark=>window.native('theme-changed',{dark}),dark);
+                await checkTransparent();
+            }
+            for(const [width,height] of [[1920,1080],[480,270],[1280,800]]){
+                await page.setViewportSize({width,height});await checkTransparent();
+            }
+            for(const paused of [true,false]){
+                await page.evaluate(paused=>{
+                    window.emitVideo('mpv-prop-change',{name:'pause',data:paused});
+                    window.native('mpv-prop-change',{name:'pause',data:paused});
+                },paused);
+                await checkTransparent();
+            }
+            await page.evaluate(()=>window.shellVideo.dispatch({type:'command',commandName:'unload'}));
+            assert.equal(await page.evaluate(()=>getComputedStyle(document.body).backgroundImage),before,'The gradient returns after native playback stops');
+            await page.evaluate(()=>window.shellVideo.dispatch({type:'command',commandName:'load',commandArgs:{stream:{url:'https://example.invalid/next-isolated-test.mp4'}}}));
+        }
+        await page.evaluate(()=>window.shellVideo.dispatch({type:'command',commandName:'destroy'}));
+        assert.equal(await page.evaluate(()=>getComputedStyle(document.body).backgroundImage),before);
+        assert.deepEqual(errors,[]);
+    }finally{await browser.close();}
+});

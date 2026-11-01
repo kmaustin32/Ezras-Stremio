@@ -611,7 +611,9 @@
                 --modal-background-color:#161A26!important;
             }
             html[data-stremio-dark-theme] body {
-                background-image:linear-gradient(to bottom right,var(--primary-background-color) 0%,var(--secondary-background-color) 100%)!important;
+                /* ShellVideo sets an inline transparent background to reveal
+                   native mpv beneath WebView2. Never override that with !important. */
+                background-image:linear-gradient(to bottom right,var(--primary-background-color) 0%,var(--secondary-background-color) 100%);
             }
             html[data-stremio-dark-theme] [class*="intro-container"] > [class*="background-container"] {
                 background:none!important;
