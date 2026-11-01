@@ -19,7 +19,7 @@ D3D11 playback. Use Windows 10/11 x64.
 
 ## Install and use
 
-Download `Ezras-Stremio-1.3.7-x64.exe` from this fork's release. The installer
+Download `Ezras-Stremio-1.3.7-hotfix-x64.exe` from this fork's release. The installer
 installs WebView2 when needed. The `.zip` is portable but requires the system
 WebView2 runtime. Extract the ZIP into its own directory and run `stremio.exe`.
 Use the installer whose filename starts with `Ezras-Stremio`; **BUILD-ONLY** downloads are
@@ -346,3 +346,9 @@ Tests render the actual Library page body, LibItem, MetaItem, episode and source
 Library navigation has its own compatibility check, separate from the four playback fixes. CI covers all 32 combinations. Unknown renderer or href-forwarding structures are left intact; V3 and V4 cached patches migrate to V5 metadata without duplicating successful edits.
 
 The Windows dependency/build cache includes the repository identity because generated CMake files contain absolute checkout paths. Renaming the repository starts a fresh cache namespace, and failed builds do not save partial caches. Pinned dependency versions and checksums remain unchanged.
+
+### Native playback transparency (1.3.7 Hotfix)
+
+The Dark Mode body gradient deliberately has no `!important`: the community ShellVideo implementation sets inline transparent backgrounds on its container and ancestors after native video loads, then clears those inline styles on unload. An important background image prevents that handoff and hides mpv even though audio keeps playing. Preserve the inline transparency contract when changing any page background.
+
+The regression test instantiates the actual current ShellVideo module and checks all ancestor backgrounds and rendered PNG alpha during two load/unload cycles, theme switches, normal/fullscreen/PiP-sized viewports, pause/resume and destroy. Its negative control fails against 1.3.7. A native WebView2 test also captures the compiled overlay: video-area pixels must have zero alpha during playback, the gradient must return afterward, and foreground controls must remain opaque. This supplements the native mpv pixel/rendering tests, rather than treating separate video and toolbar tests as sufficient.
