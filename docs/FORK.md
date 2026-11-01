@@ -19,7 +19,7 @@ D3D11 playback. Use Windows 10/11 x64.
 
 ## Install and use
 
-Download `Ezras-Stremio-1.3.6-x64.exe` from this fork's release. The installer
+Download `Ezras-Stremio-1.3.7-x64.exe` from this fork's release. The installer
 installs WebView2 when needed. The `.zip` is portable but requires the system
 WebView2 runtime. Extract the ZIP into its own directory and run `stremio.exe`.
 Use the installer whose filename starts with `Ezras-Stremio`; **BUILD-ONLY** downloads are
@@ -295,7 +295,7 @@ exact artifacts. It no longer needs a publisher-only source commit.
 
 ## Theme and settings appearance (1.3.2)
 
-The tray's **Use Dark Theme** setting (`[General] UseDarkTheme`) now also controls the hosted app palette. When enabled, the app background uses a horizontal gradient from `#161A26` on the left to `#181C29` on the right and player toolbar/episode-button icons, the player episode title, elapsed/total/remaining time labels and the normal volume range use `#858B99`. Normal-mode controls use white. Fullscreen/Picture-in-Picture icons use the same full opacity as the other player controls. Turning it off restores the hosted UI's original background and white player controls. The shell supplies its saved state on startup, answers `get-theme`, and sends `theme-changed` when toggled, including after navigation/reload. This does not follow the operating system's color preference or change the user's setting.
+The tray's **Use Dark Theme** setting (`[General] UseDarkTheme`) now also controls the hosted app palette. When enabled, the app background uses a smooth diagonal gradient from `#0B0F18` in the upper left to `#161A26` in the lower right and player toolbar/episode-button icons, the player episode title, elapsed/total/remaining time labels and the normal volume range use `#858B99`. Normal-mode controls use white. Fullscreen/Picture-in-Picture icons use the same full opacity as the other player controls. Turning it off restores the hosted UI's original background and white player controls. The shell supplies its saved state on startup, answers `get-theme`, and sends `theme-changed` when toggled, including after navigation/reload. This does not follow the operating system's color preference or change the user's setting.
 
 The playback seek bar/handle, selected sidebar navigation icons, episode-thumbnail progress and stream-source progress and add-on loading bars use `#7272c2` in both modes. Styling is scoped to the seek bar so subtitles, video and warning colors retain their existing behavior. Both volume tracks use the selected player color below 100% and keep the configured orange-to-red boost range above 100%. Settings dropdowns share rounded corners, purple borders, dark surfaces and keyboard focus outlines with the animation selector. Existing community React controls and their selection handlers remain intact.
 
