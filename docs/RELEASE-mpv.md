@@ -1,12 +1,11 @@
-## Ezra's Stremio 1.3.5
+## Ezra's Stremio 1.3.6
 
-Library shows open their details page so you can choose the episode and source before playback.
+Dark Mode has a deeper blue background with a subtle left-to-right gradient.
 
 ### What's new
 
-- **Details first for Library shows.** Selecting a show in Library opens episode details instead of automatically starting its cached stream. Poster/title clicks and Enter follow the same native details link. You can choose an episode and then a playback source.
-- **Existing shortcuts preserved.** Movies and Continue Watching retain their current navigation. The context menu's explicit Play action still intentionally uses the cached player; watched/remove actions and library/account data are preserved.
-- **Independent compatibility safeguards.** Library navigation is checked separately from the four playback fixes. Tests cover all 32 combinations, native link forwarding and V3/V4 cache upgrades. Original-bundle tests reproduce the old automatic-player target.
+- **Darker blue gradient.** The app background transitions horizontally from `#161A26` on the left to `#181C29` on the right, including behind the login screen. Dark Mode remains the default for new configurations; saved theme choices are preserved.
+- **Existing colors retained.** Purple accents, soft player icons and the translucent volume popup keep their existing styling. Turning Dark Mode off restores the original hosted background.
 
 ### Player preferences retained
 
@@ -19,6 +18,7 @@ Up/Down volume keys, click-through volume feedback, source selection and existin
 - Manual encoded-black-bar detection/reset with Ctrl+Shift+C, per-video crop reset, no-bar safety, conservative seam refinement and shader edge protection.
 - Fit/Crop/Stretch toolbar and tray controls with Ctrl+Shift+F, resetting to Fit for each video.
 - Picture-in-Picture beside fullscreen, synchronized with the tray.
+- Library shows open details for episode and source selection; movies, Continue Watching and explicit Play keep their behavior.
 - New videos start at 100% volume or a lower selected maximum. Maximum Volume updates the actual amplification limit and slider, with orange-to-red boost above 100%.
 - Autoplay off is honored at video end and cancels countdowns. Manual Next and watch-progress handling remain available.
 - Unwatched episode blur covers alternate thumbnails, absolute-numbered anime, later seasons, episode lists and next-episode popups.
@@ -31,9 +31,9 @@ The redesigned [README](../README.md) covers these features, installation, short
 
 ### Downloads
 
-- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.5/Ezras-Stremio-1.3.5-x64.exe)
-- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.5/Ezras-Stremio-1.3.5-x64.zip)
-- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.5/SHA256SUMS.txt)
+- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.6/Ezras-Stremio-1.3.6-x64.exe)
+- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.6/Ezras-Stremio-1.3.6-x64.zip)
+- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.6/SHA256SUMS.txt)
 
 Use Windows 10/11 x64. The installer sets up WebView2 when needed; the portable ZIP needs the system WebView2 Runtime. When upgrading, retain your configuration to keep custom mpv.conf, input.conf and other scripts. The fork's own black-bar script is updated. The original shell version and installation/profile paths are retained for upgrade compatibility.
 
