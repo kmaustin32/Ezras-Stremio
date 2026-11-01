@@ -62,7 +62,7 @@
         if (profile.addonsLocked === true) throw new Error('Your installed add-on list is unavailable. Open Add-ons and try again.');
         const installed = addons(profile.addons);
         const libraryItems = [...items.values()].sort((a, b) => a.name.localeCompare(b.name) || a._id.localeCompare(b._id));
-        return {format: 'ezras-stremio-backup', version: 1, applicationVersion: '1.3.6', exportedAt: now.toISOString(),
+        return {format: 'ezras-stremio-backup', version: 1, applicationVersion: '1.3.7', exportedAt: now.toISOString(),
             source: 'local snapshot', localLibraryParts: buckets,
             notes: [buckets === 2 ? 'Includes both recent and older library records saved on this device.' :
                 'Only one of the two local library parts was available. Recent or older titles may be missing. Open Library while online and export again.',

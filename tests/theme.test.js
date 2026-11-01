@@ -150,8 +150,8 @@ test('Dark Mode follows the shell toggle, restores normal colors, and scopes see
     try{
         assert.ok(await page.evaluate(()=>window.messages.some(m=>m.args[0]==='get-theme')));
         const background=()=>page.evaluate(()=>getComputedStyle(document.body).backgroundImage);
-        const darkGradient='linear-gradient(to right, rgb(22, 26, 38) 0%, rgb(24, 28, 41) 100%)';
-        assert.equal(await background(),darkGradient,'Dark Mode spans the screen from the darker left endpoint to the lighter right endpoint');
+        const darkGradient='linear-gradient(to right bottom, rgb(11, 15, 24) 0%, rgb(22, 26, 38) 100%)';
+        assert.equal(await background(),darkGradient,'Dark Mode transitions smoothly from the upper-left endpoint to the lower-right endpoint');
         for(const id of ['top-icon','bottom-icon']) assert.equal(await color(id),'rgb(133, 139, 153)');
         assert.equal(await color('warning'),'rgb(255, 165, 0)');
         assert.equal(await color('subtitle'),'rgb(255, 255, 255)');

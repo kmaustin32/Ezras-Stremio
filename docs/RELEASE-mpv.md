@@ -1,10 +1,10 @@
-## Ezra's Stremio 1.3.6
+## Ezra's Stremio 1.3.7
 
-Dark Mode has a deeper blue background with a subtle left-to-right gradient.
+Dark Mode has a deeper diagonal blue gradient from the upper left to the lower right.
 
 ### What's new
 
-- **Darker blue gradient.** The app background transitions horizontally from `#161A26` on the left to `#181C29` on the right, including behind the login screen. Dark Mode remains the default for new configurations; saved theme choices are preserved.
+- **Darker blue gradient.** The app background transitions smoothly from `#0B0F18` in the upper left to `#161A26` in the lower right, including behind the login screen. Dark Mode remains the default for new configurations; saved theme choices are preserved.
 - **Existing colors retained.** Purple accents, soft player icons and the translucent volume popup keep their existing styling. Turning Dark Mode off restores the original hosted background.
 
 ### Player preferences retained
@@ -31,9 +31,9 @@ The redesigned [README](../README.md) covers these features, installation, short
 
 ### Downloads
 
-- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.6/Ezras-Stremio-1.3.6-x64.exe)
-- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.6/Ezras-Stremio-1.3.6-x64.zip)
-- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.6/SHA256SUMS.txt)
+- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.7/Ezras-Stremio-1.3.7-x64.exe)
+- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.7/Ezras-Stremio-1.3.7-x64.zip)
+- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.7/SHA256SUMS.txt)
 
 Use Windows 10/11 x64. The installer sets up WebView2 when needed; the portable ZIP needs the system WebView2 Runtime. When upgrading, retain your configuration to keep custom mpv.conf, input.conf and other scripts. The fork's own black-bar script is updated. The original shell version and installation/profile paths are retained for upgrade compatibility.
 

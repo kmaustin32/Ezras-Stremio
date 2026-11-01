@@ -606,12 +606,12 @@
         style.id = 'stremio-fork-theme';
         style.textContent = `
             html[data-stremio-dark-theme] {
-                --primary-background-color:#161A26!important;
-                --secondary-background-color:#181C29!important;
+                --primary-background-color:#0B0F18!important;
+                --secondary-background-color:#161A26!important;
                 --modal-background-color:#161A26!important;
             }
             html[data-stremio-dark-theme] body {
-                background-image:linear-gradient(to right,var(--primary-background-color) 0%,var(--secondary-background-color) 100%)!important;
+                background-image:linear-gradient(to bottom right,var(--primary-background-color) 0%,var(--secondary-background-color) 100%)!important;
             }
             html[data-stremio-dark-theme] [class*="intro-container"] > [class*="background-container"] {
                 background:none!important;
