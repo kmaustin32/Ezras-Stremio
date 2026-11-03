@@ -3,6 +3,7 @@
 
 #include <windows.h>
 #include <string>
+#include <nlohmann/json_fwd.hpp>
 
 std::string Base64Encode(const std::string& in);
 #include <vector>
@@ -10,6 +11,7 @@ std::string Base64Encode(const std::string& in);
 
 std::string WStringToUtf8(const std::wstring &wstr);
 std::wstring Utf8ToWstring(const std::string& utf8Str);
+std::wstring SerializeWebMessage(const nlohmann::json& message);
 std::string ToLowerStr(std::string s);
 std::string decodeURIComponent(const std::string& encoded);
 std::wstring GetExeDirectory();

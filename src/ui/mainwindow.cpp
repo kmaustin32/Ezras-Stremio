@@ -53,6 +53,9 @@ bool CheckSingleInstance(int argc, char* argv[], std::wstring &outProtocolArg)
         AppendToCrashLog("CreateMutex failed => fallback to multi.");
         return true;
     }
+    // Argument decoding and FileExists call Win32 APIs too; they can replace
+    // the status returned by CreateMutexW before we decide which instance owns it.
+    const bool alreadyRunning = GetLastError() == ERROR_ALREADY_EXISTS;
     std::wstring protocolArg;
     for(int i=1; i<argc; ++i){
         int size_needed = MultiByteToWideChar(CP_UTF8, 0, argv[i], -1, NULL, 0);
@@ -66,7 +69,7 @@ bool CheckSingleInstance(int argc, char* argv[], std::wstring &outProtocolArg)
         }
     }
 
-    if(GetLastError()==ERROR_ALREADY_EXISTS){
+    if(alreadyRunning){
         FocusExistingInstance(protocolArg);
         return false;
     }
@@ -127,12 +130,11 @@ void SendToJS(const std::string &eventName, const nlohmann::json &eventData)
     msg["args"]   = { eventName, eventData };
 
     // Serialize to wstring + Post
-    std::string payload = msg.dump();
-    std::wstring wpayload(payload.begin(), payload.end());
+    const std::wstring wpayload = SerializeWebMessage(msg);
     g_webview->PostWebMessageAsString(wpayload.c_str());
 
 #ifdef DEBUG_LOG
-    std::cout << "[Native->JS] " << payload << "\n";
+    std::cout << "[Native->JS] " << msg.dump() << "\n";
 #endif
 }
 
@@ -296,10 +298,12 @@ void HandleEvent(const std::string &ev, std::vector<std::string> &args)
             }
         }
     } else if (ev=="open-external") {
-        std::wstring uri(args[0].begin(), args[0].end());
+        if (args.empty() || args[0].empty()) return;
+        const std::wstring uri = Utf8ToWstring(args[0]);
         ShellExecuteW(nullptr, L"open", uri.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
     } else if (ev=="navigate") {
-        std::wstring uri(args[0].begin(), args[0].end());
+        if (args.empty() || args[0].empty() || !g_webview) return;
+        const std::wstring uri = Utf8ToWstring(args[0]);
         if (args[0] == "home") {
             g_webview->Navigate(g_webuiUrl.c_str());
         } else {
@@ -352,8 +356,7 @@ void HandleInboundJSON(const std::string &msg)
             transportObj["methods"] = methods;
             root["data"]["transport"] = transportObj;
 
-            std::string payload = root.dump();
-            std::wstring wpayload(payload.begin(), payload.end());
+            const std::wstring wpayload = SerializeWebMessage(root);
             g_webview->PostWebMessageAsString(wpayload.c_str());
             return;
         }

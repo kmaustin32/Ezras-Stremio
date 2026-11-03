@@ -76,6 +76,7 @@ set(SOURCES
         src/core/globals.cpp
         src/utils/helpers.h
         src/utils/helpers.cpp
+        src/utils/text_encoding.cpp
         src/utils/config.h
         src/utils/config.cpp
         src/utils/crashlog.h
@@ -159,6 +160,12 @@ if(BUILD_TESTING)
     add_executable(discord-tests tests/discord_test.cpp)
     target_link_libraries(discord-tests PRIVATE nlohmann_json::nlohmann_json ${DISCORD_LIB})
     add_test(NAME discord-presence COMMAND discord-tests)
+    add_executable(discord-presence-tests tests/discord_presence_test.cpp src/utils/discord.cpp)
+    target_link_libraries(discord-presence-tests PRIVATE nlohmann_json::nlohmann_json unofficial::webview2::webview2)
+    add_test(NAME discord-production-presence COMMAND discord-presence-tests)
+    add_executable(text-encoding-tests tests/text_encoding_test.cpp src/utils/text_encoding.cpp)
+    target_link_libraries(text-encoding-tests PRIVATE nlohmann_json::nlohmann_json)
+    add_test(NAME unicode-native-transport COMMAND text-encoding-tests)
     add_executable(display-tests tests/display_mode_test.cpp src/mpv/display_mode.cpp src/mpv/playback_defaults.cpp)
     set_target_properties(display-tests PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/display-tests")
