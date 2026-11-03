@@ -37,3 +37,14 @@ std::wstring SerializeWebMessage(const nlohmann::json& message)
 {
     return Utf8ToWstring(message.dump());
 }
+
+std::optional<std::wstring> DecodeNativeLaunchText(const void* data, size_t byteCount)
+{
+    if (!data || byteCount == 0 || byteCount % sizeof(wchar_t)) return std::nullopt;
+    std::wstring text(static_cast<const wchar_t*>(data), byteCount / sizeof(wchar_t));
+    // COPYDATA senders may include the terminator or send just the characters.
+    // Never retain it in the extension/URI, or accept an embedded null payload.
+    if (!text.empty() && text.back() == L'\0') text.pop_back();
+    if (text.empty() || text.find(L'\0') != std::wstring::npos) return std::nullopt;
+    return text;
+}

@@ -1,6 +1,8 @@
 #include "mainwindow.h"
 
 #include <fstream>
+#include <algorithm>
+#include <cwctype>
 #include <iostream>
 #include <windowsx.h>
 #include <ShlObj.h>
@@ -557,8 +559,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
         PCOPYDATASTRUCT pcds = (PCOPYDATASTRUCT)lParam;
         if (pcds && pcds->dwData == 1 && pcds->lpData) {
-            // Assuming data is a wide string containing the URL or file path
-            std::wstring receivedUrl((wchar_t*)pcds->lpData, pcds->cbData / sizeof(wchar_t));
+            const auto decoded = DecodeNativeLaunchText(pcds->lpData, pcds->cbData);
+            if (!decoded) return 0;
+            const std::wstring& receivedUrl = *decoded;
             std::wcout << L"Received URL in main instance: " << receivedUrl << std::endl;
 
             // Check if received URL is a file and exists
@@ -566,12 +569,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 // Extract file extension
                 size_t dotPos = receivedUrl.find_last_of(L".");
                 std::wstring extension = (dotPos != std::wstring::npos) ? receivedUrl.substr(dotPos) : L"";
+                std::transform(extension.begin(), extension.end(), extension.begin(),
+                    [](wchar_t ch) { return static_cast<wchar_t>(std::towlower(ch)); });
 
                 if (extension == L".torrent") {
                     // Handle .torrent files
-                    std::string utf8FilePath = WStringToUtf8(receivedUrl);
-
-                    std::ifstream ifs(utf8FilePath, std::ios::binary);
+                    std::ifstream ifs(std::filesystem::path(receivedUrl), std::ios::binary);
                     if (!ifs) {
                         std::cerr << "Error: Could not open torrent file.\n";
                         break;
