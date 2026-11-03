@@ -23,7 +23,7 @@
 
 ## ✨ Made for your player
 
-Everything added to this fork, from the first mpv upgrade through **1.3.7 Hotfix**:
+Everything added to this fork, from the first mpv upgrade through **1.3.8**:
 
 | Feature | What you get |
 | --- | --- |
@@ -63,9 +63,9 @@ Everything added to this fork, from the first mpv upgrade through **1.3.7 Hotfix
 
 | Download | How to use it |
 | --- | --- |
-| 📥 [**1.3.7 Hotfix installer — recommended**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.7-hotfix/Ezras-Stremio-1.3.7-hotfix-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
-| 💼 [**1.3.7 Hotfix portable ZIP**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.7-hotfix/Ezras-Stremio-1.3.7-hotfix-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
-| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.7-hotfix/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
+| 📥 [**1.3.8 installer — recommended**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.8/Ezras-Stremio-1.3.8-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
+| 💼 [**1.3.8 portable ZIP**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.8/Ezras-Stremio-1.3.8-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
+| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.8/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
 
 Use files named **Ezras-Stremio** for this fork. Downloads marked **BUILD-ONLY** are archived build dependencies. Community package-manager listings install the upstream edition; use this fork's releases for these features.
 

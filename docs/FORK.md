@@ -19,7 +19,7 @@ D3D11 playback. Use Windows 10/11 x64.
 
 ## Install and use
 
-Download `Ezras-Stremio-1.3.7-hotfix-x64.exe` from this fork's release. The installer
+Download `Ezras-Stremio-1.3.8-x64.exe` from this fork's release. The installer
 installs WebView2 when needed. The `.zip` is portable but requires the system
 WebView2 runtime. Extract the ZIP into its own directory and run `stremio.exe`.
 Use the installer whose filename starts with `Ezras-Stremio`; **BUILD-ONLY** downloads are
@@ -353,7 +353,7 @@ The Dark Mode body gradient deliberately has no `!important`: the community Shel
 
 The regression test instantiates the actual current ShellVideo module and checks all ancestor backgrounds and rendered PNG alpha during two load/unload cycles, theme switches, normal/fullscreen/PiP-sized viewports, pause/resume and destroy. Its negative control fails against 1.3.7. A native WebView2 test also captures the compiled overlay: video-area pixels must have zero alpha during playback, the gradient must return afterward, and foreground controls must remain opaque. This supplements the native mpv pixel/rendering tests, rather than treating separate video and toolbar tests as sufficient.
 
-### Maintenance fixes (unreleased)
+### Maintenance fixes (1.3.8)
 
 - Discord watching activity accepts its ten required arguments and checks optional pause/details/watch-link fields before reading them. Episode status text remains alive through the SDK call. Invalid, missing, overflowing or inconsistent playback times leave the activity text visible without an invalid timer. The production formatter has separate tests from the SDK serializer, including disabled RPC and paused/movie/details states.
 - Native-to-web JSON uses UTF-8 decoding instead of widening individual bytes, preserving non-Latin track titles and extension names. External links and navigation use the same UTF-8 conversion, and empty requests are ignored. Dedicated Windows tests cover Japanese, Hebrew and emoji in JSON and URLs.
