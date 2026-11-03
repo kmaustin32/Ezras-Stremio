@@ -1,12 +1,13 @@
-## Ezra's Stremio 1.3.7 Hotfix
+## Ezra's Stremio 1.3.8
 
-Restores video visibility in Dark Mode while keeping the diagonal background gradient.
+This maintenance release fixes Discord activity, Unicode text and links, and opening files in an already running app.
 
 ### What's fixed
 
-- **Native video is visible again.** The gradient introduced in 1.3.6 could cover native mpv playback, leaving audio with only the app background. The gradient now allows the native player's inline transparent background to take precedence. It returns automatically when playback closes.
-- **Stronger playback checks.** The actual ShellVideo component is exercised through playback, theme switches, pause/resume, resizing, unload and replay. Rendered browser alpha and compiled WebView2 PNG captures verify transparency where native video belongs while keeping controls visible. A negative control reproduces the faulty 1.3.7 behavior.
-- **Requested gradient retained.** Dark Mode still blends smoothly from `#0B0F18` in the upper left to `#161A26` in the lower right. Saved theme choices and existing popup/player colors are preserved.
+- **Discord activity.** Missing optional fields are handled safely, episode titles stay intact, and invalid timing data leaves the activity visible without a misleading countdown.
+- **Unicode text and links.** Native messages and navigation preserve non-Latin track titles, extension names, and links. Empty navigation and external link requests are ignored.
+- **Opening files in the running app.** Windows now detects an existing instance before processing launch arguments can overwrite the result.
+- **Torrent file handoff.** Forwarded `.torrent` files open correctly when the filename has non-Latin characters or an uppercase extension.
 
 ### Player preferences retained
 
@@ -32,9 +33,9 @@ The redesigned [README](../README.md) covers these features, installation, short
 
 ### Downloads
 
-- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.7-hotfix/Ezras-Stremio-1.3.7-hotfix-x64.exe)
-- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.7-hotfix/Ezras-Stremio-1.3.7-hotfix-x64.zip)
-- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.7-hotfix/SHA256SUMS.txt)
+- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.8/Ezras-Stremio-1.3.8-x64.exe)
+- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.8/Ezras-Stremio-1.3.8-x64.zip)
+- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.8/SHA256SUMS.txt)
 
 Use Windows 10/11 x64. The installer sets up WebView2 when needed; the portable ZIP needs the system WebView2 Runtime. When upgrading, retain your configuration to keep custom mpv.conf, input.conf and other scripts. The fork's own black-bar script is updated. The original shell version and installation/profile paths are retained for upgrade compatibility.
 
