@@ -211,7 +211,7 @@ test('Toolbar dragging and boosted maximum changes stay synchronized with the re
         const colors = dark => page.evaluate(dark => {window.native('theme-changed', {dark}); window.setVolume(dark ? 185 : 190);}, dark);
         for (const dark of [true, false]) {
             await colors(dark); await popup.waitFor();
-            assert.equal(await popup.evaluate(el => getComputedStyle(el).backgroundColor), dark ? 'rgba(34, 38, 53, 0.1)' : 'rgba(255, 255, 255, 0.05)');
+            assert.equal(await popup.evaluate(el => getComputedStyle(el).backgroundColor), dark ? 'rgba(22, 26, 38, 0.1)' : 'rgba(255, 255, 255, 0.05)');
             assert.equal(await popup.locator('[class*="volume-icon"]').evaluate(el => getComputedStyle(el).color), dark ? 'rgb(133, 139, 153)' : 'rgba(255, 255, 255, 0.9)');
         }
         await page.mouse.move(640, 360); await page.locator('#toolbar-volume').hover();

@@ -1,13 +1,13 @@
-## Ezra's Stremio 1.3.8
+## Ezra's Stremio 1.4.0
 
-This maintenance release fixes Discord activity, Unicode text and links, and opening files in an already running app.
+Skip intros and outros from the player, with a button that matches the current theme.
 
-### What's fixed
+### What's new
 
-- **Discord activity.** Missing optional fields are handled safely, episode titles stay intact, and invalid timing data leaves the activity visible without a misleading countdown.
-- **Unicode text and links.** Native messages and navigation preserve non-Latin track titles, extension names, and links. Empty navigation and external link requests are ignored.
-- **Opening files in the running app.** Windows now detects an existing instance before processing launch arguments can overwrite the result.
-- **Torrent file handoff.** Forwarded `.torrent` files open correctly when the filename has non-Latin characters or an uppercase extension.
+- **Skip Intro and Skip Outro.** A translucent, softly glowing button fades in over 0.25 seconds above the seek bar during a labeled segment. Dark Mode uses **#858B99** text and border on a translucent **#161A26** background. Normal mode uses white text and border.
+- **Optional timestamp lookup.** In **Settings → Player → Controls**, enable **Look up skip timestamps** to fill gaps in embedded chapter data for supported titles. The lookup sends the title ID, episode numbers and runtime to [TheIntroDB](https://theintrodb.org/).
+- **Outro handling.** A marked post-credits scene stays playable. When an outro reaches the end of the video, the existing autoplay setting decides whether to advance.
+- **Dark Mode volume popup.** The translucent panel now uses **#161A26** at 10% opacity.
 
 ### Player preferences retained
 
@@ -33,14 +33,14 @@ The redesigned [README](../README.md) covers these features, installation, short
 
 ### Downloads
 
-- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.8/Ezras-Stremio-1.3.8-x64.exe)
-- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.8/Ezras-Stremio-1.3.8-x64.zip)
-- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.3.8/SHA256SUMS.txt)
+- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.4.0/Ezras-Stremio-1.4.0-x64.exe)
+- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.4.0/Ezras-Stremio-1.4.0-x64.zip)
+- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.4.0/SHA256SUMS.txt)
 
 Use Windows 10/11 x64. The installer sets up WebView2 when needed; the portable ZIP needs the system WebView2 Runtime. When upgrading, retain your configuration to keep custom mpv.conf, input.conf and other scripts. The fork's own black-bar script is updated. The original shell version and installation/profile paths are retained for upgrade compatibility.
 
 ### Validation and upstream compatibility
 
-GitHub Actions builds the installer and portable archive and runs the native configuration, blur/framing/rendering, black-bar/seam, shader, streaming/transcoding, all 32 live compatibility combinations, actual Library/details/episode/source navigation, real keyboard/spatial-navigation and popup interactions, real community slider, episode-image blur, settings/shortcuts, animation and timeout preferences, theme switching, live dropdown interaction, backup, WebView2 and installer-branding checks before publication.
+GitHub Actions builds the installer and portable archive and runs the native configuration, blur/framing/rendering, black-bar/seam, shader, streaming/transcoding, chapter seek and paused end-of-video, skip-button behavior and styling, community player compatibility, Library navigation, keyboard and popup interactions, episode-image blur, settings, themes, backup, WebView2 and installer-branding checks before publication.
 
 Theme and settings styling are isolated in the fork script; they do not rewrite the hosted community bundle or profile. Automatic upstream binary updates remain disabled. Source history is preserved for future upstream merges; incompatible hosted UI changes are reported rather than silently discarding other compatible fixes.

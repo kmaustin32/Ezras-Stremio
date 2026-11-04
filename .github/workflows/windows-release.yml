@@ -61,6 +61,8 @@ jobs:
           if ($LASTEXITCODE) { throw 'Streaming dependency tests failed' }
           python tests/mpv_smoke.py --dll .build-cache/libmpv/libmpv-2.dll --output .build-cache/render-test --video .build-cache/media-test/sample.avi --display-bridge cmake-build-release-x64/display-bridge/display-test-bridge.dll
           if ($LASTEXITCODE) { throw 'Embedded rendering tests failed' }
+          python tests/skip_media.py --dll .build-cache/libmpv/libmpv-2.dll --ffmpeg .build-cache/media-tools/ffmpeg.exe --output .build-cache/skip-media
+          if ($LASTEXITCODE) { throw 'Chapter seek and end-of-video tests failed' }
           python tests/bar_detection.py --dll .build-cache/libmpv/libmpv-2.dll --ffmpeg .build-cache/media-tools/ffmpeg.exe --output .build-cache/bar-detection-test
           if ($LASTEXITCODE) { throw 'Manual black-bar detection tests failed' }
           node --test tests/shortcut.test.js tests/server_patch.test.js
@@ -73,7 +75,7 @@ jobs:
           npm install --prefix .build-cache/ui-test --no-save --ignore-scripts playwright@1.62.1
           if ($LASTEXITCODE) { throw 'UI test dependency install failed' }
           $env:NODE_PATH = "$pwd/.build-cache/ui-test/node_modules"
-          node --test tests/player_controls.test.js tests/player_layout.test.js tests/episode_blur.test.js tests/player_shortcuts.test.js tests/backup_ui.test.js tests/paused_controls.test.js tests/animation_settings.test.js tests/theme.test.js tests/player_volume_feedback.test.js tests/library_navigation.test.js
+          node --test tests/player_controls.test.js tests/player_layout.test.js tests/episode_blur.test.js tests/player_shortcuts.test.js tests/backup_ui.test.js tests/paused_controls.test.js tests/animation_settings.test.js tests/theme.test.js tests/player_volume_feedback.test.js tests/library_navigation.test.js tests/player_skip.test.js
           if ($LASTEXITCODE) { throw 'Player UI tests failed' }
       - name: Test native WebView2 bootstrap and cached reload
         shell: pwsh
@@ -103,8 +105,8 @@ jobs:
           python tests/branding_package.py --exe dist/win-x64/stremio.exe --original .build-cache/upstream/stremio.exe --installer 'utils/Stremio 5.0.22-x64.exe'
           if ($LASTEXITCODE) { throw 'Packaged application branding verification failed' }
           New-Item -ItemType Directory -Force out | Out-Null
-          Copy-Item 'utils/Stremio 5.0.22-x64.exe' out/Ezras-Stremio-1.3.8-x64.exe
-          Compress-Archive -Path dist/win-x64/* -DestinationPath out/Ezras-Stremio-1.3.8-x64.zip
+          Copy-Item 'utils/Stremio 5.0.22-x64.exe' out/Ezras-Stremio-1.4.0-x64.exe
+          Compress-Archive -Path dist/win-x64/* -DestinationPath out/Ezras-Stremio-1.4.0-x64.zip
           Copy-Item images/stremio2.png out/stremio-icon.png
           Get-ChildItem out -File | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)" } | Set-Content out/SHA256SUMS.txt
       - uses: actions/upload-artifact@v7
@@ -171,4 +173,4 @@ jobs:
           for file in dependency-files/*.exe; do
             mv -- "$file" "${file%/*}/BUILD-ONLY-${file##*/}"
           done
-          gh release create "$GITHUB_REF_NAME" --title "Ezra's Stremio 1.3.8" --notes-file docs/RELEASE-mpv.md release-files/* dependency-files/*
+          gh release create "$GITHUB_REF_NAME" --title "Ezra's Stremio 1.4.0" --notes-file docs/RELEASE-mpv.md release-files/* dependency-files/*
