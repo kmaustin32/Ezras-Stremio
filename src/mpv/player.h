@@ -14,6 +14,8 @@ void HandleMpvEvents();
 void HandleMpvCommand(const std::vector<std::string>& args);
 void HandleMpvSetProp(const std::vector<std::string>& args);
 void HandleMpvObserveProp(const std::vector<std::string>& args);
+void NotifySkipMedia();
+void SeekSkipSegment(const std::vector<std::string>& args);
 
 // For pausing
 void pauseMPV(bool allowed);

@@ -34,6 +34,11 @@
     const controlTimeouts = ['0.5', '1', '2', '5', 'never'];
     let controlTimeout = '1';
     let timeoutStatus = '';
+    const skipLookupKey = 'stremio-fork-skip-lookup';
+    let skipLookupEnabled = readSkipLookup();
+    let skipMedia = null;
+    let skipButton;
+    let shownSkip = null;
     const appliedStyles = new WeakMap();
     const playerShortcuts = [
         {key: 'CTRL+b', keys: ['Ctrl', 'B'], label: 'Toggle ambient border blur'},
@@ -153,6 +158,135 @@
         }));
     }
 
+    function readSkipLookup() {
+        try { return localStorage.getItem(skipLookupKey) === 'true'; }
+        catch { return false; }
+    }
+
+    function chapterSkips(chapters, duration) {
+        return chapters.flatMap((chapter, index) => {
+            const title = typeof chapter?.title === 'string' ? chapter.title.trim() : '';
+            const intro = /^(?:intro(?:duction)?|opening(?: (?:credits|theme))?|op)(?:\s*\d+)?$/i.test(title);
+            const outro = /^(?:outro|ending(?: (?:credits|theme))?|end credits|credits|ed)(?:\s*\d+)?$/i.test(title);
+            if (!intro && !outro) return [];
+            const start = chapter.time;
+            const end = index + 1 < chapters.length ? chapters[index + 1]?.time : outro ? duration : null;
+            return validSkip(start, end, duration) ? [{kind: intro ? 'intro' : 'outro', start, end}] : [];
+        });
+    }
+
+    function validSkip(start, end, duration) {
+        return Number.isFinite(start) && Number.isFinite(end) && start >= 0 && start < end && end <= duration;
+    }
+
+    function skipLookupQuery(hash, duration) {
+        const route = hash.match(/^#\/player\/[^/]+\/[^/]*\/[^/]*\/(series|movie)\/(tt\d{7,12})\/([^/?]+)(?:\?.*)?$/);
+        if (!route) return null;
+        const [, type, id, video] = route;
+        const query = new URLSearchParams({imdb_id: id, duration_ms: String(Math.round(duration * 1000)),
+            details: 'true', merge_unknown: 'false'});
+        if (type === 'series') {
+            let episode;
+            try { episode = decodeURIComponent(video).match(/^(tt\d+):(\d{1,4}):(\d{1,5})$/); }
+            catch { return null; }
+            if (!episode || episode[1] !== id) return null;
+            query.set('season', episode[2]);
+            query.set('episode', episode[3]);
+        } else if (video !== id) return null;
+        return query;
+    }
+
+    function prepareSkips(media) {
+        media.local = chapterSkips(media.chapters, media.duration);
+        media.remote = [];
+        media.request?.abort();
+        const query = skipLookupEnabled && skipLookupQuery(media.hash, media.duration);
+        const missing = ['intro', 'outro'].filter(kind => !media.local.some(segment => segment.kind === kind));
+        if (!query || !missing.length) return;
+        const request = new AbortController();
+        media.request = request;
+        fetch('https://api.theintrodb.org/v4/media?' + query, {
+            credentials: 'omit', referrerPolicy: 'no-referrer',
+            signal: AbortSignal.any([request.signal, AbortSignal.timeout(5000)])
+        }).then(response => response.ok ? response.json() : null).then(result => {
+            if (!result || request.signal.aborted || skipMedia !== media || media.hash !== location.hash ||
+                !Number.isFinite(result.group_duration_ms) ||
+                Math.abs(result.group_duration_ms - media.duration * 1000) > 1000) return;
+            if (query.has('season') && (result.type !== 'tv' || result.season !== Number(query.get('season')) ||
+                result.episode !== Number(query.get('episode')))) return;
+            if (!query.has('season') && result.type !== 'movie') return;
+            for (const kind of missing) {
+                const entries = result[kind === 'intro' ? 'intro' : 'credits'];
+                if (!Array.isArray(entries)) continue;
+                for (const entry of entries) {
+                    const start = entry?.start_ms === null && kind === 'intro' ? 0 : entry?.start_ms / 1000;
+                    const end = entry?.end_ms === null && kind === 'outro' ? media.duration : entry?.end_ms / 1000;
+                    if (entry?.start_ms !== null && !Number.isFinite(entry?.start_ms)) continue;
+                    if (entry?.end_ms !== null && !Number.isFinite(entry?.end_ms)) continue;
+                    if ((kind === 'outro' && entry.start_ms === null) || (kind === 'intro' && entry.end_ms === null)) continue;
+                    if (validSkip(start, end, media.duration) &&
+                        !media.local.some(segment => start < segment.end && segment.start < end))
+                        media.remote.push({kind, start, end});
+                }
+            }
+            schedule();
+        }).catch(() => {}); // A missing or unavailable timestamp never interrupts playback.
+    }
+
+    function currentSkip() {
+        if (!skipMedia || skipMedia.hash !== location.hash || !Number.isFinite(skipMedia.time)) return null;
+        const {local, remote, time} = skipMedia;
+        const containsTime = segment => segment.start <= time && time < segment.end;
+        return local.find(containsTime) || remote.find(containsTime) || null;
+    }
+
+    function updateSkipButton(player) {
+        const seekBar = player?.querySelector('[class*="seek-bar-container"]');
+        const segment = state.active && seekBar && currentSkip();
+        if (!segment || playerOverlayOpen('[class*="next-video-popup-container"]')) {
+            skipButton?.remove();
+            shownSkip = null;
+            return;
+        }
+        if (segment !== shownSkip || skipButton?.parentElement !== player) {
+            skipButton?.remove();
+            shownSkip = segment;
+            const prompt = document.createElement('button');
+            prompt.id = 'stremio-fork-skip-segment';
+            prompt.type = 'button';
+            prompt.textContent = segment.kind === 'intro' ? 'Skip Intro' : 'Skip Outro';
+            for (const type of ['mousedown', 'dblclick'])
+                prompt.addEventListener(type, event => event.stopPropagation());
+            prompt.addEventListener('click', event => {
+                event.stopPropagation();
+                if (currentSkip() === segment)
+                    send('seek-skip-segment', [skipMedia.serial, String(segment.start), String(segment.end)]);
+            });
+            prompt.addEventListener('keydown', event => {
+                if (event.code !== 'Space' && event.code !== 'Enter') return;
+                event.preventDefault();
+                event.stopPropagation();
+                if (!event.repeat) prompt.click();
+            });
+            skipButton = prompt;
+            player.append(prompt);
+        }
+        skipButton.toggleAttribute('data-paused', paused);
+        // Ignore the toolbar's slide transform so the prompt stays reachable
+        // while the rest of the controls are hidden.
+        const bar = seekBar.closest('[class*="control-bar-layer"]');
+        const barHeight = bar ? bar.getBoundingClientRect().bottom - seekBar.getBoundingClientRect().top : 0;
+        const popup = player.querySelector('[class*="next-video-popup-container"]');
+        const popupHeight = popup ? player.getBoundingClientRect().bottom - popup.getBoundingClientRect().top : 0;
+        setStyle(skipButton, '--stremio-skip-offset', Math.max(barHeight, popupHeight) + 'px');
+    }
+
+    function updateSkipLookup(enabled) {
+        skipLookupEnabled = enabled;
+        if (skipMedia?.duration > 0 && skipMedia.hash === location.hash) prepareSkips(skipMedia);
+        schedule();
+    }
+
     function readAnimationDuration() {
         try {
             const saved = localStorage.getItem(animationStorageKey);
@@ -262,6 +396,22 @@
                 const timeoutNote = document.createElement('p'); timeoutNote.id = 'stremio-fork-timeout-status';
                 timeoutNote.setAttribute('role', 'status'); timeoutNote.className = help.className;
                 group.append(timeoutEntry, timeoutNote);
+                const lookupEntry = document.createElement('div'); lookupEntry.className = row.className;
+                const lookupName = document.createElement('div'); lookupName.className = name.className;
+                const lookupLabel = document.createElement('label'); lookupLabel.className = label.className;
+                lookupLabel.htmlFor = 'stremio-fork-skip-lookup'; lookupLabel.textContent = 'Look up skip timestamps';
+                const lookupHelp = document.createElement('p'); lookupHelp.className = help.className;
+                lookupHelp.id = 'stremio-fork-skip-help';
+                lookupHelp.textContent = 'Use TheIntroDB when the video has no labeled intro or outro chapter. Shares the title ID, episode number and runtime with TheIntroDB.';
+                lookupName.append(lookupLabel, lookupHelp);
+                const lookupControls = document.createElement('div'); lookupControls.className = controls.className;
+                const lookup = document.createElement('input'); lookup.type = 'checkbox'; lookup.id = lookupLabel.htmlFor;
+                lookup.setAttribute('aria-describedby', lookupHelp.id);
+                lookup.addEventListener('change', () => {
+                    try { localStorage.setItem(skipLookupKey, String(lookup.checked)); } catch {}
+                    updateSkipLookup(lookup.checked);
+                });
+                lookupControls.append(lookup); lookupEntry.append(lookupName, lookupControls); group.append(lookupEntry);
                 // Append only fork-owned nodes; React retains all native rows.
                 section.querySelector(':scope > [class*="section-title"]').after(group);
             }
@@ -275,6 +425,7 @@
             const timeoutNote = group.querySelector('#stremio-fork-timeout-status');
             if (timeoutNote.textContent !== timeoutStatus) timeoutNote.textContent = timeoutStatus;
             timeoutNote.hidden = !timeoutStatus;
+            group.querySelector('#stremio-fork-skip-lookup').checked = skipLookupEnabled;
         }
     }
 
@@ -285,16 +436,17 @@
 
     function controlsAreBlocked() {
         if (pointerHeld || document.documentElement.className.includes('active-slider-within')) return true;
-        const controls = '[class*="nav-bar-layer"], [class*="control-bar-layer"], [class*="side-drawer-button-layer"]';
+        const controls = '[class*="nav-bar-layer"], [class*="control-bar-layer"], [class*="side-drawer-button-layer"], #stremio-fork-skip-segment';
         if (keyboardFocus && controlPlayer?.contains(document.activeElement) && document.activeElement.closest(controls)) return true;
         return playerOverlayOpen();
     }
 
-    function playerOverlayOpen() {
+    function playerOverlayOpen(ignore) {
         // Never hide a settings/subtitle/speed menu, episode drawer, popup,
         // error or loading state. These elements are owned by the hosted UI.
         const selectors = '[class*="menu-layer"], [class*="side-drawer-layer"], [class*="error-layer"], [class*="buffering-layer"], [class*="context-menu-container"], [role="dialog"], [role="menu"]';
         return Array.from(document.querySelectorAll(selectors)).some(element => {
+            if (ignore && element.matches(ignore)) return false;
             const rect = element.getBoundingClientRect();
             const style = getComputedStyle(element);
             return rect.width > 0 && rect.height > 0 && style.display !== 'none' &&
@@ -639,7 +791,7 @@
             [class*="meta-item-container"] [class*="watched-icon-layer"] {background-color:#DEA066!important}
             [class*="player-container"] [class*="volume-change-indicator"],
             [class*="player-container"] [class*="volume-change-indicator"] * {pointer-events:none!important}
-            html[data-stremio-dark-theme] [class*="volume-change-indicator"] {background-color:rgba(34,38,53,.1)!important}
+            html[data-stremio-dark-theme] [class*="volume-change-indicator"] {background-color:rgba(22,26,38,.1)!important}
             html[data-stremio-dark-theme] [class*="volume-change-indicator"] [class*="volume-icon"] {
                 color:#858B99!important;
             }
@@ -650,6 +802,22 @@
                 --primary-foreground-color:var(--stremio-player-control-color);
                 --primary-accent-color:var(--stremio-player-control-color);
             }
+            #stremio-fork-skip-segment {
+                position:absolute;z-index:1;right:1.5rem;
+                bottom:min(max(8.25rem,calc(var(--stremio-skip-offset,0px) + .75rem)),calc(100% - 5rem));
+                max-width:calc(100% - 3rem);
+                padding:.65em 1.25em;border:2px solid currentColor;border-radius:.65rem;
+                color:var(--stremio-player-control-color,#fff);background:rgba(0,0,0,.48);
+                box-shadow:0 0 .65rem color-mix(in srgb,currentColor 38%,transparent);
+                font:inherit;font-size:1.25rem;font-weight:600;cursor:pointer!important;
+                animation:stremio-fork-skip-fade .25s ease-out both;
+            }
+            html[data-stremio-dark-theme] #stremio-fork-skip-segment {background:rgba(22,26,38,.62)}
+            #stremio-fork-skip-segment:hover {box-shadow:0 0 .9rem color-mix(in srgb,currentColor 60%,transparent)}
+            #stremio-fork-skip-segment:focus-visible {outline:2px solid currentColor;outline-offset:3px}
+            [data-stremio-controls="hidden"] > #stremio-fork-skip-segment[data-paused] {display:none}
+            @keyframes stremio-fork-skip-fade {from {opacity:0} to {opacity:1}}
+            @media (prefers-reduced-motion:reduce) {#stremio-fork-skip-segment {animation:none}}
         `;
         document.head.append(style);
         // Use the shell's saved choice when available; otherwise start in Dark Mode.
@@ -684,6 +852,7 @@
         updateVolume(player);
         updatePip(player);
         updateCompatibility(player);
+        updateSkipButton(player);
         const controls = player?.querySelector('[class*="control-bar-buttons-menu-container"]');
         if (!controls || !state.active) {
             button?.remove();
@@ -744,8 +913,32 @@
             schedule();
             return;
         }
+        if (payload?.args?.[0] === 'skip-media-changed') {
+            skipMedia?.request?.abort();
+            const media = payload.args[1];
+            skipMedia = media?.seekable === true && typeof media.serial === 'string' ? {
+                serial: media.serial, hash: location.hash, time: media['time-pos'], duration: media.duration,
+                chapters: Array.isArray(media.chapters) ? media.chapters : [], local: [], remote: []
+            } : null;
+            if (skipMedia?.duration > 0) prepareSkips(skipMedia);
+            schedule();
+            return;
+        }
         if (payload?.args?.[0] === 'mpv-prop-change') {
             const property = payload.args[1];
+            if (property?.name === 'time-pos' && skipMedia) {
+                const previous = currentSkip();
+                skipMedia.time = property.data;
+                if (previous !== currentSkip()) schedule();
+                return;
+            }
+            if (property?.name === 'duration' && skipMedia && !(skipMedia.duration > 0) &&
+                Number.isFinite(property.data) && property.data > 0) {
+                skipMedia.duration = property.data;
+                prepareSkips(skipMedia);
+                schedule();
+                return;
+            }
             if (property?.name === 'volume' && typeof property.data === 'number' && Number.isFinite(property.data))
                 volume = property.data;
             else if (property?.name === 'mute' && typeof property.data === 'boolean') muted = property.data;
@@ -779,10 +972,17 @@
         schedule();
         send('get-display-mode');
         send('get-picture-in-picture');
+        send('get-skip-media');
     }
     window.addEventListener('stremio-fork-volume-limit', event => applyVolumeLimit(event.detail));
     window.addEventListener('stremio-fork-compatibility', event => receiveCompatibility(event.detail));
+    window.addEventListener('resize', schedule);
+    window.addEventListener('hashchange', () => {
+        if (skipMedia?.hash !== location.hash) skipMedia?.request?.abort();
+        schedule();
+    });
     window.addEventListener('storage', event => {
+        if (event.key === skipLookupKey || event.key === null) updateSkipLookup(readSkipLookup());
         if (event.key !== animationStorageKey && event.key !== timeoutStorageKey && event.key !== null) return;
         if (event.key === animationStorageKey || event.key === null) {
             animationStatus = '';

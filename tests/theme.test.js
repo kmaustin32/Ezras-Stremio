@@ -284,7 +284,7 @@ test('Watched badges use warm peach in both themes; the real volume-change popup
             await page.evaluate(dark=>{window.native('theme-changed',{dark});window.setPopupVolume(dark?110:105);},dark);
             await popup.waitFor();
             assert.equal(await popup.evaluate(el=>getComputedStyle(el).color),dark?'rgb(133, 139, 153)':'rgba(255, 255, 255, 0.9)');
-            assert.equal(await popup.evaluate(el=>getComputedStyle(el.parentElement).backgroundColor),dark?'rgba(34, 38, 53, 0.1)':'rgba(255, 255, 255, 0.05)');
+            assert.equal(await popup.evaluate(el=>getComputedStyle(el.parentElement).backgroundColor),dark?'rgba(22, 26, 38, 0.1)':'rgba(255, 255, 255, 0.05)');
             assert.equal(await popup.evaluate(el=>getComputedStyle(el.parentElement).opacity),'1','Only the background is translucent; speaker opacity is unchanged');
             for(const id of ['watched-badge','watched-poster']) assert.equal(await background(id),'rgb(222, 160, 102)');
             assert.notEqual(await background('upcoming-badge'),'rgb(222, 160, 102)','Upcoming is not a watched marker');

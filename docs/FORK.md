@@ -19,7 +19,7 @@ D3D11 playback. Use Windows 10/11 x64.
 
 ## Install and use
 
-Download `Ezras-Stremio-1.3.8-x64.exe` from this fork's release. The installer
+Download `Ezras-Stremio-1.4.0-x64.exe` from this fork's release. The installer
 installs WebView2 when needed. The `.zip` is portable but requires the system
 WebView2 runtime. Extract the ZIP into its own directory and run `stremio.exe`.
 Use the installer whose filename starts with `Ezras-Stremio`; **BUILD-ONLY** downloads are
@@ -323,7 +323,7 @@ Completed-episode badges and library watched markers use `#DEA066` in both modes
 
 Dark Mode is the startup default in the native shell and in the hosted player when no valid shell snapshot is available. The shipped `UseDarkTheme=1` configuration and missing-preference fallback agree. An explicit saved `UseDarkTheme=0` still restores normal mode; tray toggles and save/reload preserve that choice. The native settings test exercises the real loader/saver against an isolated configuration rather than the user's profile.
 
-In Dark Mode, the volume-change popup background is `rgba(34,38,53,0.1)` (`#222635` at 10% opacity). Opacity is applied to the background color, keeping the speaker at `#858B99` with its existing opacity. Normal-mode popup styling, rounded corners, padding and popup timing remain unchanged.
+In Dark Mode, the volume-change popup background uses 10% opacity, with the color updated to `#161A26` in 1.4.0. The speaker uses `#858B99` with its existing opacity. Normal mode retains the original popup styling.
 
 Control animation speed adds 0.1 seconds. Both timing dropdowns display numeric choices without a `sec` suffix, with units described in their help text. The animation default remains 0.5 seconds and the timeout default remains 1 second; stored values and cross-window preferences are compatible with earlier releases.
 
@@ -359,3 +359,9 @@ The regression test instantiates the actual current ShellVideo module and checks
 - Native-to-web JSON uses UTF-8 decoding instead of widening individual bytes, preserving non-Latin track titles and extension names. External links and navigation use the same UTF-8 conversion, and empty requests are ignored. Dedicated Windows tests cover Japanese, Hebrew and emoji in JSON and URLs.
 - Single-instance startup remembers the result of `CreateMutexW` immediately. Decoding/probing launch arguments can change Windows' last-error value, which previously could cause an existing instance to be missed when opening a link or file.
 - Forwarded file/protocol requests accept both terminated and unterminated UTF-16 text, remove the optional terminator before extension checks, and reject malformed packets. Torrent extension checks ignore case, and torrent files are opened through native wide filesystem paths. Magnet/protocol contents are preserved.
+
+### Skip Intro and Skip Outro (1.4.0)
+
+The native shell reports chapter titles and boundaries for each loaded seekable video. The player shows a themed button above the seek bar only while playback is inside a labeled intro or outro. The seek request carries the current file's serial, and the native handler checks the playback position and bounds before seeking. A labeled chapter after credits stays playable. Skipping an outro that reaches the end emits MPV's normal EOF event and follows the player's autoplay setting.
+
+**Settings → Player → Controls → Look up skip timestamps** is off by default. If enabled, it sends the IMDb title ID, episode number when applicable, and video runtime to [TheIntroDB](https://theintrodb.org/). The player accepts timestamps for the matching episode and runtime only and gives embedded chapters priority.

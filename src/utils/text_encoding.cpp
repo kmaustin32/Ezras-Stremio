@@ -35,7 +35,8 @@ std::wstring Utf8ToWstring(const std::string& utf8Str)
 
 std::wstring SerializeWebMessage(const nlohmann::json& message)
 {
-    return Utf8ToWstring(message.dump());
+    // libmpv metadata can contain invalid UTF-8, including chapter titles.
+    return Utf8ToWstring(message.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace));
 }
 
 std::optional<std::wstring> DecodeNativeLaunchText(const void* data, size_t byteCount)

@@ -14,6 +14,10 @@ int main()
         const auto encoded = SerializeWebMessage(message);
         if (encoded.find(title) == std::wstring::npos || nlohmann::json::parse(WStringToUtf8(encoded)) != message)
             throw std::runtime_error("Native JSON transport corrupted non-Latin titles");
+        const nlohmann::json malformed = {{"title", std::string("Intro ") + char(0xff)}, {"time", 12}};
+        const auto sanitized = nlohmann::json::parse(WStringToUtf8(SerializeWebMessage(malformed)));
+        if (sanitized["title"] != WStringToUtf8(L"Intro \ufffd") || sanitized["time"] != 12)
+            throw std::runtime_error("Invalid chapter title bytes disrupted the native JSON message");
         const auto uri = std::string("https://example.invalid/") + utf8 + "?q=" + utf8;
         if (WStringToUtf8(Utf8ToWstring(uri)) != uri) throw std::runtime_error("Unicode URL lost characters");
         if (!Utf8ToWstring("").empty() || !WStringToUtf8(L"").empty()) throw std::runtime_error("Empty conversion changed");

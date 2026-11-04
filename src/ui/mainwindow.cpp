@@ -186,6 +186,10 @@ void HandleEvent(const std::string &ev, std::vector<std::string> &args)
         }
     } else if (ev == "get-display-mode") {
         NotifyDisplayModeState(HasNativeVideo());
+    } else if (ev == "get-skip-media") {
+        NotifySkipMedia();
+    } else if (ev == "seek-skip-segment") {
+        SeekSkipSegment(args);
     } else if (ev == "cycle-display-mode") {
         if (HasNativeVideo() && !CycleDisplayMode(g_mpv))
             AppendToCrashLog("[MPV]: Could not change display mode");

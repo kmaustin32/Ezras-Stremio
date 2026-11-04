@@ -5,6 +5,7 @@
 #include <iostream>
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include "../core/globals.h"
 #include "../utils/crashlog.h"
 #include "../utils/helpers.h"
@@ -61,6 +62,56 @@ static nlohmann::json mpvNodeToJson(const mpv_node* node)
     }
 }
 
+// File lifecycle and skip requests are both handled on the window thread.
+static unsigned long long skipMediaSerial = 0;
+static bool skipMediaLoaded = false;
+
+void NotifySkipMedia()
+{
+    if (!g_webview) return;
+    nlohmann::json media = {{"serial", std::to_string(skipMediaSerial)}, {"seekable", false}};
+    int seekable = 0;
+    if (g_mpv && skipMediaLoaded && mpv_get_property(g_mpv, "seekable", MPV_FORMAT_FLAG, &seekable) >= 0 && seekable) {
+        media["seekable"] = true;
+        for (const char* property : {"duration", "time-pos"}) {
+            double value = 0;
+            if (mpv_get_property(g_mpv, property, MPV_FORMAT_DOUBLE, &value) >= 0)
+                media[property] = value;
+        }
+        mpv_node chapters{};
+        if (mpv_get_property(g_mpv, "chapter-list", MPV_FORMAT_NODE, &chapters) >= 0) {
+            media["chapters"] = mpvNodeToJson(&chapters);
+            mpv_free_node_contents(&chapters);
+        }
+    }
+    SendToJS("skip-media-changed", media);
+}
+
+void SeekSkipSegment(const std::vector<std::string>& args)
+{
+    if (!g_mpv || !skipMediaLoaded || args.size() != 3 || args[0] != std::to_string(skipMediaSerial)) return;
+    try {
+        size_t startLength = 0, endLength = 0;
+        const double start = std::stod(args[1], &startLength);
+        const double end = std::stod(args[2], &endLength);
+        if (startLength != args[1].size() || endLength != args[2].size() ||
+            !std::isfinite(start) || !std::isfinite(end) || start < 0 || end <= start) return;
+        int seekable = 0;
+        double position = 0, duration = 0;
+        if (mpv_get_property(g_mpv, "seekable", MPV_FORMAT_FLAG, &seekable) < 0 || !seekable ||
+            mpv_get_property(g_mpv, "time-pos", MPV_FORMAT_DOUBLE, &position) < 0 ||
+            mpv_get_property(g_mpv, "duration", MPV_FORMAT_DOUBLE, &duration) < 0 ||
+            position < start || position >= end || end > duration) return;
+        // An exact seek to the end follows the same EOF path as natural playback.
+        const char* command[] = {"seek", args[2].c_str(), "absolute+exact", nullptr};
+        if (mpv_command_async(g_mpv, 0, command) >= 0 && end == duration) {
+            // Paused mpv stays on the last frame after a seek until playback resumes.
+            int playing = 0;
+            mpv_set_property_async(g_mpv, 0, "pause", MPV_FORMAT_FLAG, &playing);
+        }
+    } catch (const std::exception&) { /* Ignore malformed skip requests. */ }
+}
+
 // Helper to properly capitalize mpv error
 static std::string capitalizeFirstLetter(const std::string& input) {
     if (input.empty()) return input;
@@ -88,11 +139,18 @@ void HandleMpvEvents()
 
         switch(ev->event_id)
         {
+        case MPV_EVENT_START_FILE:
+            ++skipMediaSerial;
+            skipMediaLoaded = false;
+            NotifySkipMedia();
+            break;
         case MPV_EVENT_FILE_LOADED:
             // Each video starts at normal full volume, independently of the last video.
             g_currentVolume = (std::min)(100.0, MaximumPlayerVolume());
             if (!ApplyVideoStartDefaults(g_mpv))
                 AppendToCrashLog("[MPV]: Could not reset video to 100% volume and Fit");
+            skipMediaLoaded = true;
+            NotifySkipMedia();
             [[fallthrough]];
         case MPV_EVENT_VIDEO_RECONFIG:
         {
@@ -161,6 +219,8 @@ void HandleMpvEvents()
         }
         case MPV_EVENT_END_FILE:
         {
+            skipMediaLoaded = false;
+            NotifySkipMedia();
             NotifyDisplayModeState(false);
             mpv_event_end_file* ef=(mpv_event_end_file*)ev->data;
             nlohmann::json j;
