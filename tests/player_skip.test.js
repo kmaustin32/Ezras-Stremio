@@ -59,6 +59,17 @@ test('Embedded chapters show styled, click-to-seek prompts only inside the label
     await absent();
     await time(12);
     await label('Skip Intro');
+    const setControls = value => page.locator('.player-container-fixture')
+        .evaluate((element, value) => element.dataset.stremioControls = value, value);
+    await setControls('hidden');
+    assert.ok(await prompt.isVisible(), 'The prompt stays reachable while playing with the controls hidden');
+    await native('mpv-prop-change', {name: 'pause', data: true});
+    await page.waitForFunction(() => document.getElementById('stremio-fork-skip-segment')?.hasAttribute('data-paused'));
+    await setControls('hidden');
+    await prompt.waitFor({state: 'hidden'});
+    await native('mpv-prop-change', {name: 'pause', data: false});
+    await prompt.waitFor({state: 'visible'});
+    await setControls('visible');
     const style = () => prompt.evaluate(button => {
         const css = getComputedStyle(button);
         return [css.color, css.borderColor, css.backgroundColor, css.animationDuration, css.boxShadow];

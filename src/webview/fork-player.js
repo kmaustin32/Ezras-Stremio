@@ -271,6 +271,7 @@
             skipButton = prompt;
             player.append(prompt);
         }
+        skipButton.toggleAttribute('data-paused', paused);
         // Ignore the toolbar's slide transform so the prompt stays reachable
         // while the rest of the controls are hidden.
         const bar = seekBar.closest('[class*="control-bar-layer"]');
@@ -435,7 +436,7 @@
 
     function controlsAreBlocked() {
         if (pointerHeld || document.documentElement.className.includes('active-slider-within')) return true;
-        const controls = '[class*="nav-bar-layer"], [class*="control-bar-layer"], [class*="side-drawer-button-layer"]';
+        const controls = '[class*="nav-bar-layer"], [class*="control-bar-layer"], [class*="side-drawer-button-layer"], #stremio-fork-skip-segment';
         if (keyboardFocus && controlPlayer?.contains(document.activeElement) && document.activeElement.closest(controls)) return true;
         return playerOverlayOpen();
     }
@@ -814,6 +815,7 @@
             html[data-stremio-dark-theme] #stremio-fork-skip-segment {background:rgba(22,26,38,.62)}
             #stremio-fork-skip-segment:hover {box-shadow:0 0 .9rem color-mix(in srgb,currentColor 60%,transparent)}
             #stremio-fork-skip-segment:focus-visible {outline:2px solid currentColor;outline-offset:3px}
+            [data-stremio-controls="hidden"] > #stremio-fork-skip-segment[data-paused] {display:none}
             @keyframes stremio-fork-skip-fade {from {opacity:0} to {opacity:1}}
             @media (prefers-reduced-motion:reduce) {#stremio-fork-skip-segment {animation:none}}
         `;
