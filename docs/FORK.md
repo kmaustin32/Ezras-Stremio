@@ -323,7 +323,7 @@ Completed-episode badges and library watched markers use `#DEA066` in both modes
 
 Dark Mode is the startup default in the native shell and in the hosted player when no valid shell snapshot is available. The shipped `UseDarkTheme=1` configuration and missing-preference fallback agree. An explicit saved `UseDarkTheme=0` still restores normal mode; tray toggles and save/reload preserve that choice. The native settings test exercises the real loader/saver against an isolated configuration rather than the user's profile.
 
-In Dark Mode, the volume-change popup background is `rgba(34,38,53,0.1)` (`#222635` at 10% opacity). Opacity is applied to the background color, keeping the speaker at `#858B99` with its existing opacity. Normal-mode popup styling, rounded corners, padding and popup timing remain unchanged.
+In Dark Mode, the volume-change popup background uses 10% opacity, with the color updated to `#161A26` in 1.4.0. The speaker uses `#858B99` with its existing opacity. Normal mode retains the original popup styling.
 
 Control animation speed adds 0.1 seconds. Both timing dropdowns display numeric choices without a `sec` suffix, with units described in their help text. The animation default remains 0.5 seconds and the timeout default remains 1 second; stored values and cross-window preferences are compatible with earlier releases.
 
