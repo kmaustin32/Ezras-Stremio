@@ -2,6 +2,9 @@
     'use strict';
     const storagePrefix = 'stremio-fork-custom-lists:';
     const changeEvent = 'stremio-fork-lists-changed';
+    const indexKey = 'stremio-fork-anime-imdb-index-v1';
+    const indexUrl = 'https://raw.githubusercontent.com/Fribb/anime-lists/master/indices/imdb_index.json';
+    const indexLifetime = 24 * 60 * 60 * 1000;
     const defaults = [
         {id: 'anime', name: 'Anime', items: []},
         {id: 'live-action', name: 'Live Action', items: []}
@@ -13,6 +16,9 @@
     };
     const storageKey = uid => storagePrefix + encodeURIComponent(uid);
     const newDefaults = () => defaults.map(list => ({...list, items: []}));
+    const categoryIds = new Set(defaults.map(list => list.id));
+    const smartLists = new Map([['most-watched', 'timeswatched'], ['watched', 'watched'], ['not-watched', 'notwatched']]);
+    const sorts = new Set(['lastwatched', 'name', 'namereverse']);
 
     function decodeLists(raw) {
         if (raw === null) return newDefaults();
@@ -52,6 +58,75 @@
         try { return JSON.parse(raw); } catch { return null; }
     }
 
+    function imdbIds(index) {
+        const ids = new Set();
+        if (object(index)) {
+            for (const [key, entry] of Object.entries(index)) {
+                if (!Array.isArray(entry?.['anime-list']) || !entry['anime-list'].length) continue;
+                for (const id of key.replace(/^\[|\]$/g, '').split(',').map(value => value.trim())) {
+                    if (/^tt\d+$/.test(id)) ids.add(id);
+                }
+            }
+        }
+        return ids;
+    }
+
+    function automaticCategory(item, ids) {
+        return item.type === 'anime' || /^(?:kitsu|mal|anilist|anidb):\d+$/.test(item._id) || ids?.has(item._id)
+            ? 'anime' : 'live-action';
+    }
+
+    function classifyLists(lists, records, ids) {
+        const categories = new Map();
+        // Beta 1 stored manual picks in the two built-in lists. Honor them
+        // directly, with Anime taking priority if a title was in both.
+        for (const category of ['live-action', 'anime']) {
+            const list = lists.find(list => list.id === category);
+            for (const id of list?.items ?? []) categories.set(id, category);
+        }
+        const members = new Map(defaults.map(list => [list.id, []]));
+        for (const item of records.values()) {
+            const category = categories.get(item._id) ?? automaticCategory(item, ids);
+            categories.set(item._id, category);
+            members.get(category).push(item._id);
+        }
+        return {categories, lists: lists.map(list => members.has(list.id) ? {...list, items: members.get(list.id)} : list)};
+    }
+
+    function moveTitles(lists, ids, destination) {
+        const moved = new Set(ids);
+        for (const list of lists) {
+            if (!categoryIds.has(list.id)) continue;
+            list.items = list.items.filter(id => !moved.has(id));
+            if (list.id === destination) list.items.push(...moved);
+        }
+    }
+
+    let animeIndex, nextIndexAttempt = 0, indexRequest;
+    function refreshAnimeIndex() {
+        if (animeIndex === undefined) {
+            const saved = parse(localStorage.getItem(indexKey));
+            animeIndex = Array.isArray(saved?.ids) ? new Set(saved.ids) : null;
+            if (animeIndex && Number.isFinite(saved.fetchedAt)) nextIndexAttempt = saved.fetchedAt + indexLifetime;
+        }
+        if (indexRequest || Date.now() < nextIndexAttempt) return;
+        // Download a public index in one request. The request carries no
+        // Library titles, identifiers, or account information.
+        indexRequest = fetch(indexUrl, {credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(10000)})
+            .then(async response => {
+                if (!response.ok) throw new Error('Anime index is unavailable.');
+                const ids = imdbIds(await response.json());
+                if (ids.size < 1000) throw new Error('Anime index is incomplete.');
+                nextIndexAttempt = Date.now() + indexLifetime;
+                animeIndex = ids;
+                try {localStorage.setItem(indexKey, JSON.stringify({fetchedAt: Date.now(), ids: [...ids]}));}
+                catch { /* Continue with the in-memory index. */ }
+                window.dispatchEvent(new Event(changeEvent));
+            })
+            .catch(() => {nextIndexAttempt = Date.now() + 120000;})
+            .finally(() => {indexRequest = null;});
+    }
+
     function useLocalData(React, fixedUid) {
         const [snapshot, setSnapshot] = React.useState(null);
         React.useEffect(() => {
@@ -59,14 +134,17 @@
             const refresh = () => {
                 try {
                     const uid = fixedUid === undefined ? accountId(parse(localStorage.getItem('profile'))) : fixedUid;
+                    if (uid) refreshAnimeIndex();
                     const parts = uid ? [uid, localStorage.getItem(storageKey(uid)), localStorage.getItem('library'),
-                        localStorage.getItem('library_recent')] : [null, null, null, null];
+                        localStorage.getItem('library_recent'), animeIndex] : [null, null, null, null, null];
                     if (previous && parts.every((part, index) => part === previous[index])) return;
                     previous = parts;
                     let lists, error;
                     try { lists = decodeLists(parts[1]); }
                     catch { lists = []; error = 'Saved lists could not be read.'; }
-                    setSnapshot({uid, lists, error, ...libraryRecords(uid, [parse(parts[2]), parse(parts[3])])});
+                    const records = libraryRecords(uid, [parse(parts[2]), parse(parts[3])]);
+                    const classified = error || !uid ? {lists, categories: new Map()} : classifyLists(lists, records.byId, animeIndex);
+                    setSnapshot({uid, error, ...records, ...classified});
                 } catch {
                     setSnapshot({uid: fixedUid, lists: [], byId: new Map(), error: 'Local storage is unavailable.'});
                 }
@@ -111,6 +189,19 @@
 
     function sortValue(value) {
         return routeParams(value).get('sort')?.toLowerCase();
+    }
+
+    function viewId(hash) {
+        const sort = sortValue(hash);
+        return routeParams(hash).get('forkList') ?? (sort === 'unwatched' ? 'not-watched'
+            : [...smartLists].find(([, legacySort]) => legacySort === sort)?.[0]);
+    }
+
+    function libraryRoute(path, list, sort) {
+        const query = new URLSearchParams();
+        if (sort) query.set('sort', sort);
+        if (list) query.set('forkList', list);
+        return path + (query.size ? '?' + query : '');
     }
 
     function itemProps(item) {
@@ -164,7 +255,14 @@
                     lists.map(list => h('label', {key: list.id, className: 'fork-list-choice'},
                         h('input', {type: 'checkbox', checked: chosen.has(list.id), onChange: event => {
                             const checked = event.target.checked;
-                            setChosen(old => {const next = new Set(old); if (checked) next.add(list.id); else next.delete(list.id); return next;});
+                            setChosen(old => {
+                                const next = new Set(old);
+                                if (checked) {
+                                    if (categoryIds.has(list.id)) for (const id of categoryIds) next.delete(id);
+                                    next.add(list.id);
+                                } else next.delete(list.id);
+                                return next;
+                            });
                         }}), list.name))),
             error && h('p', {role: 'alert'}, error),
             h('div', {className: 'fork-list-dialog-actions'},
@@ -186,24 +284,31 @@
             window.addEventListener('hashchange', changed);
             return () => window.removeEventListener('hashchange', changed);
         }, []);
-        const params = routeParams(hash);
         const lists = data?.lists ?? newDefaults();
-        const active = lists.find(list => list.id === params.get('forkList'));
-        const sort = sortValue(hash);
-        const watchFilter = sort === 'watched' ? true : ['notwatched', 'unwatched'].includes(sort) ? false : null;
+        const requestedSort = sortValue(hash);
+        const activeId = viewId(hash) ?? 'all';
+        const active = lists.find(list => list.id === activeId);
+        const smart = smartLists.has(activeId);
+        const sort = sorts.has(requestedSort) ? requestedSort : null;
+        const watchFilter = smart ? activeId !== 'not-watched' : null;
         const [toolbar, content] = body.props.children;
         const [dropdown, sorting] = toolbar.props.children;
         const cards = Array.isArray(content?.props.children) ?
             content.props.children.filter(card => card?.type === LibItem && typeof card.props._id === 'string') : [];
         const liveCards = new Map(cards.map(card => [card.props._id, card]));
-        const localMode = Boolean(active || watchFilter !== null);
+        const localMode = Boolean(active || smart);
         const canEdit = Boolean(data && !data.error);
 
         const add = ids => {setNotice(''); setDialog({mode: 'add', ids: [...ids]});};
         const decorate = card => {
             const id = card.props._id;
+            const category = data?.categories?.get(id) ?? automaticCategory(card.props, animeIndex);
+            const destination = category === 'anime' ? 'live-action' : 'anime';
             const handle = event => {
                 if (event.value === 'fork-add-to-list') add(selected.has(id) ? selected : [id]);
+                else if (event.value === 'fork-move-category') {
+                    changeLists(uid, lists => moveTitles(lists, [id], destination)).catch(error => setNotice(error.message));
+                }
                 else if (event.value === 'fork-remove-from-list' && active) {
                     changeLists(uid, lists => {
                         const list = lists.find(list => list.id === active.id);
@@ -211,7 +316,7 @@
                     }).catch(error => setNotice(error.message));
                 } else card.props.optionOnSelect?.(event);
             };
-            if (canEdit) menuHandlers.set(handle, Boolean(active));
+            if (canEdit) menuHandlers.set(handle, {destination, removable: Boolean(active && !categoryIds.has(active.id))});
             return React.cloneElement(card, {key: id, optionOnSelect: handle,
                 'data-fork-list-selected': selected.has(id) || undefined,
                 onClick: event => {
@@ -222,30 +327,40 @@
                 }});
         };
         const options = lists.map(list => ({value: listLink(list.id), label: list.name}));
+        const nativeLabel = (value, fallback) => sorting.props.options.find(option => sortValue(option.value) === value)?.label ?? fallback;
+        const orderOptions = [['lastwatched', 'Last Watched'], ['name', 'A–Z'], ['namereverse', 'Z–A']]
+            .map(([value, fallback]) => ({value: '#/library?sort=' + value, label: nativeLabel(value, fallback)}));
+        const quick = [{value: listLink('all'), label: 'All'}, ...options.filter(option => categoryIds.has(routeParams(option.value).get('forkList'))),
+            {value: listLink('most-watched'), label: nativeLabel('timeswatched', 'Most Watched')},
+            {value: listLink('watched'), label: nativeLabel('watched', 'Watched')},
+            {value: listLink('not-watched'), label: nativeLabel('notwatched', 'Unwatched')}];
         const selectList = value => {
-            if (options.some(option => option.value === value)) location.hash = value;
-            else dropdown.props.onSelect(value);
+            if (routeParams(value).has('forkList')) location.hash = libraryRoute('#/library', routeParams(value).get('forkList'), sort);
+            else {
+                const targetPath = value.split('?')[0];
+                dropdown.props.onSelect(libraryRoute(targetPath, smart ? activeId : null, sort));
+            }
         };
-        const quick = options.filter(option => defaults.some(list => option.value === listLink(list.id)));
-        const sortOptions = [...sorting.props.options];
-        const insert = sortOptions.findIndex(option => sortValue(option.value) === 'timeswatched');
-        sortOptions.splice(insert < 0 ? sortOptions.length : insert, 0, ...quick);
-        // The hosted chip keeps its first callback for a given option. Read
-        // the current route when it is activated to keep the selected list.
-        const selectSort = React.useCallback(value => {
+        // The hosted chip retains its initial handler. Read the current route
+        // so sorting keeps the view and type that are active at click time.
+        const selectChip = React.useCallback(value => {
             const query = routeParams(value);
-            const activeId = routeParams().get('forkList');
-            if (activeId && !query.has('forkList') && !['watched', 'notwatched', 'unwatched'].includes(sortValue(value))) {
-                query.set('forkList', activeId);
-                location.hash = '#/library?' + query;
-            } else location.hash = value;
+            const list = query.get('forkList');
+            const currentPath = location.hash.split('?')[0];
+            const currentSort = sortValue(location.hash);
+            if (list) {
+                const targetPath = smartLists.has(list) ? currentPath : '#/library';
+                const keepSort = list !== 'most-watched' && sorts.has(currentSort);
+                location.hash = libraryRoute(targetPath, list, keepSort ? currentSort : null);
+            } else location.hash = libraryRoute(currentPath, viewId(location.hash), query.get('sort'));
         }, []);
+        const selectedChips = [];
+        if (sort || activeId !== 'most-watched') selectedChips.push('#/library?sort=' + (sort ?? 'lastwatched'));
+        selectedChips.push(listLink(activeId));
         const header = React.cloneElement(toolbar, null,
             React.cloneElement(dropdown, {options: [...dropdown.props.options, ...options],
                 value: active ? listLink(active.id) : dropdown.props.value, onSelect: selectList}),
-            React.cloneElement(sorting, {options: sortOptions,
-                selected: active ? [...(sort ? sorting.props.selected : []), listLink(active.id)] : sorting.props.selected,
-                onSelect: selectSort}),
+            React.cloneElement(sorting, {options: [...orderOptions, ...quick], selected: selectedChips, onSelect: selectChip}),
             h('div', {className: 'fork-list-toolbar-actions'},
                 selected.size > 0 && h('button', {type: 'button', onClick: () => add(selected)}, 'Add to list (' + selected.size + ')'),
                 h('button', {type: 'button', disabled: !canEdit, onClick: () => {setNotice(''); setDialog({mode: 'create'});}}, 'Create list')));
@@ -267,9 +382,8 @@
             const name = (a, b) => a.props.name.localeCompare(b.props.name);
             if (sort === 'namereverse') matches.sort((a, b) => name(b, a));
             else if (sort === 'name') matches.sort(name);
-            else if (sort === 'timeswatched') matches.sort((a, b) => times(b) - times(a) || name(a, b));
-            else if (sort === 'notwatched' || sort === 'unwatched') matches.sort((a, b) => date(a) - date(b) || name(a, b));
-            else if (sort) matches.sort((a, b) => date(b) - date(a) || name(a, b));
+            else if (activeId === 'most-watched' && !sort) matches.sort((a, b) => times(b) - times(a) || name(a, b));
+            else matches.sort((a, b) => date(b) - date(a) || name(a, b));
             view = matches.length ? h('div', {key: hash, className: styles['meta-items-container']}, matches.map(decorate))
                 : h('p', {className: 'fork-list-notice', role: 'status'}, active ? 'This list is empty.' :
                     data?.available || liveCards.size ? 'No matching titles.' : 'Waiting for the saved Library…');
@@ -287,7 +401,9 @@
                             created = {id: crypto.randomUUID(), name: value, items: []};
                             lists.push(created);
                         } else {
-                            for (const list of lists) if (value.has(list.id))
+                            const category = [...value].find(id => categoryIds.has(id));
+                            if (category) moveTitles(lists, dialog.ids, category);
+                            for (const list of lists) if (!categoryIds.has(list.id) && value.has(list.id))
                                 list.items = [...new Set([...list.items, ...dialog.ids])];
                         }
                     });
@@ -333,14 +449,14 @@
     }
 
     if (typeof module !== 'undefined' && module.exports) {
-        module.exports = {decodeLists, libraryRecords, itemProps};
+        module.exports = {decodeLists, libraryRecords, itemProps, imdbIds, classifyLists, moveTitles};
         return;
     }
     if (window.top !== window.self || !window.chrome?.webview || window.__stremioForkLists ||
         !['stremio.zarg.me', 'zaarrg.github.io'].includes(location.hostname)) return;
     window.__stremioForkLists = {
         hasListRoute() {
-            return location.hash.startsWith('#/library?') && routeParams().has('forkList');
+            return /^#\/library(?:\/[^/?]*)?\?/.test(location.hash) && routeParams().has('forkList');
         },
         library(React, Nav, LibItem, notifications, styles, profile, navProps, body) {
             const uid = accountId(profile);
@@ -351,15 +467,22 @@
             return React.createElement(LibraryLists, {key: uid, React, Nav, LibItem, notifications, styles, navProps, body, uid});
         },
         menu(options, handler) {
-            if (!menuHandlers.has(handler)) return options;
-            const result = [...options, {value: 'fork-add-to-list', label: 'Add to list'}];
-            if (menuHandlers.get(handler)) result.push({value: 'fork-remove-from-list', label: 'Remove from this list'});
+            const menu = menuHandlers.get(handler);
+            if (!menu) return options;
+            const destination = defaults.find(list => list.id === menu.destination).name;
+            const result = [...options, {value: 'fork-add-to-list', label: 'Add to list'},
+                {value: 'fork-move-category', label: 'Move to ' + destination}];
+            if (menu.removable) result.push({value: 'fork-remove-from-list', label: 'Remove from this list'});
             return result;
         },
         home(React, boardProps, ...children) {
             return React.createElement(HomeLists, {React, boardProps, children});
         }
     };
+    setTimeout(() => {
+        try {if (accountId(parse(localStorage.getItem('profile')))) refreshAnimeIndex();}
+        catch { /* Storage errors are shown when the Library opens. */ }
+    }, 0);
     const style = document.createElement('style');
     style.textContent = `
         .fork-list-toolbar-actions {display:flex;flex:none;gap:.5rem;margin-left:auto;padding-left:.75rem}

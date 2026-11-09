@@ -120,15 +120,17 @@ Picture-in-Picture is beside fullscreen at the top of the player and in the tray
 
 ## 📚 Keep your library
 
-### Custom lists in 2.0.0 Beta 1
+### Library lists in 2.0.0 Beta 2
 
 - Choose **Create list** in the Library toolbar, name it, then find it in the **All / Movie / Series** dropdown.
-- Open a title's three-dot menu and choose **Add to list**. Select any number of lists in the popup.
+- Open a title's three-dot menu and choose **Add to list**. A title can belong to several custom lists and one automatic category.
 - **Ctrl+click** posters to select several titles. Use the toolbar's **Add to list** button or open the three-dot menu on one of the selected titles.
-- **Anime** and **Live Action** start empty and have shortcuts between **Z–A** and **Most Watched**. **Watched** and **Unwatched** filter the Library to matching titles.
-- Home shows your lists after **Featured Movies**. Membership is saved locally for your signed-in account on this device.
+- **All** is between **Z–A** and **Anime**. Select one Library view at a time and use **Last Watched**, **A–Z**, or **Z–A** within it. **Most Watched** starts ranked by watch count. **Watched** and **Unwatched** filter the Library.
+- **Anime** and **Live Action** fill from your saved Library, including older titles, at startup and as the Library changes. Anime IDs and a [public IMDb mapping index](https://github.com/Fribb/anime-lists) identify anime. **Live Action** is the catch-all for other titles, including unmatched titles and Western animation.
+- Use **Move to Anime** or **Move to Live Action** in the three-dot menu to save a correction. In-place updates keep your Beta 1 custom lists and category choices. Home shows the lists after **Featured Movies**.
+- Automatic categories rebuild from your Stremio Library on a new computer. Custom lists and manual moves are saved per account on each device.
 
-[Download 2.0.0 Beta 1](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.0.0-beta.1)
+[Download 2.0.0 Beta 2](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.0.0-beta.2)
 
 ### Library and add-on backup
 

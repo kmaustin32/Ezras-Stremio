@@ -4,13 +4,13 @@ const fs = require('node:fs');
 const {chromium} = require('playwright');
 const forkScript = fs.readFileSync('src/webview/fork-player.js', 'utf8');
 const listsScript = fs.readFileSync('src/webview/fork-lists.js', 'utf8');
-const {decodeLists, libraryRecords, itemProps} = require('../src/webview/fork-lists');
+const {decodeLists, libraryRecords, itemProps, imdbIds, classifyLists, moveTitles} = require('../src/webview/fork-lists');
 const executablePath = [process.env.STREMIO_TEST_BROWSER,
     'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
     'C:/Program Files/Microsoft/Edge/Application/msedge.exe'].find(path => path && fs.existsSync(path));
 let assets;
 
-async function setup(withAppearance = false, withLists = false) {
+async function setup(withAppearance = false, withLists = false, listFixture = {}) {
     assets ||= (async () => {
         const home = await fetch('https://stremio.zarg.me/'); assert.ok(home.ok);
         const html = await home.text();
@@ -44,19 +44,23 @@ async function setup(withAppearance = false, withLists = false) {
         const page = await browser.newPage({viewport: {width: 1280, height: 800}}), errors = [];
         page.on('pageerror', error => errors.push(error.message));
         if (withLists) page.setDefaultTimeout(10000);
+        const indexRequests = [];
+        if (withLists) await page.route('https://raw.githubusercontent.com/Fribb/anime-lists/master/indices/imdb_index.json', async route => {
+            indexRequests.push({url: route.request().url(), method: route.request().method(), headers: await route.request().allHeaders()});
+            if (listFixture.offline) return route.abort();
+            const entries = Array.from({length: 1000}, (_, i) => ['[tt' + (100000 + i) + ']', {'anime-list': [i]}]);
+            entries.push(['[tt300]', {'anime-list': [1]}]);
+            return route.fulfill({headers: {'access-control-allow-origin': '*'}, json: Object.fromEntries(entries)});
+        });
         await page.route('https://stremio.zarg.me/**', route => route.fulfill({contentType: 'text/html', body: `<html><head><style>${css}</style><style>body{margin:0;background:#222635;color:white}#app{height:100vh}.fixture-page{height:100vh;padding:30px}#details,#sources{padding:50px}#details [class*="video-container"]{width:400px}#sources [class*="stream-container"]{width:600px;min-height:100px}</style></head><body><div id="app"></div></body></html>`}));
-        await page.addInitScript(() => {
+        await page.addInitScript(seed => {
             localStorage.setItem('localProfile', '{"maxVolume":"225","keep":"unchanged"}');
             localStorage.setItem('profile', '{"fixture":"account-storage-unchanged"}');
-        });
-        await page.goto('https://stremio.zarg.me/#/library/series');
-        if (withLists) {
-            await page.evaluate(() => {window.chrome.webview = {};});
-            await page.addScriptTag({content: listsScript});
-        }
-        const anchor = '(()=>{var e;o.g.importScripts'; assert.ok(bundle.includes(anchor));
-        await page.addScriptTag({content: bundle.replace(anchor, 'window.req=o;window.modules=a;return;' + anchor)});
-        await page.evaluate(({withAppearance, withLists}) => {
+            if (seed && localStorage.getItem('stremio-fork-custom-lists:test') === null)
+                localStorage.setItem('stremio-fork-custom-lists:test', JSON.stringify(seed));
+        }, listFixture.seed);
+        await page.goto('https://stremio.zarg.me/' + (listFixture.home ? '#/' : '#/library/series'));
+        const fixture = ({withAppearance, withLists}) => {
             const req = window.req, React = req(30758), ReactDOM = req(99576), h = React.createElement;
             const find = term => Object.values(window.modules).find(fn => fn.toString().includes(term));
             const load = (factory, overrides = {}) => {const module = {exports: {}}; factory(module, module.exports, Object.assign(id => Object.hasOwn(overrides, id) ? overrides[id] : req(id), req)); return module.exports;};
@@ -113,7 +117,7 @@ async function setup(withAppearance = false, withLists = false) {
                 const saved = (id, name, watched, type = 'series') => ({_id: id, name, type, poster, posterShape: 'poster',
                     removed: false, temp: false, _mtime: '2024-01-01', state: {timesWatched: watched}});
                 const recent = {tt100: saved('tt100', 'Fixture Show', 0), tt200: saved('tt200', 'Another Show', 1)};
-                const older = {tt300: saved('tt300', 'Older Movie', 1, 'movie'), tt400: saved('tt400', 'Older Unwatched', 0)};
+                const older = {tt300: saved('tt300', 'Older Movie', 4, 'movie'), tt400: saved('tt400', 'Older Unwatched', 0)};
                 window.fixtureItems.push({...recent.tt200, watched: true, deepLinks: {metaDetailsVideos: '#/detail/series/tt200'}});
                 window.setFixtureAccount = uid => {
                     window.fixtureProfile = {auth: {user: {_id: uid}}, settings: {streamingServerWarningDismissed: new Date(0)}};
@@ -156,10 +160,22 @@ async function setup(withAppearance = false, withLists = false) {
                     queryParams: new URLSearchParams(withLists ? query : 'sort=lastWatched'), 'data-revision': revision});
             }
             ReactDOM.createRoot(document.getElementById('app')).render(h(App));
-        }, {withAppearance, withLists});
+        };
+        async function boot() {
+            if (withLists) {
+                await page.evaluate(() => {window.chrome.webview = {};});
+                await page.addScriptTag({content: listsScript});
+            }
+            const anchor = '(()=>{var e;o.g.importScripts';
+            assert.ok(bundle.includes(anchor));
+            await page.addScriptTag({content: bundle.replace(anchor, 'window.req=o;window.modules=a;return;' + anchor)});
+            await page.evaluate(fixture, {withAppearance, withLists});
+        }
+        await boot();
         const card = page.locator('[class*="meta-item-container"]').filter({hasText: 'Fixture Show'});
-        await card.waitFor();
-        return {browser, page, errors, card};
+        if (listFixture.home) await page.locator('[data-fork-home-lists]').waitFor();
+        else await card.waitFor();
+        return {browser, page, errors, card, indexRequests, boot};
     } catch (error) {await browser.close(); throw error;}
 }
 
@@ -187,6 +203,26 @@ test('List storage defaults, latest-record selection, and watched state work wit
     assert.equal(libraryRecords('signed-in', [mismatch]).available, false);
 });
 
+test('Anime classification matches exact IDs and keeps Beta 1 manual choices and custom lists', () => {
+    const data = imdbIds({'[tt30, tt31]': {'anime-list': [7]}, '[tt40]': {'anime-list': []}, '[]': {'anime-list': [1]}});
+    assert.deepEqual([...data], ['tt30', 'tt31']);
+    const saved = decodeLists(JSON.stringify({version: 1, lists: [
+        {id: 'anime', name: 'Anime', items: ['tt20']},
+        {id: 'live-action', name: 'Live Action', items: ['tt20', 'tt30']},
+        {id: 'custom', name: 'Weekend', items: ['tt30', 'kitsu:5']}
+    ]}));
+    const records = new Map(['tt20', 'tt30', 'tt31', 'tt40', 'kitsu:5', 'special'].map(id =>
+        [id, {_id: id, type: id === 'special' ? 'anime' : 'series'}]));
+    assert.deepEqual(classifyLists(saved, records, data).lists.map(list => list.items),
+        [['tt20', 'tt31', 'kitsu:5', 'special'], ['tt30', 'tt40'], ['tt30', 'kitsu:5']]);
+    moveTitles(saved, ['tt20', 'kitsu:5'], 'live-action');
+    assert.deepEqual(classifyLists(saved, records, data).lists.map(list => list.items),
+        [['tt31', 'special'], ['tt20', 'tt30', 'tt40', 'kitsu:5'], ['tt30', 'kitsu:5']]);
+    records.delete('kitsu:5');
+    assert.equal(classifyLists(saved, records, data).lists[1].items.includes('kitsu:5'), false);
+    assert.deepEqual(saved[2].items, ['tt30', 'kitsu:5']);
+});
+
 test('Live Library creates lists, adds multiple titles to multiple lists, and places them after Featured Movies', async () => {
     const {browser, page, errors, card} = await setup(false, true);
     try {
@@ -201,7 +237,7 @@ test('Live Library creates lists, adds multiple titles to multiple lists, and pl
         const chip = name => toolbar.locator('[data-value]').getByText(name, {exact: true});
         const other = page.locator('[class*="meta-item-container-"]').filter({hasText: 'Another Show'});
         assert.deepEqual(await toolbar.locator('[data-value]').allTextContents(),
-            ['Last Watched', 'A–Z', 'Z–A', 'Anime', 'Live Action', 'Most Watched', 'Watched', 'Unwatched']);
+            ['Last Watched', 'A–Z', 'Z–A', 'All', 'Anime', 'Live Action', 'Most Watched', 'Watched', 'Unwatched']);
         const createBox = await create.boundingBox(), selectBox = await select.boundingBox();
         assert.ok(createBox.x > selectBox.x && Math.abs(createBox.y - selectBox.y) < selectBox.height);
         await create.click();
@@ -229,15 +265,15 @@ test('Live Library creates lists, adds multiple titles to multiple lists, and pl
         await dialog.waitFor({state: 'hidden'});
         assert.equal(await page.locator('[data-fork-list-selected]').count(), 0);
         await chip('Anime').click();
-        await page.waitForURL('**/#/library?forkList=anime');
+        await page.waitForURL(url => new URLSearchParams(url.hash.split('?')[1]).get('forkList') === 'anime');
         await select.getByText('Anime', {exact: true}).waitFor();
-        assert.deepEqual(await titles(), ['Fixture Show', 'Another Show']);
+        assert.deepEqual(await titles(), ['Another Show', 'Fixture Show', 'Older Movie']);
         await chip('A–Z').click();
         await page.waitForURL('**/#/library?sort=name&forkList=anime');
         await page.waitForFunction(() => document.querySelector('[class*="meta-item-container-"]').title === 'Another Show');
         await openList('Weekend <Picks>');
         await card.waitFor();
-        assert.deepEqual(await titles(), ['Fixture Show', 'Another Show']);
+        assert.deepEqual(await titles(), ['Another Show', 'Fixture Show']);
         const menu = card.locator('[class*="menu-label-container"]');
         await menu.click();
         await page.getByText('Add to list', {exact: true}).click();
@@ -256,10 +292,11 @@ test('Live Library creates lists, adds multiple titles to multiple lists, and pl
         assert.match(await slot.evaluate(node => node.previousElementSibling.innerText), /Featured Series/);
         assert.match(await slot.evaluate(node => node.nextElementSibling.innerText), /Popular Movies/);
         const animeRow = slot.locator('[class*="meta-row-container-"]').filter({hasText: 'Anime'});
-        assert.equal(await animeRow.locator('a[title="Fixture Show"]').getAttribute('href'), '#/detail/series/tt100');
+        assert.equal(await animeRow.locator('a[title="Another Show"]').getAttribute('href'), '#/detail/series/tt200');
+        assert.equal(await animeRow.locator('a[title="Fixture Show"]').count(), 0);
         await animeRow.getByText('BUTTON_SEE_ALL').click();
-        await card.waitFor();
-        assert.deepEqual(await titles(), ['Fixture Show', 'Another Show']);
+        await other.waitFor();
+        assert.deepEqual(await titles(), ['Another Show', 'Older Movie']);
         assert.deepEqual(await page.evaluate(() => window.playRequests), []);
         assert.deepEqual(await page.evaluate(() => window.dispatches), []);
         await page.setViewportSize({width: 375, height: 800});
@@ -303,6 +340,99 @@ test('Watched and Unwatched exclude each other beyond the first page and custom 
         assert.equal(await page.getByText('Private list', {exact: true}).count(), 0);
         await page.evaluate(route => {window.setFixtureAccount('test'); location.hash = route;}, privateRoute);
         await type.getByText('Private list', {exact: true}).waitFor();
+        assert.deepEqual(errors, []);
+    } finally {await browser.close();}
+});
+
+test('Library chooses one list and one independent sort while cycling through built-in views', async () => {
+    const {browser, page, errors} = await setup(false, true);
+    try {
+        const toolbar = page.locator('[class*="selectable-inputs-container-"]');
+        const chip = name => toolbar.locator('[data-value]').getByText(name, {exact: true});
+        const highlighted = type => toolbar.locator(`[data-value*="${type}"][class*="active-"]`).allTextContents();
+        const waitForHighlight = (type, label) => toolbar.locator(`[data-value*="${type}"][class*="active-"]`)
+            .filter({hasText: label}).waitFor();
+        const titles = () => page.locator('[class*="meta-item-container-"] [class*="title-label-"]').allTextContents();
+        for (const list of ['Anime', 'Live Action', 'Watched', 'Unwatched', 'All', 'Most Watched']) {
+            await chip(list).click();
+            await waitForHighlight('forkList=', list);
+            assert.deepEqual(await highlighted('forkList='), [list]);
+        }
+        await page.locator('a[title="Older Movie"]').waitFor();
+        assert.deepEqual(await titles(), ['Older Movie', 'Another Show']);
+        assert.deepEqual(await highlighted('sort='), []);
+        for (const [label, expected] of [['A–Z', ['Another Show', 'Older Movie']], ['Z–A', ['Older Movie', 'Another Show']],
+            ['Last Watched', ['Another Show', 'Older Movie']]]) {
+            await chip(label).click();
+            await waitForHighlight('sort=', label);
+            assert.deepEqual(await highlighted('sort='), [label]);
+            assert.deepEqual(await highlighted('forkList='), ['Most Watched']);
+            assert.deepEqual(await titles(), expected);
+        }
+        await chip('All').click();
+        await waitForHighlight('forkList=', 'All');
+        assert.deepEqual(await highlighted('forkList='), ['All']);
+        assert.deepEqual(await highlighted('sort='), ['Last Watched']);
+        assert.deepEqual(errors, []);
+    } finally {await browser.close();}
+});
+
+test('Automatic lists use the full synced Library, update as records arrive, and keep Beta 1 lists and manual moves on restart', async () => {
+    const options = {home: true, seed: {version: 1, lists: [
+        {id: 'anime', name: 'Anime', items: ['tt100']},
+        {id: 'live-action', name: 'Live Action', items: []},
+        {id: 'favorites', name: 'Favorites', items: ['tt100', 'tt400']}
+    ]}};
+    const {browser, page, errors, indexRequests, boot} = await setup(false, true, options);
+    try {
+        const key = 'stremio-fork-custom-lists:test';
+        const load = () => page.evaluate(key => JSON.parse(localStorage.getItem(key)), key);
+        const chip = name => page.locator('[class*="selectable-inputs-container-"] [data-value]').getByText(name, {exact: true});
+        const title = name => page.locator(`a[class*="meta-item-container-"][title="${name}"]`);
+        const row = page.locator('[data-fork-home-lists] [class*="meta-row-container-"]').filter({hasText: 'Anime'});
+        await row.getByTitle('Older Movie', {exact: true}).waitFor();
+        await row.getByText('BUTTON_SEE_ALL', {exact: true}).click();
+        await title('Older Movie').waitFor();
+        await title('Fixture Show').waitFor();
+        assert.deepEqual(await load(), options.seed);
+        assert.equal(indexRequests.length, 1);
+        assert.equal(indexRequests[0].method, 'GET');
+        assert.equal(indexRequests[0].headers.cookie, undefined);
+        assert.equal(indexRequests[0].headers.referer, undefined);
+        await page.evaluate(() => {
+            const data = JSON.parse(localStorage.getItem('library_recent'));
+            const item = data.items.tt100;
+            data.items['kitsu:999'] = {...item, _id: 'kitsu:999', name: 'New Kitsu Show'};
+            localStorage.setItem('library_recent', JSON.stringify(data));
+        });
+        await title('New Kitsu Show').waitFor();
+        await page.evaluate(() => {
+            const data = JSON.parse(localStorage.getItem('library_recent'));
+            data.items['kitsu:999'].removed = true;
+            localStorage.setItem('library_recent', JSON.stringify(data));
+        });
+        await title('New Kitsu Show').waitFor({state: 'detached'});
+        await title('Older Movie').locator('[class*="menu-label-container"]').click();
+        await page.getByText('Move to Live Action', {exact: true}).click();
+        await title('Older Movie').waitFor({state: 'detached'});
+        const saved = await load();
+        assert.deepEqual(saved.lists[2], options.seed.lists[2]);
+        assert.deepEqual(saved.lists[1].items, ['tt300']);
+        await page.reload();
+        options.offline = true;
+        await boot();
+        await title('Fixture Show').waitFor();
+        assert.equal(await title('Older Movie').count(), 0);
+        await chip('Live Action').click();
+        await title('Older Movie').waitFor();
+        await title('Older Unwatched').waitFor();
+        assert.deepEqual(await load(), saved);
+        assert.equal(indexRequests.length, 1, 'Restart reuses the downloaded index');
+        const dropdown = page.locator('[class*="select-input-container-"] [aria-haspopup="listbox"]');
+        await dropdown.click();
+        await page.getByRole('listbox').getByText('Favorites', {exact: true}).click();
+        await title('Fixture Show').waitFor();
+        await title('Older Unwatched').waitFor();
         assert.deepEqual(errors, []);
     } finally {await browser.close();}
 });
