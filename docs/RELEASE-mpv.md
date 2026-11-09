@@ -1,13 +1,12 @@
-## Ezra's Stremio 1.4.0
+## Ezra's Stremio 1.5.0
 
-Skip intros and outros from the player, with a button that matches the current theme.
+Choose a watched accent, browse with a softer poster hover, and use Library controls styled to match Settings.
 
 ### What's new
 
-- **Skip Intro and Skip Outro.** A translucent, softly glowing button fades in over 0.25 seconds above the seek bar during a labeled segment. Dark Mode uses **#858B99** text and border on a translucent **#161A26** background. Normal mode uses white text and border.
-- **Optional timestamp lookup.** In **Settings → Player → Controls**, enable **Look up skip timestamps** to fill gaps in embedded chapter data for supported titles. The lookup sends the title ID, episode numbers and runtime to [TheIntroDB](https://theintrodb.org/).
-- **Outro handling.** A marked post-credits scene stays playable. When an outro reaches the end of the video, the existing autoplay setting decides whether to advance.
-- **Dark Mode volume popup.** The translucent panel now uses **#161A26** at 10% opacity.
+- **Secondary color.** In **Settings → General**, choose Purple `#7272C2`, Amber `#DEA066` (default), Teal `#61D1C7`, Dusty Rose `#E08EB3`, or Sage `#B6D283`. Watched tags and checkmark badges update immediately, and the choice is saved on this device.
+- **Poster hover.** Show and movie covers get a soft purple border glow and a gentler zoom. The cover stays still when Windows requests reduced motion.
+- **Library controls.** Search, dropdowns and sorting use the same squared corners as Settings. The selected sort and the dropdown selection dot use the main purple.
 
 ### Player preferences retained
 
@@ -23,6 +22,7 @@ Up/Down volume keys, click-through volume feedback, source selection and existin
 - Library shows open details for episode and source selection; movies, Continue Watching and explicit Play keep their behavior.
 - New videos start at 100% volume or a lower selected maximum. Maximum Volume updates the actual amplification limit and slider, with orange-to-red boost above 100%.
 - Autoplay off is honored at video end and cancels countdowns. Manual Next and watch-progress handling remain available.
+- Skip Intro and Skip Outro use labeled chapters, with optional timestamp lookup in Player settings.
 - Unwatched episode blur covers alternate thumbnails, absolute-numbered anime, later seasons, episode lists and next-episode popups.
 - Purple #7272c2 branding throughout the application, installer and web logos; readable settings labels and a complete shipped Player Shortcuts catalog.
 - Anime4K HQ/FSR shortcuts, audio normalization, subtitle overrides and the existing customized mpv defaults.
@@ -33,14 +33,14 @@ The redesigned [README](../README.md) covers these features, installation, short
 
 ### Downloads
 
-- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.4.0/Ezras-Stremio-1.4.0-x64.exe)
-- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.4.0/Ezras-Stremio-1.4.0-x64.zip)
-- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.4.0/SHA256SUMS.txt)
+- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.5.0/Ezras-Stremio-1.5.0-x64.exe)
+- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.5.0/Ezras-Stremio-1.5.0-x64.zip)
+- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.5.0/SHA256SUMS.txt)
 
 Use Windows 10/11 x64. The installer sets up WebView2 when needed; the portable ZIP needs the system WebView2 Runtime. When upgrading, retain your configuration to keep custom mpv.conf, input.conf and other scripts. The fork's own black-bar script is updated. The original shell version and installation/profile paths are retained for upgrade compatibility.
 
 ### Validation and upstream compatibility
 
-GitHub Actions builds the installer and portable archive and runs the native configuration, blur/framing/rendering, black-bar/seam, shader, streaming/transcoding, chapter seek and paused end-of-video, skip-button behavior and styling, community player compatibility, Library navigation, keyboard and popup interactions, episode-image blur, settings, themes, backup, WebView2 and installer-branding checks before publication.
+GitHub Actions builds the installer and portable archive and runs checks for native playback, blur, framing, rendering, black-bar detection, shaders, streaming, chapter seeks, skip buttons, Library navigation and styling, poster motion, palette persistence, keyboard and popup interactions, episode-image blur, backup, WebView2 and installer branding before publication.
 
 Theme and settings styling are isolated in the fork script; they do not rewrite the hosted community bundle or profile. Automatic upstream binary updates remain disabled. Source history is preserved for future upstream merges; incompatible hosted UI changes are reported rather than silently discarding other compatible fixes.

@@ -40,7 +40,8 @@ async function setup(dark = true, currentDark = dark) {
     })();
     const [bundle, css] = await assets;
     const browser = await chromium.launch({executablePath, headless: true});
-    const page = await browser.newPage({viewport: {width: 1280, height: 800}});
+    const context = await browser.newContext({viewport: {width: 1280, height: 800}});
+    const page = await context.newPage();
     try {
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.route('https://stremio.zarg.me/**', route => route.fulfill({contentType:'text/html',body:`<html><head><style>${css}</style></head><body><div id="app"></div></body></html>`}));
@@ -118,8 +119,10 @@ async function setup(dark = true, currentDark = dark) {
                 h('div',{id:'addon-loading',className:loading['streams-list-container']},h('div',{className:loading['addons-loading-container']},h('div',{id:'addon-loading-label',className:loading['addons-loading']},'1 addons are still loading'),h('div',{id:'addon-loading-bar',className:loading['addons-loading-bar']}))),
                 h('div',{className:stream['stream-container']},h('div',{className:stream['info-container']},h('div',{className:stream['progress-bar-container']},h('div',{id:'stream-progress',className:stream['progress-bar'],style:{width:'37%'}},null)))),
                 h('div',{id:'settings',className:settings['settings-container'],style:{height:650}},h('div',{className:settings['settings-content']},
-                    h('div',{className:settings['side-menu-container']},h('button',{'data-section':'player'},'Player')),
-                    h('div',{className:settings['sections-container']},h('div',{className:settings['section-container']},h('div',{className:settings['section-title']},'Player'),row('Audio language'),row('Subtitle languages',{multiSelect:true,selected:multi,onSelect:e=>{window.multi=e.value;setMulti([...new Set([...multi,e.value])]);}}))))),
+                    h('div',{className:settings['side-menu-container']},h('button',{'data-section':'general'},'General'),h('button',{'data-section':'player'},'Player')),
+                    h('div',{className:settings['sections-container']},
+                        h('div',{className:settings['section-container']},h('div',{className:settings['option-container']+' '+settings['user-info-option-container']},'Profile')),
+                        h('div',{className:settings['section-container']},h('div',{className:settings['section-title']},'Player'),row('Audio language'),row('Subtitle languages',{multiSelect:true,selected:multi,onSelect:e=>{window.multi=e.value;setMulti([...new Set([...multi,e.value])]);}}))))),
                 h('div',{id:'player',className:player['player-container'],style:{position:'relative',height:150}},
                     h('nav',{className:player['nav-bar-layer']+' '+navbar['horizontal-nav-bar-container'],style:{height:50}},h('h2',{id:'episode-title',className:navbar.title},'Squid Game – Episode (3x5)'),icon('top-icon','white'),h('div',{className:navbar['buttons-container']},h('button',{id:'fullscreen',title:fullscreen?'Exit fullscreen mode':'Enter fullscreen mode',className:navbar['button-container']},h(Icon,{className:navbar.icon,name:fullscreen?'minimize':'maximize'}))),h('span',{id:'stremio-fork-compatibility',style:{color:'orange'}},icon('warning','orange'))),
                     h('div',{className:player['control-bar-layer'],style:{height:100}},icon('bottom-icon','white'),h('div',{className:controls['control-bar-buttons-menu-container']}),
@@ -290,12 +293,59 @@ test('Watched badges use warm peach in both themes; the real volume-change popup
             assert.notEqual(await background('upcoming-badge'),'rgb(222, 160, 102)','Upcoming is not a watched marker');
             assert.notEqual(await background('episode-flags'),'rgb(222, 160, 102)','Do not color the combined flags wrapper');
             assert.equal(await page.locator('#watched-badge span').textContent(),'Watched');
-            assert.notEqual(await page.locator('#watched-badge svg').evaluate(el=>getComputedStyle(el).color),'rgb(222, 160, 102)','Keep checkmark contrast');
+            assert.equal(await page.locator('#watched-badge svg').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(11, 15, 24)','Keep checkmark contrast');
         }
         assert.deepEqual(errors,[]);
     } finally {await browser.close();}
 });
 
+test('Secondary color updates all watched badges, persists, and leaves other accents alone', async () => {
+    const {browser, page, errors} = await setup();
+    try {
+        const picker = page.getByLabel('Secondary color', {exact: true});
+        const palette = [
+            ['#7272C2', 'Purple', 'rgb(114, 114, 194)'], ['#DEA066', 'Amber', 'rgb(222, 160, 102)'],
+            ['#61D1C7', 'Teal', 'rgb(97, 209, 199)'], ['#E08EB3', 'Dusty rose', 'rgb(224, 142, 179)'],
+            ['#B6D283', 'Sage', 'rgb(182, 210, 131)']
+        ];
+        const key = 'stremio-fork-watched-accent';
+        assert.deepEqual(await picker.locator('option').evaluateAll(options => options.map(option => [option.value, option.text])),
+            palette.map(([hex, name]) => [hex, `${name} (${hex})`]));
+        assert.equal(await picker.inputValue(), '#DEA066');
+        const fill = id => page.locator('#'+id).evaluate(el => getComputedStyle(el).backgroundColor);
+        const upcoming = await fill('upcoming-badge');
+        const progress = await fill('episode-progress');
+        for (const dark of [true, false]) {
+            await page.evaluate(dark => window.native('theme-changed', {dark}), dark);
+            for (const [hex, , rgb] of palette) {
+                await picker.selectOption(hex);
+                for (const id of ['watched-badge', 'watched-poster']) assert.equal(await fill(id), rgb);
+                for (const selector of ['#watched-badge svg', '#watched-poster svg']) {
+                    const colors = await page.locator(selector).evaluate(el => {
+                        const style = getComputedStyle(el);
+                        return [style.color, style.backgroundColor];
+                    });
+                    assert.deepEqual(colors, [rgb, 'rgb(11, 15, 24)']);
+                }
+                assert.equal(await page.locator('#watched-badge span').evaluate(el => getComputedStyle(el).color), 'rgb(11, 15, 24)');
+                assert.equal(await fill('upcoming-badge'), upcoming);
+                assert.equal(await fill('episode-progress'), progress);
+            }
+        }
+        const second = await page.context().newPage();
+        await second.route('https://stremio.zarg.me/**', route => route.fulfill({contentType: 'text/html', body: '<html><body></body></html>'}));
+        await second.addInitScript(() => {window.chrome = {webview: {postMessage() {}, addEventListener() {}}};});
+        await second.addInitScript({content: script});
+        await second.goto('https://stremio.zarg.me/#/settings');
+        assert.equal(await second.evaluate(() => document.documentElement.style.getPropertyValue('--stremio-watched-accent')), '#B6D283');
+        await second.reload();
+        assert.equal(await second.evaluate(() => document.documentElement.style.getPropertyValue('--stremio-watched-accent')), '#B6D283');
+        await second.evaluate(key => localStorage.setItem(key, 'invalid'), key);
+        await page.waitForFunction(() => document.getElementById('stremio-fork-watched-accent').value === '#DEA066');
+        assert.equal(await fill('watched-badge'), 'rgb(222, 160, 102)');
+        assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+});
 
 test('Dark Mode is the fallback without a shell snapshot and an explicit saved normal-mode choice takes priority',async()=>{
     const {browser,page,errors,color}=await setup(null,null);

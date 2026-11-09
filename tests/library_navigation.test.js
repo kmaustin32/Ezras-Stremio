@@ -2,12 +2,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const {chromium} = require('playwright');
+const forkScript = fs.readFileSync('src/webview/fork-player.js', 'utf8');
 const executablePath = [process.env.STREMIO_TEST_BROWSER,
     'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
     'C:/Program Files/Microsoft/Edge/Application/msedge.exe'].find(path => path && fs.existsSync(path));
 let assets;
 
-async function setup() {
+async function setup(withAppearance = false) {
     assets ||= (async () => {
         const home = await fetch('https://stremio.zarg.me/'); assert.ok(home.ok);
         const html = await home.text();
@@ -46,7 +47,7 @@ async function setup() {
         await page.goto('https://stremio.zarg.me/#/library/series');
         const anchor = '(()=>{var e;o.g.importScripts'; assert.ok(bundle.includes(anchor));
         await page.addScriptTag({content: bundle.replace(anchor, 'window.req=o;window.modules=a;return;' + anchor)});
-        await page.evaluate(() => {
+        await page.evaluate(withAppearance => {
             const req = window.req, React = req(30758), ReactDOM = req(99576), h = React.createElement;
             const find = term => Object.values(window.modules).find(fn => fn.toString().includes(term));
             const load = (factory, overrides = {}) => {const module = {exports: {}}; factory(module, module.exports, Object.assign(id => Object.hasOwn(overrides, id) ? overrides[id] : req(id), req)); return module.exports;};
@@ -67,10 +68,18 @@ async function setup() {
                 73582: translation,
                 60350: {useProfile: () => ({auth: {user: {id: 'test'}}}), useNotifications: () => ({items: {tt100: [1, 2]}}), routesRegexp: {},
                     useOnScrollToBottom: () => () => {}, withCoreSuspender: component => {Library = component; return component;}},
-                78811: () => [{selected: {request: {page: 1}}, catalog: window.fixtureItems}, () => window.morePages++],
-                72715: () => [{value: null}, {}, false],
-                84902: {...components, LibItem, MainNavBars: ({children, className}) => h('div', {className: 'fixture-page ' + className}, children),
-                    Chips: () => null, MultiselectMenu: () => null, DelayedRenderer: ({children}) => children}
+                78811: () => [{selected: {type: 'Ready', request: {page: 1}}, catalog: window.fixtureItems}, () => window.morePages++],
+                72715: () => {
+                    const [type, setType] = React.useState('series');
+                    const [sort, setSort] = React.useState('lastWatched');
+                    return [{value: type, onSelect: setType, options: [{value: 'series', label: 'Series'}, {value: 'movie', label: 'Movies'}]},
+                        {selected: [sort], onSelect: setSort, options: [{value: 'lastWatched', label: 'Last Watched'}, {value: 'name', label: 'Name'}]}, false];
+                },
+                84902: {...components, LibItem, MainNavBars: ({children, className}) => h('div', {className: 'fixture-page ' + className},
+                    withAppearance && h(components.SearchBar, {title: 'Search', onChange: value => {window.searchValue = value;}}), children),
+                    Chips: withAppearance ? components.Chips : () => null,
+                    MultiselectMenu: withAppearance ? components.MultiselectMenu : () => null,
+                    DelayedRenderer: ({children}) => children}
             });
             const poster = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300"><rect width="200" height="300" fill="#7272c2"/></svg>');
             window.fixtureItems = [{_id: 'tt100', type: 'series', name: 'Fixture Show', poster, posterShape: 'poster', progress: 37, watched: false,
@@ -92,12 +101,77 @@ async function setup() {
                 return h(Library, {model, urlParams: {type: 'series'}, queryParams: new URLSearchParams('sort=lastWatched'), 'data-revision': revision});
             }
             ReactDOM.createRoot(document.getElementById('app')).render(h(App));
-        });
+        }, withAppearance);
         const card = page.locator('[class*="meta-item-container"]').filter({hasText: 'Fixture Show'});
         await card.waitFor();
         return {browser, page, errors, card};
     } catch (error) {await browser.close(); throw error;}
 }
+
+test('Live Library controls use squared corners and purple selection, and real posters glow on hover', async () => {
+    const {browser, page, errors, card} = await setup(true);
+    try {
+        const search = page.locator('[class*="search-bar-container-"]');
+        const sort = page.locator('[data-value="lastWatched"]');
+        const type = page.locator('[class*="select-input-container-"] [aria-haspopup="listbox"]');
+        const frame = card.locator('[class*="poster-container-"]');
+        const cover = card.locator('[class*="poster-image-layer-"]');
+        const background = el => el.evaluate(node => getComputedStyle(node).backgroundColor);
+        const radius = el => el.evaluate(node => getComputedStyle(node).borderTopLeftRadius);
+        const duration = () => cover.evaluate(node => parseFloat(getComputedStyle(node).transitionDuration));
+        const waitForSortColor = (value, color) => page.waitForFunction(
+            ([value, color]) => getComputedStyle(document.querySelector(`[data-value="${value}"]`)).backgroundColor === color,
+            [value, color]);
+        const baseline = {radius: await radius(search), selected: await background(sort), zoom: await duration()};
+        await page.evaluate(() => {window.chrome = {webview: {addEventListener() {}, postMessage() {}}};});
+        await page.addScriptTag({content: forkScript});
+        await page.locator('html[data-stremio-library]').waitFor({state: 'attached'});
+        const purple = 'rgb(114, 114, 194)';
+        assert.equal(await sort.evaluate(node => getComputedStyle(node).getPropertyValue('--quaternary-accent-color')), '#7272C2');
+        await waitForSortColor('lastWatched', purple);
+        const controlRadius = await search.evaluate(node => parseFloat(getComputedStyle(document.documentElement).fontSize) * 0.75 + 'px');
+        for (const viewport of [{width: 1280, height: 800}, {width: 650, height: 800}, {width: 360, height: 800}]) {
+            await page.setViewportSize(viewport);
+            for (const control of [search, type, sort, page.locator('[data-value="name"]')])
+                assert.equal(await radius(control), controlRadius);
+            for (const field of [search, type]) {
+                const box = await field.boundingBox();
+                assert.ok(box && box.x >= 0 && box.x + box.width <= viewport.width + 1, 'The search and filter fit the window');
+            }
+            assert.equal(await background(sort), purple);
+            assert.notEqual(await background(page.locator('[data-value="name"]')), purple);
+        }
+        await page.setViewportSize({width: 1280, height: 800});
+        await search.locator('input').fill('sample');
+        assert.equal(await search.locator('input').inputValue(), 'sample');
+        await type.click();
+        const menu = page.getByRole('listbox');
+        assert.equal(await radius(menu), controlRadius);
+        assert.equal(await background(menu.locator('[aria-selected="true"] [class*="icon-"]')), purple);
+        await menu.getByText('Movies', {exact: true}).click();
+        assert.equal((await type.innerText()).trim(), 'Movies');
+        await page.locator('[data-value="name"]').click();
+        await waitForSortColor('name', purple);
+        assert.notEqual(await background(sort), purple);
+        assert.ok(await duration() > baseline.zoom);
+        await frame.hover();
+        await page.waitForFunction(() => getComputedStyle(document.querySelector('[class*="poster-container-"]')).boxShadow.includes('114, 114, 194'));
+        await page.waitForFunction(() => getComputedStyle(document.querySelector('[class*="poster-image-layer-"]')).transform === 'matrix(1.05, 0, 0, 1.05, 0, 0)');
+        await page.emulateMedia({reducedMotion: 'reduce'});
+        assert.equal(await duration(), 0);
+        assert.equal(await cover.evaluate(node => getComputedStyle(node).transform), 'none');
+        assert.ok((await frame.evaluate(node => getComputedStyle(node).boxShadow)).includes('114, 114, 194'));
+        await page.mouse.move(2, 2);
+        await page.evaluate(() => window.showLibrary('continue_watching'));
+        await page.locator('html[data-stremio-library]').waitFor({state: 'detached'});
+        assert.equal(await radius(search), baseline.radius);
+        await waitForSortColor('name', baseline.selected);
+        await page.evaluate(() => window.showLibrary());
+        await page.locator('html[data-stremio-library]').waitFor({state: 'attached'});
+        assert.equal(await radius(search), controlRadius);
+        assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+});
 
 test('Library show opens details and permits choosing an episode and a different source before playback', async () => {
     const {browser, page, errors, card} = await setup();
