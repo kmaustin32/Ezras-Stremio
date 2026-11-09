@@ -324,7 +324,8 @@ test('Live Library creates lists, adds multiple titles to multiple lists, and pl
         await page.waitForURL('**/#/library?sort=name&forkList=anime');
         await page.waitForFunction(() => document.querySelector('[class*="meta-item-container-"]').title === 'Another Show');
         await openList('Weekend <Picks>');
-        await card.waitFor();
+        await select.getByText('Weekend <Picks>', {exact: true}).waitFor();
+        await page.getByTitle('Older Movie', {exact: true}).waitFor({state: 'detached'});
         assert.deepEqual(await titles(), ['Another Show', 'Fixture Show']);
         const menu = card.locator('[class*="menu-label-container"]');
         await menu.click();
