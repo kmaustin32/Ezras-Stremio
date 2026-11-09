@@ -23,17 +23,6 @@
 #include "webview/webview.h"
 // This started as 1-week project so please don't take the code to seriously
 int main(int argc, char *argv[]) {
-  // Catch unhandled exceptions
-  SetUnhandledExceptionFilter([](EXCEPTION_POINTERS *info) -> LONG {
-    std::wstringstream ws;
-    ws << L"Unhandled exception! Code=0x" << std::hex
-       << info->ExceptionRecord->ExceptionCode;
-    AppendToCrashLog(ws.str());
-    Cleanup();
-    return EXCEPTION_EXECUTE_HANDLER;
-  });
-  atexit(Cleanup);
-
   // DPI
   if (IsWindowsVersionOrGreater(10, 0, 14393)) {
     typedef BOOL(WINAPI * SetDpiCtxFn)(DPI_AWARENESS_CONTEXT);
@@ -87,6 +76,17 @@ int main(int argc, char *argv[]) {
 
   // Load config
   LoadSettings();
+
+  // Only the instance that loaded the settings may write them during cleanup.
+  SetUnhandledExceptionFilter([](EXCEPTION_POINTERS *info) -> LONG {
+    std::wstringstream ws;
+    ws << L"Unhandled exception! Code=0x" << std::hex
+       << info->ExceptionRecord->ExceptionCode;
+    AppendToCrashLog(ws.str());
+    Cleanup();
+    return EXCEPTION_EXECUTE_HANDLER;
+  });
+  atexit(Cleanup);
 
   // Initialize Discord RPC
   InitializeDiscord();

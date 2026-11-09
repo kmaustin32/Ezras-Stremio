@@ -734,6 +734,7 @@ Section "uninstall"
   removeData:
     ; User chose to remove data - remove entire install folder (including .WebView2)
     RMDir /r "$INSTDIR"
+    Call un.RemoveLibraryStore
     Goto done
 
   keepUserData:
@@ -746,6 +747,24 @@ Section "uninstall"
       ExecShell "open" "https://github.com/Zaarrg/stremio-desktop-v5/blob/webview-windows/docs/GOODBYE.md"
 
 SectionEnd
+
+Function un.RemoveLibraryStore
+    ; Library records live outside the installation directory. Avoid following
+    ; a redirected app folder or deleting files outside the store's format.
+    StrCmp "$LOCALAPPDATA" "" libraryCleanupDone
+    StrCpy $1 "$LOCALAPPDATA\EzrasStremio"
+    System::Call 'kernel32::GetFileAttributesW(w r1)i.r0'
+    IntOp $0 $0 & 0x410
+    IntCmp $0 0x10 0 libraryCleanupDone libraryCleanupDone
+    StrCpy $1 "$1\Library"
+    System::Call 'kernel32::GetFileAttributesW(w r1)i.r0'
+    IntOp $0 $0 & 0x410
+    IntCmp $0 0x10 0 libraryCleanupDone libraryCleanupDone
+    Delete "$1\*.json"
+    Delete "$1\*.json.tmp"
+    RMDir "$1"
+  libraryCleanupDone:
+FunctionEnd
 
 ; ------------------- ;
 ;  Check if writable  ;

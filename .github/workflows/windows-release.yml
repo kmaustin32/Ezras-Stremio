@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 env:
-  FORK_RELEASE_VERSION: 2.0.0-beta.3
+  FORK_RELEASE_VERSION: 2.0.0-beta.4
 
 jobs:
   build:
@@ -107,6 +107,7 @@ jobs:
           if ($LASTEXITCODE) { throw 'Packaging failed' }
           python tests/branding_package.py --exe dist/win-x64/stremio.exe --original .build-cache/upstream/stremio.exe --installer 'utils/Stremio 5.0.22-x64.exe'
           if ($LASTEXITCODE) { throw 'Packaged application branding verification failed' }
+          ./tests/windows_lifecycle.ps1 -AppDirectory dist/win-x64 -Installer 'utils/Stremio 5.0.22-x64.exe'
           New-Item -ItemType Directory -Force out | Out-Null
           Copy-Item 'utils/Stremio 5.0.22-x64.exe' "out/Ezras-Stremio-${env:FORK_RELEASE_VERSION}-x64.exe"
           Compress-Archive -Path dist/win-x64/* -DestinationPath "out/Ezras-Stremio-${env:FORK_RELEASE_VERSION}-x64.zip"

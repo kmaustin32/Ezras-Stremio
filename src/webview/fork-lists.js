@@ -83,10 +83,10 @@
         entry = {};
         savedLists.set(uid, entry);
         entry.ready = Promise.resolve().then(() => {
-            const raw = localStorage.getItem(storageKey(uid));
-            return requestStore('load', uid, {legacy: raw === null ? null : JSON.parse(raw)});
-        }).then(({record}) => {
+            return requestStore('load', uid, {legacy: localStorage.getItem(storageKey(uid))});
+        }).then(({record, legacyUnreadable}) => {
             entry.record = record;
+            entry.legacyUnreadable = legacyUnreadable === true;
         }).catch(() => {
             entry.error = 'Saved lists could not be read.';
         }).finally(() => window.dispatchEvent(new Event(changeEvent)));
@@ -197,7 +197,7 @@
                     if (uid) refreshAnimeIndex();
                     const entry = uid ? loadLists(uid) : null;
                     const parts = uid ? [uid, entry.record, localStorage.getItem('library'), localStorage.getItem('library_recent'),
-                        animeIndex, entry.error, fixedUid ? localStorage.getItem('streams') : null] : [null, null, null, null, null, null, null];
+                         animeIndex, entry.error, fixedUid ? localStorage.getItem('streams') : null, entry.legacyUnreadable] : [null];
                     if (previous && parts.every((part, index) => part === previous[index])) return;
                     previous = parts;
                     let lists, error = entry?.error;
@@ -205,7 +205,8 @@
                     catch { lists = []; error = 'Saved lists could not be read.'; }
                     const records = libraryRecords(uid, [parse(parts[2]), parse(parts[3])]);
                     const classified = error || !uid ? {lists, categories: new Map()} : classifyLists(lists, records.byId, animeIndex);
-                    setSnapshot({uid, error, editable: Boolean(entry?.record && !error), streams: streamRecords(uid, parts[6]), ...records, ...classified});
+                     setSnapshot({uid, error, legacyUnreadable: entry?.legacyUnreadable, editable: Boolean(entry?.record && !error),
+                         streams: streamRecords(uid, parts[6]), ...records, ...classified});
                 } catch {
                     setSnapshot({uid: fixedUid, lists: [], byId: new Map(), error: 'Local storage is unavailable.'});
                 }
@@ -486,6 +487,8 @@
 
         return h(Nav, navProps, React.cloneElement(body, null, header, view,
             (data?.error || notice) && h('p', {className: 'fork-list-notice', role: 'alert'}, data?.error || notice),
+            data?.legacyUnreadable && h('p', {className: 'fork-list-notice', role: 'status'},
+                'Older Library lists could not be imported. Your current lists are available.'),
             dialog && h(ListDialog, {React, mode: dialog.mode, lists, count: dialog.ids?.length,
                 close: () => setDialog(null), save: async value => {
                     let created;

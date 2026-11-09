@@ -35,13 +35,24 @@ int main()
         const auto primary = legacy(json::array({list("anime", "Anime", {"tt100"}), list("custom", "Weekend", {"tt200"})}));
         const auto first = load("primary", "account", primary).at("record");
         require(first["revision"] == 1 && first["lists"] == primary["lists"], "Migrate primary lists");
+        const auto broken = load("fallback", "account", "{broken");
+        require(broken["legacyUnreadable"] == true && broken["record"] == first,
+            "Broken legacy JSON must leave shared lists and the revision available");
+        const auto invalid = load("fallback", "account", legacy(json::array({list("invalid", " ", {"tt100"})})).dump());
+        require(invalid["legacyUnreadable"] == true && invalid["record"] == first,
+            "Malformed legacy records must leave shared lists available");
+        const auto fresh = load("fallback", "fresh-account", "null");
+        require(fresh["legacyUnreadable"] == true && fresh["record"]["revision"] == 0 &&
+            fresh["record"]["lists"].empty(), "Allow a new account to create lists despite unreadable legacy data");
         const auto fallback = legacy(json::array({list("live-action", "Live Action", {"tt100", "tt300"}),
             list("custom", "Weekend", {"tt400"}), list("favorites", "Favorites", {"tt500"})}));
-        const auto shared = load("fallback", "account", fallback).at("record");
+        const auto shared = load("fallback", "account", fallback.dump()).at("record");
         require(shared["revision"] == 2 && shared["lists"].size() == 4, "Merge independent fallback lists");
         require(shared["lists"][1]["items"] == json::array({"tt200", "tt400"}), "Merge memberships without duplicates");
         require(shared["lists"][2]["items"] == json::array({"tt300"}), "Retain existing manual category choice");
         require(load("primary", "account", primary)["record"] == shared, "Read the same store from both hosts");
+        require(!load("primary", "account", "{broken").contains("legacyUnreadable"),
+            "Ignore old storage after that origin was migrated");
         require(save("primary", 1, primary["lists"])["conflict"] == true, "Reject a stale write");
         auto revised = shared["lists"];
         revised[1]["items"] = json::array({"tt400"});

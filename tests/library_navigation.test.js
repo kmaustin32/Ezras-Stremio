@@ -49,8 +49,13 @@ async function setup(withAppearance = false, withLists = false, listFixture = {}
         const store = new Map();
         if (withLists) await page.exposeFunction('fixtureLibraryStore', ({requestId, action, uid, legacy, revision, lists}) => {
             let record = store.get(uid);
+            let olderLists, legacyUnreadable;
+            if (legacy !== null && legacy !== undefined) {
+                try {olderLists = JSON.parse(legacy);}
+                catch {legacyUnreadable = true;}
+            }
             if (!record) {
-                record = {...(legacy ?? {version: 1, lists: []}), revision: legacy ? 1 : 0};
+                record = {...(olderLists ?? {version: 1, lists: []}), revision: olderLists ? 1 : 0};
                 store.set(uid, record);
             }
             if (action === 'save') {
@@ -58,7 +63,7 @@ async function setup(withAppearance = false, withLists = false, listFixture = {}
                 record = {version: 1, revision: revision + 1, lists};
                 store.set(uid, record);
             }
-            return {requestId, record};
+            return {requestId, record, legacyUnreadable};
         });
         if (withLists) await page.route('https://raw.githubusercontent.com/Fribb/anime-lists/master/indices/imdb_index.json', async route => {
             indexRequests.push({url: route.request().url(), method: route.request().method(), headers: await route.request().allHeaders()});
@@ -466,6 +471,29 @@ test('Switching lists clears hidden selection, and older cards resume their cach
         assert.deepEqual(JSON.parse(inflateSync(Buffer.from(encoded, 'base64'))), savedSource.stream);
         assert.deepEqual(errors, []);
     } finally {await browser.close();}
+});
+
+test('Unreadable older data on the fallback host leaves saved lists visible and editable', async t => {
+    const seed = {version: 1, lists: [{id: 'favorites-id', name: 'Favorites', items: ['tt100']}]};
+    const {browser, page, boot, store} = await setup(false, true, {seed});
+    t.after(() => browser.close());
+    const create = page.getByRole('button', {name: 'Create list', exact: true}).and(page.locator(':enabled'));
+    await create.waitFor();
+    assert.equal(store.get('test').lists[0].name, 'Favorites');
+
+    await page.goto('https://zaarrg.github.io/stremio-web-shell-fixes/#/library?forkList=favorites-id');
+    await page.evaluate(() => localStorage.setItem('stremio-fork-custom-lists:test', '{broken'));
+    await boot();
+    await page.getByText('Older Library lists could not be imported. Your current lists are available.', {exact: true}).waitFor();
+    await page.getByTitle('Fixture Show', {exact: true}).waitFor();
+    assert.equal(await page.getByTitle('Older Movie', {exact: true}).count(), 0);
+    await create.click();
+    await page.getByRole('dialog').getByRole('textbox').fill('New list');
+    await page.getByRole('button', {name: 'Create', exact: true}).click();
+    await page.waitForFunction(() => [...document.querySelectorAll('p')].some(node => node.textContent === 'This list is empty.'));
+    assert.ok(store.get('test').lists.some(list => list.name === 'New list'));
+    assert.deepEqual(store.get('test').lists.find(list => list.name === 'Favorites').items, ['tt100']);
+    assert.equal(await page.evaluate(() => localStorage.getItem('stremio-fork-custom-lists:test')), '{broken');
 });
 
 test('A failed Library compatibility patch shows a warning on Library and Home', async () => {

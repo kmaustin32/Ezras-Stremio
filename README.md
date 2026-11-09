@@ -120,7 +120,7 @@ Picture-in-Picture is beside fullscreen at the top of the player and in the tray
 
 ## 📚 Keep your library
 
-### Library lists in 2.0.0 Beta 3
+### Library lists in 2.0.0 Beta 4
 
 - Choose **Create list** in the Library toolbar, name it, then find it in the **All / Movie / Series** dropdown.
 - Open a title's three-dot menu and choose **Add to list**. A title can belong to several custom lists and one automatic category.
@@ -130,8 +130,9 @@ Picture-in-Picture is beside fullscreen at the top of the player and in the tray
 - Use **Move to Anime** or **Move to Live Action** in the three-dot menu to save a correction. In-place updates keep your Beta 1 custom lists and category choices. Home shows the lists after **Featured Movies**.
 - Automatic categories rebuild from your Stremio Library on a new computer. Custom lists and manual moves are saved per account on each device.
 - The primary and fallback web interfaces now use the same local lists. Older beta lists migrate when you open the corresponding interface. Switching Library views clears bulk selection, and older cards can resume the exact saved source from their three-dot menu.
+- If older browser data cannot be read, the Library shows a notice and keeps your saved lists available. When uninstalling, **Remove all data and configuration** also clears the device's saved custom lists and category corrections.
 
-[Download 2.0.0 Beta 3](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.0.0-beta.3)
+[Download 2.0.0 Beta 4](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.0.0-beta.4)
 
 ### Library and add-on backup
 

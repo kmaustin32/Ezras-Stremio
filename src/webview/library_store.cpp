@@ -21,11 +21,25 @@ void ValidateLists(const json& lists)
         const auto name = list.at("name").get<std::string>();
         const auto& items = list.at("items");
         if (id.empty() || id.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789-") != std::string::npos ||
-            name.empty() || !ids.insert(id).second || !items.is_array())
+            name.find_first_not_of(" \t\r\n\f\v") == std::string::npos || !ids.insert(id).second || !items.is_array())
             throw std::runtime_error("Saved lists could not be read.");
         for (const auto& item : items)
             if (!item.is_string() || item.get_ref<const std::string&>().empty())
                 throw std::runtime_error("Saved lists could not be read.");
+    }
+}
+
+bool ValidLegacy(const json& legacy)
+{
+    try {
+        if (!legacy.is_object() || !legacy.contains("version") || legacy["version"] != 1 ||
+            !legacy.contains("lists")) return false;
+        ValidateLists(legacy["lists"]);
+        return true;
+    } catch (const json::exception&) {
+        return false;
+    } catch (const std::runtime_error&) {
+        return false;
     }
 }
 
@@ -114,13 +128,16 @@ json HandleLibraryStoreRequest(const std::filesystem::path& directory, std::stri
             const json sourceOrigin = std::string(origin);
             if (request.contains("legacy") && !request["legacy"].is_null() &&
                 std::find(migrated.begin(), migrated.end(), sourceOrigin) == migrated.end()) {
-                const auto& legacy = request["legacy"];
-                if (legacy.value("version", 0) != 1) throw std::runtime_error("Older saved lists could not be read.");
-                ValidateLists(legacy.at("lists"));
-                MergeLegacy(record["lists"], legacy["lists"]);
-                migrated.push_back(sourceOrigin);
-                record["revision"] = revision + 1;
-                WriteRecord(path, record);
+                const auto& raw = request["legacy"];
+                const auto legacy = raw.is_string() ? json::parse(raw.get_ref<const std::string&>(), nullptr, false) : raw;
+                if (ValidLegacy(legacy)) {
+                    MergeLegacy(record["lists"], legacy["lists"]);
+                    migrated.push_back(sourceOrigin);
+                    record["revision"] = revision + 1;
+                    WriteRecord(path, record);
+                } else {
+                    response["legacyUnreadable"] = true;
+                }
             }
         } else if (action == "save") {
             if (request.at("revision").get<int>() != revision) response["conflict"] = true;

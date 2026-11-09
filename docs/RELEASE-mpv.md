@@ -1,17 +1,15 @@
-## Ezra's Stremio 2.0.0 Beta 3
+## Ezra's Stremio 2.0.0 Beta 4
 
-- **Shared Library lists.** The primary and fallback web interfaces use the same local lists and category corrections for each account. Older beta data is imported from each interface when you open it. If the two interfaces stored conflicting corrections, the one already imported into the shared store takes priority.
-- **Older cards can resume.** The three-dot Play action uses the saved stream for that exact title and video, including its resume position, when one is available.
-- **Bulk edits follow the current view.** Switching Library views clears selection, so a bulk edit cannot include titles selected in the previous view.
-- **Library compatibility notice.** If a hosted interface update disables list support, Home and Library explain that the saved lists are still on the device.
-- **mpv shutdown.** The native app stops handling events when mpv shuts down. Commands use mpv’s asynchronous API without background threads that can outlive the player.
+- **Windows settings survive a second launch.** Opening Ezra's Stremio while it is already running leaves saved preferences intact.
+- **Custom lists stay available if older data is unreadable.** The Library shows a notice if an old list cannot be imported. You can still use and edit the lists already saved on this device.
+- **Uninstall honors your data choice.** Choosing to remove all data also clears the device's custom lists and category corrections. Choosing to keep data preserves them for a reinstall.
 
 Custom lists and manual corrections are stored per account on each Windows device. On another computer, Anime and Live Action rebuild from your regular Stremio Library.
 
 ### Windows downloads
 
-- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.0.0-beta.3/Ezras-Stremio-2.0.0-beta.3-x64.exe)
-- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.0.0-beta.3/Ezras-Stremio-2.0.0-beta.3-x64.zip)
-- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.0.0-beta.3/SHA256SUMS.txt)
+- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.0.0-beta.4/Ezras-Stremio-2.0.0-beta.4-x64.exe)
+- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.0.0-beta.4/Ezras-Stremio-2.0.0-beta.4-x64.zip)
+- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.0.0-beta.4/SHA256SUMS.txt)
 
 Use Windows 10 or 11 x64. If upgrading with the installer, retain your configuration to keep your custom mpv settings.
