@@ -111,13 +111,14 @@ json HandleLibraryStoreRequest(const std::filesystem::path& directory, std::stri
         const auto revision = record.at("revision").get<int>();
         if (action == "load") {
             auto& migrated = record["migrated"];
+            const json sourceOrigin = std::string(origin);
             if (request.contains("legacy") && !request["legacy"].is_null() &&
-                std::find(migrated.begin(), migrated.end(), origin) == migrated.end()) {
+                std::find(migrated.begin(), migrated.end(), sourceOrigin) == migrated.end()) {
                 const auto& legacy = request["legacy"];
                 if (legacy.value("version", 0) != 1) throw std::runtime_error("Older saved lists could not be read.");
                 ValidateLists(legacy.at("lists"));
                 MergeLegacy(record["lists"], legacy["lists"]);
-                migrated.push_back(origin);
+                migrated.push_back(sourceOrigin);
                 record["revision"] = revision + 1;
                 WriteRecord(path, record);
             }
