@@ -22,7 +22,7 @@
 
     function decodeLists(raw) {
         if (raw === null) return newDefaults();
-        const data = JSON.parse(raw);
+        const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (data?.version !== 1 || !Array.isArray(data.lists)) throw new Error('Saved lists could not be read.');
         const ids = new Set();
         const lists = data.lists.map(list => {
@@ -56,6 +56,66 @@
 
     function parse(raw) {
         try { return JSON.parse(raw); } catch { return null; }
+    }
+
+    const pendingStore = new Map(), savedLists = new Map();
+
+    function requestStore(action, uid, extra) {
+        return new Promise((resolve, reject) => {
+            const requestId = crypto.randomUUID();
+            const timeout = setTimeout(() => {
+                pendingStore.delete(requestId);
+                reject(new Error('Local Library storage did not respond.'));
+            }, 5000);
+            pendingStore.set(requestId, result => {
+                clearTimeout(timeout);
+                if (result.error) reject(new Error(result.error));
+                else resolve(result);
+            });
+            try {window.chrome.webview.postMessage('fork-library-store:' + JSON.stringify({requestId, action, uid, ...extra}));}
+            catch (error) {clearTimeout(timeout); pendingStore.delete(requestId); reject(error);}
+        });
+    }
+
+    function loadLists(uid) {
+        let entry = savedLists.get(uid);
+        if (entry) return entry;
+        entry = {};
+        savedLists.set(uid, entry);
+        entry.ready = Promise.resolve().then(() => {
+            const raw = localStorage.getItem(storageKey(uid));
+            return requestStore('load', uid, {legacy: raw === null ? null : JSON.parse(raw)});
+        }).then(({record}) => {
+            entry.record = record;
+        }).catch(() => {
+            entry.error = 'Saved lists could not be read.';
+        }).finally(() => window.dispatchEvent(new Event(changeEvent)));
+        return entry;
+    }
+
+    function streamRecords(uid, raw) {
+        const bucket = parse(raw);
+        const records = new Map();
+        if (!uid || bucket?.uid !== uid || !Array.isArray(bucket.items)) return records;
+        for (const pair of bucket.items) {
+            if (!Array.isArray(pair)) continue;
+            const [key, record] = pair;
+            if (typeof key?.metaId !== 'string' || typeof key.videoId !== 'string' ||
+                record?.metaId !== key.metaId || record.videoId !== key.videoId || !object(record.stream) ||
+                ![record.type, record.streamTransportUrl, record.metaTransportUrl].every(value => typeof value === 'string' && value))
+                continue;
+            records.set(JSON.stringify([key.metaId, key.videoId]), record);
+        }
+        return records;
+    }
+
+    async function cachedPlayerLink(record, offset) {
+        const input = new Blob([JSON.stringify(record.stream)]).stream().pipeThrough(new CompressionStream('deflate'));
+        const bytes = new Uint8Array(await new Response(input).arrayBuffer());
+        const encoded = btoa(Array.from(bytes, byte => String.fromCharCode(byte)).join(''));
+        const segments = [encoded, record.streamTransportUrl, record.metaTransportUrl, record.type, record.metaId, record.videoId];
+        const seconds = Math.floor(Number(offset) / 1000);
+        return '#/player/' + segments.map(encodeURIComponent).join('/') + (seconds > 0 ? '?position=' + seconds : '');
     }
 
     function imdbIds(index) {
@@ -135,16 +195,17 @@
                 try {
                     const uid = fixedUid === undefined ? accountId(parse(localStorage.getItem('profile'))) : fixedUid;
                     if (uid) refreshAnimeIndex();
-                    const parts = uid ? [uid, localStorage.getItem(storageKey(uid)), localStorage.getItem('library'),
-                        localStorage.getItem('library_recent'), animeIndex] : [null, null, null, null, null];
+                    const entry = uid ? loadLists(uid) : null;
+                    const parts = uid ? [uid, entry.record, localStorage.getItem('library'), localStorage.getItem('library_recent'),
+                        animeIndex, entry.error, fixedUid ? localStorage.getItem('streams') : null] : [null, null, null, null, null, null, null];
                     if (previous && parts.every((part, index) => part === previous[index])) return;
                     previous = parts;
-                    let lists, error;
-                    try { lists = decodeLists(parts[1]); }
+                    let lists, error = entry?.error;
+                    try { lists = decodeLists(parts[1] ?? null); }
                     catch { lists = []; error = 'Saved lists could not be read.'; }
                     const records = libraryRecords(uid, [parse(parts[2]), parse(parts[3])]);
                     const classified = error || !uid ? {lists, categories: new Map()} : classifyLists(lists, records.byId, animeIndex);
-                    setSnapshot({uid, error, ...records, ...classified});
+                    setSnapshot({uid, error, editable: Boolean(entry?.record && !error), streams: streamRecords(uid, parts[6]), ...records, ...classified});
                 } catch {
                     setSnapshot({uid: fixedUid, lists: [], byId: new Map(), error: 'Local storage is unavailable.'});
                 }
@@ -165,17 +226,26 @@
     }
 
     async function changeLists(uid, update) {
-        const key = storageKey(uid);
-        const save = () => {
+        const save = async () => {
+            const entry = loadLists(uid);
+            await entry.ready;
             if (accountId(parse(localStorage.getItem('profile'))) !== uid)
                 throw new Error('The signed-in account changed. Open Library and try again.');
-            const lists = decodeLists(localStorage.getItem(key));
-            update(lists);
-            localStorage.setItem(key, JSON.stringify({version: 1, lists}));
-            window.dispatchEvent(new Event(changeEvent));
+            if (!entry.record) throw new Error(entry.error || 'Saved lists could not be read.');
+            for (let attempt = 0; attempt < 2; ++attempt) {
+                const lists = decodeLists(entry.record);
+                update(lists);
+                const result = await requestStore('save', uid, {revision: entry.record.revision, lists});
+                entry.record = result.record;
+                window.dispatchEvent(new Event(changeEvent));
+                if (!result.conflict) return;
+                if (accountId(parse(localStorage.getItem('profile'))) !== uid)
+                    throw new Error('The signed-in account changed. Open Library and try again.');
+            }
+            throw new Error('The lists changed in another window. Try again.');
         };
-        if (navigator.locks) await navigator.locks.request(key, save);
-        else save();
+        if (navigator.locks) await navigator.locks.request(storageKey(uid), save);
+        else await save();
     }
 
     function listLink(id) {
@@ -276,7 +346,7 @@
         const h = React.createElement;
         const data = useLocalData(React, uid);
         const [hash, setHash] = React.useState(location.hash);
-        const [selected, setSelected] = React.useState(new Set());
+        const [selection, setSelection] = React.useState({key: '', ids: new Set()});
         const [dialog, setDialog] = React.useState(null);
         const [notice, setNotice] = React.useState('');
         React.useEffect(() => {
@@ -297,15 +367,37 @@
             content.props.children.filter(card => card?.type === LibItem && typeof card.props._id === 'string') : [];
         const liveCards = new Map(cards.map(card => [card.props._id, card]));
         const localMode = Boolean(active || smart);
-        const canEdit = Boolean(data && !data.error);
+        const canEdit = data?.editable === true;
+        const selectionKey = hash.split('?')[0] + '|' + activeId;
+        React.useEffect(() => {
+            setSelection(previous => previous.key === selectionKey ? previous : {key: selectionKey, ids: new Set()});
+            setDialog(null);
+        }, [selectionKey]);
+        const selected = new Set();
+        if (selection.key === selectionKey) {
+            for (const id of selection.ids) {
+                const saved = data?.byId.get(id);
+                const watched = liveCards.get(id)?.props.watched ?? (Number(saved?.state?.timesWatched) > 0);
+                if ((!data?.available || saved) && (!active || active.items.includes(id)) &&
+                    (watchFilter === null || Boolean(watched) === watchFilter)) selected.add(id);
+            }
+        }
 
         const add = ids => {setNotice(''); setDialog({mode: 'add', ids: [...ids]});};
         const decorate = card => {
             const id = card.props._id;
             const category = data?.categories?.get(id) ?? automaticCategory(card.props, animeIndex);
             const destination = category === 'anime' ? 'live-action' : 'anime';
+            const saved = data?.byId.get(id);
+            const cached = !card.props.deepLinks?.player && data?.streams?.get(JSON.stringify([id, saved?.state?.video_id]));
             const handle = event => {
-                if (event.value === 'fork-add-to-list') add(selected.has(id) ? selected : [id]);
+                if (event.value === 'fork-play-cached' && cached) {
+                    const currentHash = location.hash;
+                    cachedPlayerLink(cached, saved.state?.timeOffset).then(link => {
+                        if (location.hash === currentHash && accountId(parse(localStorage.getItem('profile'))) === uid)
+                            location.hash = link;
+                    }).catch(() => setNotice('The saved source could not be opened.'));
+                } else if (event.value === 'fork-add-to-list') add(selected.has(id) ? selected : [id]);
                 else if (event.value === 'fork-move-category') {
                     changeLists(uid, lists => moveTitles(lists, [id], destination)).catch(error => setNotice(error.message));
                 }
@@ -316,13 +408,16 @@
                     }).catch(error => setNotice(error.message));
                 } else card.props.optionOnSelect?.(event);
             };
-            if (canEdit) menuHandlers.set(handle, {destination, removable: Boolean(active && !categoryIds.has(active.id))});
+            if (canEdit || cached)
+                menuHandlers.set(handle, {cached, destination: canEdit ? destination : null, removable: canEdit && active && !categoryIds.has(active.id)});
             return React.cloneElement(card, {key: id, optionOnSelect: handle,
                 'data-fork-list-selected': selected.has(id) || undefined,
                 onClick: event => {
                     if (canEdit && event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey) {
                         event.preventDefault();
-                        setSelected(old => {const next = new Set(old); if (next.has(id)) next.delete(id); else next.add(id); return next;});
+                        const next = new Set(selected);
+                        if (next.has(id)) next.delete(id); else next.add(id);
+                        setSelection({key: selectionKey, ids: next});
                     } else card.props.onClick?.(event);
                 }});
         };
@@ -408,7 +503,7 @@
                         }
                     });
                     if (created) location.hash = listLink(created.id);
-                    else setSelected(new Set());
+                    else setSelection({key: selectionKey, ids: new Set()});
                 }})));
     }
 
@@ -449,7 +544,7 @@
     }
 
     if (typeof module !== 'undefined' && module.exports) {
-        module.exports = {decodeLists, libraryRecords, itemProps, imdbIds, classifyLists, moveTitles};
+        module.exports = {decodeLists, libraryRecords, itemProps, imdbIds, classifyLists, moveTitles, streamRecords, cachedPlayerLink};
         return;
     }
     if (window.top !== window.self || !window.chrome?.webview || window.__stremioForkLists ||
@@ -469,9 +564,13 @@
         menu(options, handler) {
             const menu = menuHandlers.get(handler);
             if (!menu) return options;
-            const destination = defaults.find(list => list.id === menu.destination).name;
-            const result = [...options, {value: 'fork-add-to-list', label: 'Add to list'},
-                {value: 'fork-move-category', label: 'Move to ' + destination}];
+            const result = [...options];
+            if (menu.cached) result.unshift({value: 'fork-play-cached', label: 'Play'});
+            if (menu.destination) {
+                const destination = defaults.find(list => list.id === menu.destination).name;
+                result.push({value: 'fork-add-to-list', label: 'Add to list'},
+                    {value: 'fork-move-category', label: 'Move to ' + destination});
+            }
             if (menu.removable) result.push({value: 'fork-remove-from-list', label: 'Remove from this list'});
             return result;
         },
@@ -479,6 +578,32 @@
             return React.createElement(HomeLists, {React, boardProps, children});
         }
     };
+    window.chrome.webview.addEventListener('message', event => {
+        const message = typeof event.data === 'string' ? parse(event.data) : event.data;
+        const [name, result] = Array.isArray(message?.args) ? message.args : [];
+        if (name !== 'fork-library-store-result' || !result) return;
+        const receive = pendingStore.get(result.requestId);
+        pendingStore.delete(result.requestId);
+        receive?.(result);
+    });
+    function showCompatibilityNotice() {
+        if (!document.body) return;
+        const unavailable = window.__stremioForkCustomListsPatched === false &&
+            /^#\/(?:library(?:[/?]|$)|(?:\?|$))/.test(location.hash || '#/');
+        const existing = document.getElementById('fork-list-compatibility');
+        if (!unavailable) existing?.remove();
+        else if (!existing) {
+            const notice = document.createElement('div');
+            notice.id = 'fork-list-compatibility';
+            notice.setAttribute('role', 'status');
+            notice.textContent = 'Custom lists are temporarily unavailable because the web interface changed. Your saved lists are still on this device.';
+            document.body.append(notice);
+        }
+    }
+    window.addEventListener('stremio-fork-compatibility', showCompatibilityNotice);
+    window.addEventListener('hashchange', showCompatibilityNotice);
+    document.addEventListener('DOMContentLoaded', showCompatibilityNotice, {once: true});
+    showCompatibilityNotice();
     setTimeout(() => {
         try {if (accountId(parse(localStorage.getItem('profile')))) refreshAnimeIndex();}
         catch { /* Storage errors are shown when the Library opens. */ }
@@ -506,6 +631,8 @@
         .fork-list-choice input {appearance:auto;margin-right:.5rem;accent-color:#7272c2}
         .fork-list-dialog-actions {display:flex;justify-content:flex-end;gap:.5rem;margin-top:1rem}
         .fork-list-notice {padding:1rem 1.5rem;color:var(--primary-foreground-color,#fff)}
+        #fork-list-compatibility {position:fixed;bottom:1rem;left:1rem;right:1rem;z-index:20;padding:.75rem 1rem;
+            border:1px solid #e6ae60;border-radius:.75rem;background:#222635;color:#fff}
         [data-fork-list-selected] [class*="poster-container-"] {outline:3px solid #aaaaf0;outline-offset:2px}
         [data-fork-home-lists] {overflow:visible}
         @media (max-width:700px) {

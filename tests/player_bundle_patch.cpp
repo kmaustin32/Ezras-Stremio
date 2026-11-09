@@ -12,7 +12,7 @@ int main(int count, char** args)
     if (!input) return 2;
     std::string script(std::istreambuf_iterator<char>(input), {}), error;
     const auto report = PatchCommunityPlayer(script);
-    if (!report.AllApplied() && !allowPartial) { std::cerr << report.warning << '\n'; return 1; }
+    if ((!report.AllApplied() || !report.customLists) && !allowPartial) { std::cerr << report.warning << '\n'; return 1; }
     std::ofstream output(args[2], std::ios::binary);
     output << script;
     return output ? 0 : 2;

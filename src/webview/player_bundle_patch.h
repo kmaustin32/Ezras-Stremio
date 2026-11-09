@@ -9,6 +9,7 @@ struct PlayerPatchReport {
     bool episodeBlur = false;
     bool volumeFeedback = false;
     bool libraryDetails = false;
+    bool customLists = false;
     std::string warning;
     bool AllApplied() const { return autoplay && volume && episodeBlur && volumeFeedback && libraryDetails; }
 };

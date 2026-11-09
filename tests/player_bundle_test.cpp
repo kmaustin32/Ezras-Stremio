@@ -78,7 +78,9 @@ int main()
             const auto report = PatchCommunityPlayer(candidate);
             require(report.autoplay == bool(mask & 1) && report.volume == bool(mask & 2) &&
                 report.episodeBlur == bool(mask & 4) && report.volumeFeedback == bool(mask & 8) && report.libraryDetails == bool(mask & 16), "Every compatibility combination is independent");
-            require(report.warning.empty() == (mask == 31), "Report unavailable fixes");
+            require(!report.customLists && report.warning.find("Custom Library lists are unavailable") != std::string::npos,
+                "The synthetic player fixture reports missing Library hooks");
+            require((report.warning == "Custom Library lists are unavailable") == (mask == 31), "Report unavailable player fixes");
             const auto once = candidate;
             const auto again = PatchCommunityPlayer(candidate);
             require(candidate == once && again.autoplay == report.autoplay && again.volume == report.volume &&

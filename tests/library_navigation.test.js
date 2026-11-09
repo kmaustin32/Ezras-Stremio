@@ -1,10 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const {inflateSync} = require('node:zlib');
 const {chromium} = require('playwright');
 const forkScript = fs.readFileSync('src/webview/fork-player.js', 'utf8');
 const listsScript = fs.readFileSync('src/webview/fork-lists.js', 'utf8');
-const {decodeLists, libraryRecords, itemProps, imdbIds, classifyLists, moveTitles} = require('../src/webview/fork-lists');
+const {decodeLists, libraryRecords, itemProps, imdbIds, classifyLists, moveTitles, streamRecords, cachedPlayerLink} = require('../src/webview/fork-lists');
 const executablePath = [process.env.STREMIO_TEST_BROWSER,
     'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
     'C:/Program Files/Microsoft/Edge/Application/msedge.exe'].find(path => path && fs.existsSync(path));
@@ -45,6 +46,20 @@ async function setup(withAppearance = false, withLists = false, listFixture = {}
         page.on('pageerror', error => errors.push(error.message));
         if (withLists) page.setDefaultTimeout(10000);
         const indexRequests = [];
+        const store = new Map();
+        if (withLists) await page.exposeFunction('fixtureLibraryStore', ({requestId, action, uid, legacy, revision, lists}) => {
+            let record = store.get(uid);
+            if (!record) {
+                record = {...(legacy ?? {version: 1, lists: []}), revision: legacy ? 1 : 0};
+                store.set(uid, record);
+            }
+            if (action === 'save') {
+                if (record.revision !== revision) return {requestId, record, conflict: true};
+                record = {version: 1, revision: revision + 1, lists};
+                store.set(uid, record);
+            }
+            return {requestId, record};
+        });
         if (withLists) await page.route('https://raw.githubusercontent.com/Fribb/anime-lists/master/indices/imdb_index.json', async route => {
             indexRequests.push({url: route.request().url(), method: route.request().method(), headers: await route.request().allHeaders()});
             if (listFixture.offline) return route.abort();
@@ -52,11 +67,13 @@ async function setup(withAppearance = false, withLists = false, listFixture = {}
             entries.push(['[tt300]', {'anime-list': [1]}]);
             return route.fulfill({headers: {'access-control-allow-origin': '*'}, json: Object.fromEntries(entries)});
         });
-        await page.route('https://stremio.zarg.me/**', route => route.fulfill({contentType: 'text/html', body: `<html><head><style>${css}</style><style>body{margin:0;background:#222635;color:white}#app{height:100vh}.fixture-page{height:100vh;padding:30px}#details,#sources{padding:50px}#details [class*="video-container"]{width:400px}#sources [class*="stream-container"]{width:600px;min-height:100px}</style></head><body><div id="app"></div></body></html>`}));
+        const fixturePage = route => route.fulfill({contentType: 'text/html', body: `<html><head><style>${css}</style><style>body{margin:0;background:#222635;color:white}#app{height:100vh}.fixture-page{height:100vh;padding:30px}#details,#sources{padding:50px}#details [class*="video-container"]{width:400px}#sources [class*="stream-container"]{width:600px;min-height:100px}</style></head><body><div id="app"></div></body></html>`});
+        await page.route('https://stremio.zarg.me/**', fixturePage);
+        if (withLists) await page.route('https://zaarrg.github.io/stremio-web-shell-fixes/**', fixturePage);
         await page.addInitScript(seed => {
             localStorage.setItem('localProfile', '{"maxVolume":"225","keep":"unchanged"}');
             localStorage.setItem('profile', '{"fixture":"account-storage-unchanged"}');
-            if (seed && localStorage.getItem('stremio-fork-custom-lists:test') === null)
+            if (seed && location.hostname === 'stremio.zarg.me' && localStorage.getItem('stremio-fork-custom-lists:test') === null)
                 localStorage.setItem('stremio-fork-custom-lists:test', JSON.stringify(seed));
         }, listFixture.seed);
         await page.goto('https://stremio.zarg.me/' + (listFixture.home ? '#/' : '#/library/series'));
@@ -163,7 +180,17 @@ async function setup(withAppearance = false, withLists = false, listFixture = {}
         };
         async function boot() {
             if (withLists) {
-                await page.evaluate(() => {window.chrome.webview = {};});
+                await page.evaluate(() => {
+                    const bridge = new EventTarget();
+                    bridge.postMessage = message => {
+                        const prefix = 'fork-library-store:';
+                        if (!message.startsWith(prefix)) return;
+                        window.fixtureLibraryStore(JSON.parse(message.slice(prefix.length))).then(result => {
+                            bridge.dispatchEvent(new MessageEvent('message', {data: JSON.stringify({args: ['fork-library-store-result', result]})}));
+                        });
+                    };
+                    window.chrome.webview = bridge;
+                });
                 await page.addScriptTag({content: listsScript});
             }
             const anchor = '(()=>{var e;o.g.importScripts';
@@ -175,7 +202,7 @@ async function setup(withAppearance = false, withLists = false, listFixture = {}
         const card = page.locator('[class*="meta-item-container"]').filter({hasText: 'Fixture Show'});
         if (listFixture.home) await page.locator('[data-fork-home-lists]').waitFor();
         else await card.waitFor();
-        return {browser, page, errors, card, indexRequests, boot};
+        return {browser, page, errors, card, indexRequests, boot, store};
     } catch (error) {await browser.close(); throw error;}
 }
 
@@ -221,6 +248,31 @@ test('Anime classification matches exact IDs and keeps Beta 1 manual choices and
     records.delete('kitsu:5');
     assert.equal(classifyLists(saved, records, data).lists[1].items.includes('kitsu:5'), false);
     assert.deepEqual(saved[2].items, ['tt30', 'kitsu:5']);
+});
+
+const savedSource = {
+    stream: {infoHash: '1234567890123456789012345678901234567890', fileIdx: 3, name: 'Cached torrent'},
+    type: 'movie', metaId: 'tt300', videoId: 'tt300',
+    streamTransportUrl: 'https://example.invalid/addon/manifest.json',
+    metaTransportUrl: 'https://example.invalid/meta/manifest.json'
+};
+
+test('Only the matching account and video can resume the exact saved source', async () => {
+    const key = {metaId: 'tt300', videoId: 'tt300'};
+    const raw = JSON.stringify({uid: 'test', items: [[key, savedSource],
+        [{...key, videoId: 'other'}, savedSource]]});
+    assert.equal(streamRecords('other', raw).size, 0);
+    const records = streamRecords('test', raw);
+    assert.equal(records.size, 1);
+    const link = await cachedPlayerLink(records.values().next().value, 12650);
+    const [encoded, streamUrl, metaUrl, type, meta, video] = link.split('?')[0].split('/').slice(2).map(decodeURIComponent);
+    assert.deepEqual(JSON.parse(inflateSync(Buffer.from(encoded, 'base64'))), savedSource.stream);
+    assert.deepEqual([streamUrl, metaUrl, type, meta, video],
+        [savedSource.streamTransportUrl, savedSource.metaTransportUrl, 'movie', 'tt300', 'tt300']);
+    assert.match(link, /\?position=12$/);
+    const direct = {...savedSource, stream: {url: 'https://example.invalid/video.mkv', behaviorHints: {proxyHeaders: {request: {Referer: 'https://example.invalid/'}}}}};
+    const directLink = await cachedPlayerLink(direct, 0);
+    assert.deepEqual(JSON.parse(inflateSync(Buffer.from(decodeURIComponent(directLink.split('/')[2]), 'base64'))), direct.stream);
 });
 
 test('Live Library creates lists, adds multiple titles to multiple lists, and places them after Featured Movies', async () => {
@@ -377,16 +429,70 @@ test('Library chooses one list and one independent sort while cycling through bu
     } finally {await browser.close();}
 });
 
+test('Switching lists clears hidden selection, and older cards resume their cached source', async () => {
+    const {browser, page, card, errors} = await setup(false, true);
+    try {
+        await page.getByRole('button', {name: 'Create list'}).waitFor();
+        await page.waitForFunction(() => !document.querySelector('.fork-list-toolbar-actions button').disabled);
+        await page.keyboard.down('Control');
+        await card.locator('[class*="poster-image-layer"]').click();
+        await page.keyboard.up('Control');
+        await page.bringToFront();
+        const bulk = page.getByRole('button', {name: 'Add to list (1)'});
+        await bulk.waitFor();
+        await page.locator('[data-value="#/library?forkList=anime"]').click();
+        const older = page.getByTitle('Older Movie', {exact: true});
+        await older.waitFor();
+        await bulk.waitFor({state: 'detached'});
+        await page.locator('[data-value="#/library?forkList=all"]').click();
+        await card.waitFor();
+        assert.equal(await bulk.count(), 0);
+        await page.locator('[data-value="#/library?forkList=anime"]').click();
+        await older.waitFor();
+        assert.equal(await older.getAttribute('href'), '#/detail/movie/tt300/tt300');
+        await page.evaluate(stream => {
+            const bucket = JSON.parse(localStorage.getItem('library'));
+            Object.assign(bucket.items.tt300.state, {video_id: 'tt300', timeOffset: 12000});
+            localStorage.setItem('library', JSON.stringify(bucket));
+            localStorage.setItem('streams', JSON.stringify({uid: 'test', items: [[{metaId: 'tt300', videoId: 'tt300'}, stream]]}));
+        }, savedSource);
+        const menu = older.locator('[class*="menu-label-container"]');
+        await page.waitForTimeout(800); // Hosted core writes are picked up on the next storage poll.
+        await menu.click();
+        await page.getByText('Play', {exact: true}).click();
+        await page.waitForURL(/#\/player\/.*\?position=12$/);
+        const encoded = decodeURIComponent(new URL(page.url()).hash.split('/')[2]);
+        assert.deepEqual(JSON.parse(inflateSync(Buffer.from(encoded, 'base64'))), savedSource.stream);
+        assert.deepEqual(errors, []);
+    } finally {await browser.close();}
+});
+
+test('A failed Library compatibility patch shows a warning on Library and Home', async () => {
+    const {browser, page, errors} = await setup(false, true);
+    try {
+        await page.evaluate(() => {
+            window.__stremioForkCustomListsPatched = false;
+            window.dispatchEvent(new Event('stremio-fork-compatibility'));
+        });
+        const notice = page.locator('#fork-list-compatibility');
+        await notice.getByText('Custom lists are temporarily unavailable', {exact: false}).waitFor();
+        await page.evaluate(() => {location.hash = '#/';});
+        await notice.waitFor();
+        await page.evaluate(() => {location.hash = '#/detail/series/tt100';});
+        await notice.waitFor({state: 'detached'});
+        assert.deepEqual(errors, []);
+    } finally {await browser.close();}
+});
+
 test('Automatic lists use the full synced Library, update as records arrive, and keep Beta 1 lists and manual moves on restart', async () => {
     const options = {home: true, seed: {version: 1, lists: [
         {id: 'anime', name: 'Anime', items: ['tt100']},
         {id: 'live-action', name: 'Live Action', items: []},
         {id: 'favorites', name: 'Favorites', items: ['tt100', 'tt400']}
     ]}};
-    const {browser, page, errors, indexRequests, boot} = await setup(false, true, options);
+    const {browser, page, errors, indexRequests, boot, store} = await setup(false, true, options);
     try {
-        const key = 'stremio-fork-custom-lists:test';
-        const load = () => page.evaluate(key => JSON.parse(localStorage.getItem(key)), key);
+        const load = () => store.get('test');
         const chip = name => page.locator('[class*="selectable-inputs-container-"] [data-value]').getByText(name, {exact: true});
         const title = name => page.locator(`a[class*="meta-item-container-"][title="${name}"]`);
         const row = page.locator('[data-fork-home-lists] [class*="meta-row-container-"]').filter({hasText: 'Anime'});
@@ -394,7 +500,7 @@ test('Automatic lists use the full synced Library, update as records arrive, and
         await row.getByText('BUTTON_SEE_ALL', {exact: true}).click();
         await title('Older Movie').waitFor();
         await title('Fixture Show').waitFor();
-        assert.deepEqual(await load(), options.seed);
+        assert.deepEqual(load(), {...options.seed, revision: 1});
         assert.equal(indexRequests.length, 1);
         assert.equal(indexRequests[0].method, 'GET');
         assert.equal(indexRequests[0].headers.cookie, undefined);
@@ -415,7 +521,7 @@ test('Automatic lists use the full synced Library, update as records arrive, and
         await title('Older Movie').locator('[class*="menu-label-container"]').click();
         await page.getByText('Move to Live Action', {exact: true}).click();
         await title('Older Movie').waitFor({state: 'detached'});
-        const saved = await load();
+        const saved = load();
         assert.deepEqual(saved.lists[2], options.seed.lists[2]);
         assert.deepEqual(saved.lists[1].items, ['tt300']);
         await page.reload();
@@ -426,13 +532,18 @@ test('Automatic lists use the full synced Library, update as records arrive, and
         await chip('Live Action').click();
         await title('Older Movie').waitFor();
         await title('Older Unwatched').waitFor();
-        assert.deepEqual(await load(), saved);
+        assert.deepEqual(load(), saved);
         assert.equal(indexRequests.length, 1, 'Restart reuses the downloaded index');
         const dropdown = page.locator('[class*="select-input-container-"] [aria-haspopup="listbox"]');
         await dropdown.click();
         await page.getByRole('listbox').getByText('Favorites', {exact: true}).click();
         await title('Fixture Show').waitFor();
         await title('Older Unwatched').waitFor();
+        await page.goto('https://zaarrg.github.io/stremio-web-shell-fixes/#/library?forkList=live-action');
+        await boot();
+        await title('Older Movie').waitFor();
+        await title('Older Unwatched').waitFor();
+        assert.deepEqual(load(), saved);
         assert.deepEqual(errors, []);
     } finally {await browser.close();}
 });

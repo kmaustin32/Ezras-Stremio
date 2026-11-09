@@ -1,18 +1,17 @@
-## Ezra's Stremio 2.0.0 Beta 2
+## Ezra's Stremio 2.0.0 Beta 3
 
-Your Library now fills **Anime** and **Live Action** automatically. It uses the full saved Library at launch and updates when titles are added or removed. Home shows the lists after Featured Movies.
+- **Shared Library lists.** The primary and fallback web interfaces use the same local lists and category corrections for each account. Older beta data is imported from each interface when you open it. If the two interfaces stored conflicting corrections, the one already imported into the shared store takes priority.
+- **Older cards can resume.** The three-dot Play action uses the saved stream for that exact title and video, including its resume position, when one is available.
+- **Bulk edits follow the current view.** Switching Library views clears selection, so a bulk edit cannot include titles selected in the previous view.
+- **Library compatibility notice.** If a hosted interface update disables list support, Home and Library explain that the saved lists are still on the device.
+- **mpv shutdown.** The native app stops handling events when mpv shuts down. Commands use mpv’s asynchronous API without background threads that can outlive the player.
 
-- Use **All** between **Z–A** and **Anime**. Choose one Library view at a time, then sort it by **Last Watched**, **A–Z**, or **Z–A**. **Most Watched** opens ranked by watch count.
-- Anime IDs such as Kitsu and exact IMDb matches from a [public anime index](https://github.com/Fribb/anime-lists) populate **Anime**. Other titles, including unmatched titles and Western animation, go into **Live Action**. The index downloads in the background without sending your Library to the provider.
-- Use **Move to Anime** or **Move to Live Action** from a poster's three-dot menu to save a correction. **Create list**, **Add to list**, and Ctrl+click bulk selection are available for your own lists.
-- An in-place upgrade preserves Beta 1's custom lists and manual category choices. If a title was manually in both categories, **Anime** takes priority until you move it.
-
-Automatic categories rebuild from your regular Stremio Library on a new computer. Custom lists and manual corrections are stored per account on each device, separately from the Library and add-on export.
+Custom lists and manual corrections are stored per account on each Windows device. On another computer, Anime and Live Action rebuild from your regular Stremio Library.
 
 ### Windows downloads
 
-- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.0.0-beta.2/Ezras-Stremio-2.0.0-beta.2-x64.exe)
-- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.0.0-beta.2/Ezras-Stremio-2.0.0-beta.2-x64.zip)
-- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.0.0-beta.2/SHA256SUMS.txt)
+- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.0.0-beta.3/Ezras-Stremio-2.0.0-beta.3-x64.exe)
+- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.0.0-beta.3/Ezras-Stremio-2.0.0-beta.3-x64.zip)
+- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.0.0-beta.3/SHA256SUMS.txt)
 
 Use Windows 10 or 11 x64. If upgrading with the installer, retain your configuration to keep your custom mpv settings.

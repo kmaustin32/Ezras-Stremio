@@ -249,9 +249,8 @@ void HandleMpvEvents()
         case MPV_EVENT_SHUTDOWN:
         {
             std::cout<<"mpv EVENT_SHUTDOWN => terminate\n";
-            mpv_terminate_destroy(g_mpv);
-            g_mpv=nullptr;
-            break;
+            CleanupMPV();
+            return;
         }
         default:
             // ignore
@@ -262,15 +261,12 @@ void HandleMpvEvents()
 
 void HandleMpvCommand(const std::vector<std::string>& args)
 {
-    std::thread([args](){
-        if(!g_mpv || args.empty()) return;
-        std::vector<const char*> cargs;
-        for(auto &s: args) {
-            cargs.push_back(s.c_str());
-        }
-        cargs.push_back(nullptr);
-        mpv_command(g_mpv, cargs.data());
-    }).detach();
+    // Submit from the window thread, which also owns the player lifetime.
+    if (!g_mpv || args.empty()) return;
+    std::vector<const char*> command;
+    for (const auto& arg : args) command.push_back(arg.c_str());
+    command.push_back(nullptr);
+    mpv_command_async(g_mpv, 0, command.data());
 }
 
 void HandleMpvSetProp(const std::vector<std::string>& args)
@@ -283,24 +279,18 @@ void HandleMpvSetProp(const std::vector<std::string>& args)
         } catch (const std::exception&) { /* Ignore invalid volume requests. */ }
         return;
     }
-    std::thread([args](){
-        if(!g_mpv || args.size()<2) return;
-        std::string val=args[1];
-        if(val=="true")  val="yes";
-        if(val=="false") val="no";
-        mpv_set_property_string(g_mpv, args[0].c_str(), val.c_str());
-    }).detach();
+    if (!g_mpv || args.size() < 2) return;
+    const char* value = args[1] == "true" ? "yes" : args[1] == "false" ? "no" : args[1].c_str();
+    mpv_set_property_async(g_mpv, 0, args[0].c_str(), MPV_FORMAT_STRING, &value);
 }
 
 void HandleMpvObserveProp(const std::vector<std::string>& args)
 {
-    std::thread([args](){
-        if(!g_mpv || args.empty()) return;
-        std::string pname=args[0];
-        g_observedProps.insert(pname);
-        mpv_observe_property(g_mpv,0,pname.c_str(),MPV_FORMAT_NODE);
-        std::cout<<"Observing prop="<<pname<<"\n";
-    }).detach();
+    if (!g_mpv || args.empty()) return;
+    const auto& name = args[0];
+    g_observedProps.insert(name);
+    mpv_observe_property(g_mpv, 0, name.c_str(), MPV_FORMAT_NODE);
+    std::cout << "Observing prop=" << name << "\n";
 }
 
 void pauseMPV(bool allowed)

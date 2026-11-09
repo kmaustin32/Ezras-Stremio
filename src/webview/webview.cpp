@@ -6,6 +6,7 @@
 #include <iostream>
 #include <utility>
 #include <Shlwapi.h>
+#include <ShlObj.h>
 #include <wrl.h>
 #include "../core/globals.h"
 #include "../utils/crashlog.h"
@@ -15,6 +16,7 @@
 #include "../resource.h"
 #include "ForkWebAssets.h"
 #include "player_resources.h"
+#include "library_store.h"
 
 static std::wstring EmbeddedBrandImage(int resourceId)
 {
@@ -551,6 +553,27 @@ static void SetupWebMessageHandler()
             if(!msgRaw) return S_OK;
             std::wstring wstr(msgRaw.get());
             std::string str = WStringToUtf8(wstr);
+            constexpr std::string_view listPrefix = "fork-library-store:";
+            if (str.starts_with(listPrefix)) {
+                // This narrow bridge is only for the two Library front ends.
+                // Generic shell events still follow the existing handler.
+                wil::unique_cotaskmem_string source, localAppData;
+                if (FAILED(args->get_Source(&source)) || !source || str.size() > 8 * 1024 * 1024) return S_OK;
+                const auto origin = LibraryStoreOrigin(source.get());
+                if (origin.empty()) return S_OK;
+                const auto request = json::parse(str.substr(listPrefix.size()), nullptr, false);
+                if (!request.is_object() || !request.contains("requestId") || !request["requestId"].is_string() ||
+                    request["requestId"].get_ref<const std::string&>().size() != 36)
+                    return S_OK;
+                if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &localAppData)) || !localAppData) {
+                    SendToJS("fork-library-store-result", {{"requestId", request["requestId"]},
+                        {"error", "Local Library storage is unavailable."}});
+                    return S_OK;
+                }
+                SendToJS("fork-library-store-result", HandleLibraryStoreRequest(
+                    std::filesystem::path(localAppData.get()) / L"EzrasStremio" / L"Library", origin, request));
+                return S_OK;
+            }
             HandleInboundJSON(str);
 
             return S_OK;

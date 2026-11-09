@@ -323,6 +323,11 @@ PlayerPatchReport PatchCommunityPlayer(std::string& script)
         report.libraryDetails = status.find("__stremioForkLibraryDetailsPatched=true;") != std::string::npos;
         if (script.ends_with(marker)) {
             if (!report.AllApplied()) report.warning = "Some community player fixes are unavailable";
+            report.customLists = status.find("__stremioForkCustomListsPatched=true;") != std::string::npos;
+            if (!report.customLists) {
+                if (!report.warning.empty()) report.warning += "; ";
+                report.warning += "Custom Library lists are unavailable";
+            }
             return report;
         }
         // Upgrade an old patched cache without reapplying its successful edits.
@@ -346,10 +351,13 @@ PlayerPatchReport PatchCommunityPlayer(std::string& script)
     report.episodeBlur = report.episodeBlur || apply("Episode blur", PatchEpisodeSpoilerBlur);
     report.volumeFeedback = report.volumeFeedback || apply("Volume popup", PatchVolumeFeedback);
     report.libraryDetails = report.libraryDetails || apply("Library details", PatchLibraryDetails);
-    bool customLists = false;
     if (report.libraryDetails) {
-        try { customLists = PatchLibraryLists(script); }
+        try { report.customLists = PatchLibraryLists(script); }
         catch (const std::regex_error&) { /* Hosted Library keeps its original layout. */ }
+    }
+    if (!report.customLists) {
+        if (!report.warning.empty()) report.warning += "; ";
+        report.warning += "Custom Library lists are unavailable";
     }
     const auto boolean = [](bool value) { return value ? "true" : "false"; };
     script += std::string("\n;window.__stremioForkAutoplayPatched=") + boolean(report.autoplay) +
@@ -357,7 +365,7 @@ PlayerPatchReport PatchCommunityPlayer(std::string& script)
         ";window.__stremioForkEpisodeBlurPatched=" + boolean(report.episodeBlur) +
         ";window.__stremioForkVolumeFeedbackPatched=" + boolean(report.volumeFeedback) +
         ";window.__stremioForkLibraryDetailsPatched=" + boolean(report.libraryDetails) +
-        ";window.__stremioForkCustomListsPatched=" + boolean(customLists) + ";";
+        ";window.__stremioForkCustomListsPatched=" + boolean(report.customLists) + ";";
     script += "window.__stremioForkCompatibility={autoplay:window.__stremioForkAutoplayPatched,volume:window.__stremioForkVolumePatched,episodeBlur:window.__stremioForkEpisodeBlurPatched,volumeFeedback:window.__stremioForkVolumeFeedbackPatched,libraryDetails:window.__stremioForkLibraryDetailsPatched};";
     script += "window.dispatchEvent(new CustomEvent('stremio-fork-compatibility',{detail:window.__stremioForkCompatibility}));";
     script += marker;

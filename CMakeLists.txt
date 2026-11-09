@@ -100,6 +100,7 @@ set(SOURCES
         src/webview/webview.cpp
         src/webview/player_bundle_patch.cpp
         src/webview/player_resources.cpp
+        src/webview/library_store.cpp
         src/ui/mainwindow.h
         src/ui/mainwindow.cpp
         src/resource.h
@@ -141,6 +142,9 @@ if(BUILD_TESTING)
     add_executable(player-bundle-tests tests/player_bundle_test.cpp src/webview/player_bundle_patch.cpp)
     add_test(NAME player-autoplay-guard COMMAND player-bundle-tests)
     add_executable(player-bundle-patch tests/player_bundle_patch.cpp src/webview/player_bundle_patch.cpp)
+    add_executable(library-store-tests tests/library_store_test.cpp src/webview/library_store.cpp)
+    target_link_libraries(library-store-tests PRIVATE nlohmann_json::nlohmann_json OpenSSL::Crypto)
+    add_test(NAME library-store-migration COMMAND library-store-tests)
     add_executable(player-webview-test tests/player_webview_test.cpp src/webview/player_resources.cpp src/webview/player_bundle_patch.cpp)
     target_link_libraries(player-webview-test PRIVATE unofficial::webview2::webview2 CURL::libcurl shlwapi.lib ole32.lib)
     target_compile_definitions(player-webview-test PRIVATE STREMIO_PLAYER_PATCH_REVISION="${PLAYER_PATCH_REVISION}")
@@ -174,6 +178,14 @@ if(BUILD_TESTING)
     target_include_directories(display-tests PRIVATE src)
     target_link_libraries(display-tests PRIVATE ${MPV_LIBRARY})
     add_test(NAME display-modes COMMAND display-tests)
+    add_executable(mpv-shutdown-tests tests/mpv_shutdown_test.cpp src/mpv/player.cpp src/mpv/ambient.cpp
+        src/mpv/display_mode.cpp src/mpv/playback_defaults.cpp)
+    target_include_directories(mpv-shutdown-tests PRIVATE src)
+    target_link_libraries(mpv-shutdown-tests PRIVATE ${MPV_LIBRARY} nlohmann_json::nlohmann_json unofficial::webview2::webview2)
+    set_target_properties(mpv-shutdown-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/mpv-shutdown-tests")
+    add_test(NAME mpv-native-shutdown COMMAND mpv-shutdown-tests)
+    add_custom_command(TARGET mpv-shutdown-tests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${MPV_RUNTIME_DLLS} $<TARGET_FILE_DIR:mpv-shutdown-tests>)
     # Python's embedded rendering test calls the same native implementation.
     add_library(display-test-bridge SHARED tests/display_bridge.cpp src/mpv/display_mode.cpp)
     set_target_properties(display-test-bridge PROPERTIES

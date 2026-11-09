@@ -107,17 +107,19 @@ test('Every combination of upstream changes preserves other fixes and unrelated 
         .replace(libraryEdits[1][1], libraryEdits[1][0]).replace(libraryEdits[2][1], libraryEdits[2][0]);
     const oldFooter = full.slice(footerStart(full)).replace(';window.__stremioForkCustomListsPatched=true', '')
         .replace('CompatibilityV6', 'CompatibilityV5');
-    const checkPatch = (name, input) => {
+    const checkPatch = (name, input, options = []) => {
         const from = path.join(folder, name + '.js'), to = from + '.patched';
         fs.writeFileSync(from, input);
-        execFileSync(executable, [from, to]);
+        execFileSync(executable, [from, to, ...options], {stdio: 'pipe'});
         return fs.readFileSync(to, 'utf8');
     };
     assert.equal(checkPatch('cache-v5', oldBody + oldFooter), full);
     const originalBoard = libraryEdits[2][0];
     const changedBoard = originalBoard.replace('["board-content"],onScroll:', '["board-content"],onScroll:/* upstream changed */');
     assert.notEqual(changedBoard, originalBoard);
-    const guarded = checkPatch('changed-board', original.replace(originalBoard, changedBoard));
+    const changed = original.replace(originalBoard, changedBoard);
+    assert.throws(() => checkPatch('changed-board-strict', changed), /Custom Library lists are unavailable/);
+    const guarded = checkPatch('changed-board', changed, ['--allow-partial']);
     assert.equal(guarded.slice(0, footerStart(guarded)), oldBody.replace(originalBoard, changedBoard));
     assert.ok(guarded.includes('__stremioForkCustomListsPatched=false;'));
     assert.ok(guarded.includes('__stremioForkLibraryDetailsPatched=true;'));
