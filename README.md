@@ -23,7 +23,7 @@
 
 ## ✨ Made for your player
 
-Everything added to this fork, from the first mpv upgrade through **1.4.0**:
+Everything added to this fork, from the first mpv upgrade through **1.5.0**:
 
 | Feature | What you get |
 | --- | --- |
@@ -42,7 +42,8 @@ Everything added to this fork, from the first mpv upgrade through **1.4.0**:
 | ⏭️ **Reliable autoplay control** | Turning off Auto play next episode stops automatic advancement and cancels its countdown. Manual Next and watch-progress handling remain available. |
 | 🎬 **Skip Intro & Skip Outro** | A translucent button fades in above the seek bar during a labeled intro or outro. Enable **Settings → Player → Controls → Look up skip timestamps** for optional [TheIntroDB](https://theintrodb.org/) coverage for videos without those chapters. A skip that ends the episode follows your autoplay preference. |
 | 🙈 **Consistent spoiler protection** | Unwatched episode thumbnails stay blurred on show pages, in the episode drawer and in the next-episode popup, including alternate images and anime using absolute episode numbers. Watched-state and setting changes update existing images. |
-| ✅ **Warmer watched markers** | Completed-episode badges and library watched markers use **#DEA066** in both modes, with checkmarks and labels retaining their contrast. |
+| ✅ **Custom watched colors** | **Settings → General → Secondary color** offers purple, amber, teal, dusty rose and sage. Amber is the default. The choice applies to watched tags and checkmark badges in both modes. |
+| ✨ **Poster hover and Library polish** | Show and movie covers zoom in a little more slowly with a soft purple glow. Library search, filters and sort chips share the squared corners of Settings dropdowns, and the selected sort uses the main purple. |
 | 🎟️ **Library shows open details** | Selecting a show in **Library** opens its episode details instead of immediately resuming a cached stream, so you can choose an episode and playback source. Movies, Continue Watching and explicit Play actions keep their behavior. |
 | 📚 **Readable library & add-on backup** | Export a dated ZIP with an offline HTML report, CSV lists and structured JSON, preserving saved titles, add-on order/configurations and available playback history. |
 | ⚙️ **Clearer settings & shortcuts** | Long labels wrap, options have more breathing room, narrow windows stack controls, and Player Shortcuts lists every shipped input.conf binding plus the fork controls. |
@@ -64,9 +65,9 @@ Everything added to this fork, from the first mpv upgrade through **1.4.0**:
 
 | Download | How to use it |
 | --- | --- |
-| 📥 [**1.4.0 installer — recommended**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.4.0/Ezras-Stremio-1.4.0-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
-| 💼 [**1.4.0 portable ZIP**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.4.0/Ezras-Stremio-1.4.0-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
-| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.4.0/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
+| 📥 [**1.5.0 installer — recommended**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.5.0/Ezras-Stremio-1.5.0-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
+| 💼 [**1.5.0 portable ZIP**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.5.0/Ezras-Stremio-1.5.0-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
+| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.5.0/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
 
 Use files named **Ezras-Stremio** for this fork. Downloads marked **BUILD-ONLY** are archived build dependencies. Community package-manager listings install the upstream edition; use this fork's releases for these features.
 

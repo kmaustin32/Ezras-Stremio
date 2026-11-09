@@ -39,6 +39,13 @@
     let skipMedia = null;
     let skipButton;
     let shownSkip = null;
+    const watchedAccentKey = 'stremio-fork-watched-accent';
+    const watchedAccents = {
+        '#7272C2': 'Purple', '#DEA066': 'Amber', '#61D1C7': 'Teal',
+        '#E08EB3': 'Dusty rose', '#B6D283': 'Sage'
+    };
+    const defaultWatchedAccent = '#DEA066';
+    let watchedAccent = defaultWatchedAccent;
     const appliedStyles = new WeakMap();
     const playerShortcuts = [
         {key: 'CTRL+b', keys: ['Ctrl', 'B'], label: 'Toggle ambient border blur'},
@@ -676,6 +683,59 @@
             fullscreen.before(compatibilityStatus);
     }
 
+    function applyWatchedAccent(value) {
+        watchedAccent = Object.hasOwn(watchedAccents, value) ? value : defaultWatchedAccent;
+        setStyle(document.documentElement, '--stremio-watched-accent', watchedAccent);
+        const select = document.getElementById('stremio-fork-watched-accent');
+        if (select) select.value = watchedAccent;
+    }
+
+    function loadWatchedAccent() {
+        let value;
+        try { value = localStorage.getItem(watchedAccentKey); } catch {}
+        applyWatchedAccent(value);
+    }
+
+    function updateAppearanceSettings() {
+        const settings = document.querySelector('[class*="settings-container"]');
+        const general = settings?.querySelector('[class*="user-info-option-container-"]')?.parentElement;
+        if (!general || general.querySelector('#stremio-fork-watched-accent')) return;
+        const template = settings.querySelector('[class*="option-container"]:has(> [class*="option-name-container"]):has(> [class*="option-input-container"])');
+        const name = template?.querySelector(':scope > [class*="option-name-container"]');
+        const input = template?.querySelector(':scope > [class*="option-input-container"]');
+        const label = name?.querySelector('[class*="label"]');
+        if (!label) return;
+
+        const row = document.createElement('div');
+        row.className = Array.from(template.classList).find(name => name.startsWith('option-container-'));
+        const title = document.createElement('div');
+        title.className = name.className;
+        const caption = document.createElement('label');
+        caption.className = label.className;
+        caption.htmlFor = 'stremio-fork-watched-accent';
+        caption.textContent = 'Secondary color';
+        title.append(caption);
+        const control = document.createElement('div');
+        control.className = Array.from(input.classList).find(name => name.startsWith('option-input-container-'));
+        const select = document.createElement('select');
+        select.id = caption.htmlFor;
+        for (const [color, name] of Object.entries(watchedAccents)) {
+            select.add(new Option(`${name} (${color})`, color));
+        }
+        select.value = watchedAccent;
+        select.addEventListener('change', () => {
+            applyWatchedAccent(select.value);
+            try { localStorage.setItem(watchedAccentKey, watchedAccent); } catch {}
+        });
+        control.append(select);
+        row.append(title, control);
+        general.append(row);
+    }
+
+    function applyLibraryRoute() {
+        document.documentElement.toggleAttribute('data-stremio-library', /^#\/library(?:[/?]|$)/.test(location.hash));
+    }
+
     function adjustSettingsLayout() {
         if (document.getElementById('stremio-fork-settings-layout')) return;
         const style = document.createElement('style');
@@ -704,7 +764,7 @@
             [class*="settings-container"] [class*="option-input-container"] select,
             [class*="settings-container"] [class*="option-input-container"][class*="multiselect-container"] {
                 width:100%;max-width:20rem;min-height:3.25rem;padding:.65rem 1rem!important;
-                border:1px solid #7272c280;border-radius:.75rem;font:inherit;
+                border:1px solid #7272c280;border-radius:var(--stremio-control-radius);font:inherit;
                 color:var(--primary-foreground-color,#fff);background:var(--modal-background-color,#272238);
                 cursor:pointer;color-scheme:dark;appearance:auto;
                 box-sizing:border-box;height:auto;overflow:visible;
@@ -715,7 +775,7 @@
                 outline:2px solid #7272c2;outline-offset:3px;
             }
             [class*="settings-container"] [class*="option-input-container"][class*="multiselect-container"] > [class*="menu-container"] {
-                border:1px solid #7272c280;border-radius:.75rem;box-sizing:border-box;
+                border:1px solid #7272c280;border-radius:var(--stremio-control-radius);box-sizing:border-box;
             }
             [class*="settings-container"] [class*="option-container"]:has(> [class*="option-name-container"]) {
                 max-width: 46rem !important;
@@ -756,7 +816,35 @@
     function startTheme() {
         const style = document.createElement('style');
         style.id = 'stremio-fork-theme';
+        const watchedBadge = `:is([class*="video-container"] [class*="watched-container-"]:not([class*="upcoming-watched-container-"]),
+            [class*="meta-item-container"] [class*="watched-icon-layer-"])`;
+        const poster = '[class*="meta-item-container-"] [class*="poster-container-"]';
+        const library = 'html[data-stremio-library] [class*="library-container-"]';
         style.textContent = `
+            html {--stremio-control-radius:.75rem}
+            ${poster} [class*="poster-image-layer-"] {transition:transform .18s ease-out}
+            @media (hover:hover) {
+                ${poster} {transition:box-shadow .18s ease-out}
+                [class*="meta-item-container-"]:hover:not(:focus-visible) [class*="poster-container-"] {
+                    box-shadow:0 0 0 .125rem #7272c2b3,0 0 .9rem .15rem #7272c273;
+                }
+            }
+            @media (prefers-reduced-motion:reduce) {
+                ${poster}, ${poster} [class*="poster-image-layer-"] {transition:none}
+                ${poster} [class*="poster-image-layer-"] {transform:none!important}
+            }
+            ${library} :is([class*="search-bar-container-"], [class*="select-input-container-"],
+                [class*="multiselect-button-"], [class*="chip-"], [class*="dropdown-"][role="listbox"],
+                [class*="search-bar-container-"] > [class*="menu-container-"]) {
+                border-radius:var(--stremio-control-radius);
+            }
+            ${library} :is([class*="search-bar-container-"], [class*="select-input-container-"], [class*="dropdown-"][role="listbox"]) {
+                box-shadow:inset 0 0 0 1px #7272c280;
+            }
+            ${library} [class*="selectable-inputs-container-"] [class*="chip-"] {--quaternary-accent-color:#7272C2}
+            ${library} [class*="select-input-container-"] [aria-selected="true"] > [class*="icon-"] {
+                --secondary-accent-color:#7272C2;
+            }
             html[data-stremio-dark-theme] {
                 --primary-background-color:#0B0F18!important;
                 --secondary-background-color:#161A26!important;
@@ -787,8 +875,14 @@
                 color:var(--stremio-player-control-color)!important;
             }
             [class*="addons-loading-bar"] {background-color:#7272c2!important}
-            [class*="video-container"] [class*="watched-container"]:not([class*="upcoming-watched-container"]),
-            [class*="meta-item-container"] [class*="watched-icon-layer"] {background-color:#DEA066!important}
+            ${watchedBadge} {background-color:var(--stremio-watched-accent,${defaultWatchedAccent})!important}
+            ${watchedBadge} > [class*="flag-label-"] {color:#0B0F18!important}
+            ${watchedBadge} > :is([class*="flag-icon-"], [class*="watched-icon-"]) {
+                color:var(--stremio-watched-accent,${defaultWatchedAccent})!important;
+                background:#0B0F18;
+                border-radius:50%;
+                box-shadow:0 0 0 .08rem #0B0F18;
+            }
             [class*="player-container"] [class*="volume-change-indicator"],
             [class*="player-container"] [class*="volume-change-indicator"] * {pointer-events:none!important}
             html[data-stremio-dark-theme] [class*="volume-change-indicator"] {background-color:rgba(22,26,38,.1)!important}
@@ -847,6 +941,7 @@
         recolorLogos();
         updatePlayerShortcuts();
         updateControlSettings();
+        updateAppearanceSettings();
         const player = document.querySelector('[class*="player-container"]');
         updateControls(player);
         updateVolume(player);
@@ -961,6 +1056,8 @@
         receiveCompatibility(window.__stremioForkCompatibility);
         startTheme();
         adjustSettingsLayout();
+        loadWatchedAccent();
+        applyLibraryRoute();
         applyAnimationDuration(readAnimationDuration());
         applyControlTimeout(readControlTimeout());
         startControls();
@@ -978,10 +1075,12 @@
     window.addEventListener('stremio-fork-compatibility', event => receiveCompatibility(event.detail));
     window.addEventListener('resize', schedule);
     window.addEventListener('hashchange', () => {
+        applyLibraryRoute();
         if (skipMedia?.hash !== location.hash) skipMedia?.request?.abort();
         schedule();
     });
     window.addEventListener('storage', event => {
+        if (event.key === watchedAccentKey || event.key === null) loadWatchedAccent();
         if (event.key === skipLookupKey || event.key === null) updateSkipLookup(readSkipLookup());
         if (event.key !== animationStorageKey && event.key !== timeoutStorageKey && event.key !== null) return;
         if (event.key === animationStorageKey || event.key === null) {

@@ -19,7 +19,7 @@ D3D11 playback. Use Windows 10/11 x64.
 
 ## Install and use
 
-Download `Ezras-Stremio-1.4.0-x64.exe` from this fork's release. The installer
+Download `Ezras-Stremio-1.5.0-x64.exe` from this fork's release. The installer
 installs WebView2 when needed. The `.zip` is portable but requires the system
 WebView2 runtime. Extract the ZIP into its own directory and run `stremio.exe`.
 Use the installer whose filename starts with `Ezras-Stremio`; **BUILD-ONLY** downloads are
@@ -316,7 +316,7 @@ The title in the player's upper-left header and both seek-bar time displays use 
 
 ### Watched markers and volume popup (1.3.2)
 
-Completed-episode badges and library watched markers use `#DEA066` in both modes. Checkmark/text contrast is retained; upcoming labels and the combined upcoming/watched wrapper are not recolored. The community volume-change popup speaker uses `#858B99` in Dark Mode and retains white in normal mode. Watched flags, playback state, volume commands and popup timing are unchanged.
+Completed-episode badges and library watched markers use the secondary color from Settings → General in both modes. The choice is saved in WebView storage on this device and defaults to `#DEA066`. The checkmark glyph uses the selected color on a dark backing, and badge text stays dark for contrast. The community volume-change popup speaker uses `#858B99` in Dark Mode and white in normal mode.
 
 
 ### Dark defaults and control labels (1.3.3)
