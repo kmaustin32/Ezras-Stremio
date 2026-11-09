@@ -51,6 +51,7 @@
         {key: 'CTRL+b', keys: ['Ctrl', 'B'], label: 'Toggle ambient border blur'},
         {key: 'CTRL+SHIFT+c', keys: ['Ctrl', 'Shift', 'C'], label: 'Detect baked-in black bars / restore framing', detail: 'Use during a clear, playing scene. The detected crop stays for this video; press again to restore. Blur is a separate toggle.'},
         {key: 'CTRL+SHIFT+f', keys: ['Ctrl', 'Shift', 'F'], label: 'Cycle Fit → Crop → Stretch', detail: 'Each new video starts in Fit.'},
+        {key: 'CTRL+s', keys: ['Ctrl', 'S'], label: 'Toggle subtitles', detail: 'Keeps hidden player controls out of view.'},
         {key: 'CTRL+1', keys: ['Ctrl', '1'], label: 'Anime4K: Mode A (HQ)'},
         {key: 'CTRL+2', keys: ['Ctrl', '2'], label: 'Anime4K: Mode B (HQ)'},
         {key: 'CTRL+3', keys: ['Ctrl', '3'], label: 'Anime4K: Mode C (HQ)'},
@@ -575,15 +576,39 @@
         };
         window.addEventListener('pointerup', release, true);
         window.addEventListener('pointercancel', release, true);
-        window.addEventListener('blur', release);
+        let pendingControlPlayer = null;
+        const isPlayerKeyTarget = event => controlPlayer?.contains(event.target) || event.target === document.body;
+        window.addEventListener('blur', () => {
+            pendingControlPlayer = null;
+            release();
+        });
         document.addEventListener('keydown', event => {
+            const inPlayer = isPlayerKeyTarget(event);
+            const plainControl = controlsEligible && inPlayer && event.ctrlKey &&
+                !event.shiftKey && !event.altKey && !event.metaKey;
+            // The modifier arrives before Ctrl+S. Wait for the next key or
+            // modifier release before counting a bare Control as activity.
+            if (plainControl && event.key === 'Control') {
+                pendingControlPlayer = controlPlayer;
+                return;
+            }
+            pendingControlPlayer = null;
+            if (plainControl && (event.code || event.key) === 'KeyS') return;
             if (volumeArrow(event)) {
                 // The community player still handles volume exactly once. Stop
                 // only default scrolling and its spatial-navigation polyfill.
                 event.preventDefault();
                 event.spatialNavigationPrevented = true;
             } else keyboardFocus = true;
-            if (controlPlayer?.contains(event.target) || event.target === document.body) controlActivity();
+            if (inPlayer) controlActivity();
+        }, true);
+        document.addEventListener('keyup', event => {
+            if (event.key !== 'Control' || event.ctrlKey) return;
+            const player = pendingControlPlayer;
+            pendingControlPlayer = null;
+            if (!player || player !== controlPlayer || !isPlayerKeyTarget(event)) return;
+            keyboardFocus = true;
+            controlActivity();
         }, true);
         document.addEventListener('focusin', event => {
             if (controlPlayer?.contains(event.target)) controlActivity();
@@ -821,12 +846,16 @@
         const poster = '[class*="meta-item-container-"] [class*="poster-container-"]';
         const library = 'html[data-stremio-library] [class*="library-container-"]';
         style.textContent = `
-            html {--stremio-control-radius:.75rem}
+            html {
+                --stremio-control-radius:.75rem;
+                --stremio-poster-highlight:255 255 255;
+            }
             ${poster} [class*="poster-image-layer-"] {transition:transform .18s ease-out}
             @media (hover:hover) {
                 ${poster} {transition:box-shadow .18s ease-out}
                 [class*="meta-item-container-"]:hover:not(:focus-visible) [class*="poster-container-"] {
-                    box-shadow:0 0 0 .125rem #7272c2b3,0 0 .9rem .15rem #7272c273;
+                    box-shadow:0 0 0 .125rem rgb(var(--stremio-poster-highlight) / 70%),
+                        0 0 .9rem .15rem rgb(var(--stremio-poster-highlight) / 45%);
                 }
             }
             @media (prefers-reduced-motion:reduce) {
@@ -846,6 +875,7 @@
                 --secondary-accent-color:#7272C2;
             }
             html[data-stremio-dark-theme] {
+                --stremio-poster-highlight:133 139 153;
                 --primary-background-color:#0B0F18!important;
                 --secondary-background-color:#161A26!important;
                 --modal-background-color:#161A26!important;
