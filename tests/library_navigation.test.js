@@ -123,7 +123,10 @@ test('Live Library controls use squared corners and purple selection, and real p
             ([value, color]) => getComputedStyle(document.querySelector(`[data-value="${value}"]`)).backgroundColor === color,
             [value, color]);
         const baseline = {radius: await radius(search), selected: await background(sort), zoom: await duration()};
-        await page.evaluate(() => {window.chrome = {webview: {addEventListener() {}, postMessage() {}}};});
+        await page.evaluate(() => {window.chrome = {webview: {
+            addEventListener: (_, handler) => {window.setForkTheme = dark => handler({data: {args: ['theme-changed', {dark}]}});},
+            postMessage() {}
+        }};});
         await page.addScriptTag({content: forkScript});
         await page.locator('html[data-stremio-library]').waitFor({state: 'attached'});
         const purple = 'rgb(114, 114, 194)';
@@ -155,12 +158,20 @@ test('Live Library controls use squared corners and purple selection, and real p
         assert.notEqual(await background(sort), purple);
         assert.ok(await duration() > baseline.zoom);
         await frame.hover();
-        await page.waitForFunction(() => getComputedStyle(document.querySelector('[class*="poster-container-"]')).boxShadow.includes('114, 114, 194'));
+        const waitForGlow = color => page.waitForFunction(color => {
+            const shadow = getComputedStyle(document.querySelector('[class*="poster-container-"]')).boxShadow;
+            return shadow.includes(`rgba(${color}, 0.7)`) && shadow.includes(`rgba(${color}, 0.45)`);
+        }, color);
+        await waitForGlow('133, 139, 153');
+        await page.evaluate(() => window.setForkTheme(false));
+        await waitForGlow('255, 255, 255');
+        await page.evaluate(() => window.setForkTheme(true));
+        await waitForGlow('133, 139, 153');
         await page.waitForFunction(() => getComputedStyle(document.querySelector('[class*="poster-image-layer-"]')).transform === 'matrix(1.05, 0, 0, 1.05, 0, 0)');
         await page.emulateMedia({reducedMotion: 'reduce'});
         assert.equal(await duration(), 0);
         assert.equal(await cover.evaluate(node => getComputedStyle(node).transform), 'none');
-        assert.ok((await frame.evaluate(node => getComputedStyle(node).boxShadow)).includes('114, 114, 194'));
+        await waitForGlow('133, 139, 153');
         await page.mouse.move(2, 2);
         await page.evaluate(() => window.showLibrary('continue_watching'));
         await page.locator('html[data-stremio-library]').waitFor({state: 'detached'});

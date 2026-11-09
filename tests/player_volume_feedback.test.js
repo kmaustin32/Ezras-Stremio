@@ -59,19 +59,25 @@ async function setup(clock = false) {
             const find = term => Object.values(window.modules).find(fn => fn.toString().includes(term));
             const sliderFactory = Object.values(window.modules).find(fn => fn.toString().includes('active-slider-within') && fn.toString().includes('getBoundingClientRect'));
             const Slider = load(sliderFactory, {75394: {useRouteFocused: () => true}, 31187: {useServices: () => ({shell: {active: false}})}});
-            const preferences = {maxVolume: '225'};
+            const preferences = {maxVolume: '225', subtitleId: 'EMBEDDED_2'};
             const VolumeSlider = load(find('displayName="VolumeSlider"') || window.modules[60941], {75394: {useRouteFocused: () => true}, 84902: {Slider}, 60350: {useStorage: () => [preferences]}});
             const Indicator = load(find('displayName="VolumeChangeIndicator"'), {27708: VolumeSlider});
             const Button = req(4723).default, Icon = req(4672).default, player = req(39031);
             const toolbar = load(find('"seek-bar":"seek-bar-'));
-            const runtime = {state: {volume: 100, muted: false, paused: false, time: 20000, subtitlesTracks: [], extraSubtitlesTracks: [], audioTracks: []}, setProp: (name, value) => {
+            const runtime = {state: {volume: 100, muted: false, paused: false, time: 20000, subtitlesTracks: [{}], extraSubtitlesTracks: [], audioTracks: []}, setProp: (name, value) => {
                 window.volumeCommands.push([name, value]); window.setVolume(value);
             }};
-            window.volumeCommands = []; window.seeks = []; window.buttonClicks = 0; window.frameClicks = 0;
+            window.volumeCommands = []; window.subtitleCommands = []; window.seeks = []; window.buttonClicks = 0; window.frameClicks = 0;
+            const selectSubtitle = (kind, id) => {
+                runtime.state.selectedSubtitlesTrackId = id;
+                window.subtitleCommands.push([kind, id]);
+            };
+            window.setSavedSubtitle = id => {preferences.subtitleId = id;};
             const scope = {Oe: runtime, le: preferences, l: React, G: Indicator, de: true, lt: false, at: false, At: false,
                 Te: {seekTimeDuration: 10000, seekShortTimeDuration: 1000, escExitFullscreen: true},
                 te: {metaItem: null}, Ae: {statistics: null}, De: () => {}, kt: value => window.seeks.push(value),
                 It: () => {}, vt: () => window.setPaused(false), Wt: () => window.setPaused(true),
+                Vt: id => selectSubtitle('embedded', id), Ht: id => selectSubtitle('extra', id), we: () => window.setMenu(true),
                 J: {active: true, send: (name, args) => window.messages.push({args: [name, args]})}};
             scope.bt = new Function('scope', 'with(scope){return (' + callback + ');}') (scope);
             const mountIndicator = new Function('scope', 'with(scope){return (' + mount + ');}') ;
@@ -113,6 +119,51 @@ async function setup(clock = false) {
         return {browser, page, errors, tick, popup: page.locator('[class*="volume-change-indicator"]')};
     } catch (error) {await browser.close(); throw error;}
 }
+
+test('Real Ctrl+S toggles subtitles without revealing controls or resetting their timeout', async () => {
+    const {browser, page, errors, tick} = await setup(true);
+    const visibility = () => page.locator('#player').getAttribute('data-stremio-controls');
+    try {
+        for (const paused of [false, true]) {
+            await page.evaluate(paused => {
+                window.setPaused(paused);
+                window.setSavedSubtitle(paused ? 'external-track' : 'EMBEDDED_2');
+                window.subtitleCommands.length = 0;
+            }, paused);
+            await tick(1100);
+            assert.equal(await visibility(), 'hidden');
+            await page.keyboard.down('Control');
+            assert.equal(await visibility(), 'hidden', 'The initial modifier must not reveal controls');
+            await page.keyboard.press('s');
+            assert.equal(await visibility(), 'hidden');
+            await page.keyboard.press('s');
+            await page.keyboard.up('Control');
+            await tick(32);
+            assert.equal(await visibility(), 'hidden', 'Releasing the modifier must not flash controls');
+            assert.deepEqual(await page.evaluate(() => window.subtitleCommands),
+                [paused ? ['extra', 'external-track'] : ['embedded', 'EMBEDDED_2'], ['embedded', null]]);
+            assert.equal(await page.locator('#menu').count(), 0);
+        }
+        await page.mouse.move(500, 340);
+        await tick(800);
+        assert.equal(await visibility(), 'visible');
+        await page.keyboard.press('Control+s');
+        await tick(240);
+        assert.equal(await visibility(), 'hidden', 'The original inactivity deadline still applies');
+        await page.keyboard.press('Control');
+        assert.equal(await visibility(), 'visible', 'A standalone Control tap still wakes controls');
+        await tick(1100);
+        await page.keyboard.press('Control+ArrowRight');
+        assert.equal(await visibility(), 'visible', 'Other Control shortcuts still wake controls');
+        assert.deepEqual(await page.evaluate(() => window.seeks), [30000]);
+        await tick(1100);
+        await page.keyboard.press('s');
+        await tick(32);
+        assert.equal(await visibility(), 'visible', 'Plain S still shows the subtitle menu');
+        assert.equal(await page.locator('#menu').count(), 1);
+        assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+});
 
 test('Real player Up/Down changes volume exactly once without spatial focus movement, including repeats, caps and paused playback', async () => {
     const {browser, page, errors} = await setup();

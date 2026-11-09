@@ -1,12 +1,11 @@
-## Ezra's Stremio 1.5.0
+## Ezra's Stremio 1.5.1
 
-Choose a watched accent, browse with a softer poster hover, and use Library controls styled to match Settings.
+Poster borders match the current theme, and Ctrl+S toggles subtitles with the controls out of the way.
 
 ### What's new
 
-- **Secondary color.** In **Settings → General**, choose Purple `#7272C2`, Amber `#DEA066` (default), Teal `#61D1C7`, Dusty Rose `#E08EB3`, or Sage `#B6D283`. Watched tags and checkmark badges update immediately, and the choice is saved on this device.
-- **Poster hover.** Show and movie covers get a soft purple border glow and a gentler zoom. The cover stays still when Windows requests reduced motion.
-- **Library controls.** Search, dropdowns and sorting use the same squared corners as Settings. The selected sort and the dropdown selection dot use the main purple.
+- **Poster hover.** The border and glow use white in Light Mode and `#858B99` in Dark Mode. The cover stays still when Windows requests reduced motion.
+- **Subtitles shortcut.** Ctrl+S toggles subtitles without showing hidden player controls or restarting their inactivity timer. Press S by itself to open the subtitles menu.
 
 ### Player preferences retained
 
@@ -20,6 +19,7 @@ Up/Down volume keys, click-through volume feedback, source selection and existin
 - Fit/Crop/Stretch toolbar and tray controls with Ctrl+Shift+F, resetting to Fit for each video.
 - Picture-in-Picture beside fullscreen, synchronized with the tray.
 - Library shows open details for episode and source selection; movies, Continue Watching and explicit Play keep their behavior.
+- Library controls share the Settings corner shape, and the secondary color picker styles watched tags and checkmarks.
 - New videos start at 100% volume or a lower selected maximum. Maximum Volume updates the actual amplification limit and slider, with orange-to-red boost above 100%.
 - Autoplay off is honored at video end and cancels countdowns. Manual Next and watch-progress handling remain available.
 - Skip Intro and Skip Outro use labeled chapters, with optional timestamp lookup in Player settings.
@@ -33,14 +33,14 @@ The redesigned [README](../README.md) covers these features, installation, short
 
 ### Downloads
 
-- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.5.0/Ezras-Stremio-1.5.0-x64.exe)
-- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.5.0/Ezras-Stremio-1.5.0-x64.zip)
-- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.5.0/SHA256SUMS.txt)
+- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.5.1/Ezras-Stremio-1.5.1-x64.exe)
+- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.5.1/Ezras-Stremio-1.5.1-x64.zip)
+- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.5.1/SHA256SUMS.txt)
 
 Use Windows 10/11 x64. The installer sets up WebView2 when needed; the portable ZIP needs the system WebView2 Runtime. When upgrading, retain your configuration to keep custom mpv.conf, input.conf and other scripts. The fork's own black-bar script is updated. The original shell version and installation/profile paths are retained for upgrade compatibility.
 
 ### Validation and upstream compatibility
 
-GitHub Actions builds the installer and portable archive and runs checks for native playback, blur, framing, rendering, black-bar detection, shaders, streaming, chapter seeks, skip buttons, Library navigation and styling, poster motion, palette persistence, keyboard and popup interactions, episode-image blur, backup, WebView2 and installer branding before publication.
+GitHub Actions builds the installer and portable archive and checks native playback, blur, framing, streaming, chapter seeks, skip buttons, Library navigation, both poster themes, palette persistence, the live subtitle shortcut, other control interactions, backup, WebView2 and installer branding before publication.
 
 Theme and settings styling are isolated in the fork script; they do not rewrite the hosted community bundle or profile. Automatic upstream binary updates remain disabled. Source history is preserved for future upstream merges; incompatible hosted UI changes are reported rather than silently discarding other compatible fixes.

@@ -18,7 +18,7 @@ const executablePath = [process.env.STREMIO_TEST_BROWSER,
 test('Player shortcut catalog covers every shipped input binding and fork control', () => {
     assert.equal(byKey.size, shortcuts.length, 'No duplicate bindings');
     for (const binding of defaults) assert.ok(byKey.has(binding.key), `Document ${binding.key}`);
-    for (const key of ['CTRL+B', 'CTRL+SHIFT+F', 'CTRL+SHIFT+C', 'TAB']) assert.ok(byKey.has(key));
+    for (const key of ['CTRL+B', 'CTRL+SHIFT+F', 'CTRL+SHIFT+C', 'CTRL+S', 'TAB']) assert.ok(byKey.has(key));
     for (const binding of defaults.filter(binding => /Anime4K: Mode/.test(binding.command))) {
         const mode = binding.command.match(/show-text "([^"]+)"/)[1];
         assert.equal(byKey.get(binding.key).label, mode, 'Mode name agrees with input.conf');
