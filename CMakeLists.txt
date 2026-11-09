@@ -9,10 +9,12 @@ option(DEBUG_LOG "Allow debug logs" ON)
 include(cmake/ForkDefaults.cmake)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-player.js"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-backup.js")
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-backup.js"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-lists.js")
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-player.js" FORK_PLAYER_SCRIPT)
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-backup.js" FORK_BACKUP_SCRIPT)
-string(APPEND FORK_PLAYER_SCRIPT "\n${FORK_BACKUP_SCRIPT}")
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-lists.js" FORK_LISTS_SCRIPT)
+string(APPEND FORK_PLAYER_SCRIPT "\n${FORK_BACKUP_SCRIPT}\n${FORK_LISTS_SCRIPT}")
 foreach(mode fit crop stretch)
     set(icon "${CMAKE_CURRENT_SOURCE_DIR}/images/player/video-scale-${mode}.svg")
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${icon}")

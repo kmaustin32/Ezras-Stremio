@@ -263,14 +263,58 @@ static bool PatchLibraryDetails(std::string& script, std::string& error)
     return true;
 }
 
+static bool PatchLibraryLists(std::string& script)
+{
+    // Keep React in charge of the Library toolbar, cards and Home rows. Apply
+    // the hooks together so a changed upstream interface is safe.
+    const std::regex library(R"rx(([\w$]+)\.createElement\(([\w$]+),(\{className:([\w$]+)\["library-container"\],route:[\w$]+\}),null!==([\w$]+)\.auth)rx");
+    const std::regex card(R"rx(\.catalog\.map\(function\([\w$,]+\)\{return [\w$]+\.createElement\(([\w$]+),[\w$]+\(\{\},[\w$]+,\{notifications:([\w$]+),removable:"library"===)rx");
+    const std::regex menu(R"rx(\.createElement\([\w$]+,[\w$]+\(\{\},([\w$]+),\{watched:[\w$]+,newVideos:[\w$]+,options:([\w$]+),optionOnSelect:[\w$]+\}\)\))rx");
+    const std::regex home(R"rx(([\w$]+)\.createElement\("div",(\{ref:[\w$]+,className:[\w$]+\["board-content"\],onScroll:[\w$]+\}),)rx");
+    const std::regex redirect(R"rx(\|\|!([\w$]+)\.value\|\|\(window\.location=\1\.value\)(?=\},\[\1\.value,[\w$]+\.selected\]\),[\w$]+\.createElement\([\w$]+,\{className:[\w$]+\["library-container"\]))rx");
+    std::smatch libraryMatch, cardMatch, menuMatch, homeMatch, redirectMatch;
+    const auto unique = [&](const std::regex& pattern, std::smatch& match) {
+        const auto first = std::sregex_iterator(script.begin(), script.end(), pattern);
+        const auto end = std::sregex_iterator();
+        if (first == end || std::next(first) != end) return false;
+        match = *first;
+        return true;
+    };
+    if (!unique(library, libraryMatch) || !unique(card, cardMatch) ||
+        !unique(menu, menuMatch) || !unique(home, homeMatch) || !unique(redirect, redirectMatch)) return false;
+    const auto react = libraryMatch[1].str(), nav = libraryMatch[2].str();
+    const std::string hooks = "window.__stremioForkLists";
+    const auto libraryText = "(" + hooks + "?.library.bind(null," + react + "," + nav + "," +
+        cardMatch[1].str() + "," + cardMatch[2].str() + "," + libraryMatch[4].str() + "," +
+        libraryMatch[5].str() + ")||" + react + ".createElement.bind(null," + nav + "))(" +
+        libraryMatch[3].str() + ",null!==" + libraryMatch[5].str() + ".auth";
+    const auto options = menuMatch[2].str();
+    auto menuText = menuMatch.str();
+    menuText.replace(menuMatch.position(2) - menuMatch.position(), options.size(),
+        "(" + hooks + "?.menu(" + options + "," + menuMatch[1].str() + ".optionOnSelect)??" + options + ")");
+    const auto homeReact = homeMatch[1].str();
+    const auto homeText = "(" + hooks + "?.home.bind(null," + homeReact + ")||" +
+        homeReact + ".createElement.bind(null,\"div\"))(" + homeMatch[2].str() + ",";
+    struct Edit { size_t offset, length; std::string replacement; };
+    std::vector<Edit> edits;
+    for (const auto& [match, replacement] : {std::pair{libraryMatch, libraryText},
+            std::pair{menuMatch, menuText}, std::pair{homeMatch, homeText},
+            std::pair{redirectMatch, "||" + hooks + "?.hasListRoute()" + redirectMatch.str()}})
+        edits.push_back({static_cast<size_t>(match.position()), static_cast<size_t>(match.length()), replacement});
+    std::sort(edits.begin(), edits.end(), [](const Edit& a, const Edit& b) { return a.offset > b.offset; });
+    for (const auto& edit : edits) script.replace(edit.offset, edit.length, edit.replacement);
+    return true;
+}
+
 PlayerPatchReport PatchCommunityPlayer(std::string& script)
 {
-    constexpr const char* marker = "/* StremioForkPlayerCompatibilityV5 */";
+    constexpr const char* marker = "/* StremioForkPlayerCompatibilityV6 */";
+    constexpr const char* priorLibraryMarker = "/* StremioForkPlayerCompatibilityV5 */";
     constexpr const char* priorMarker = "/* StremioForkPlayerCompatibilityV4 */";
     constexpr const char* legacyMarker = "/* StremioForkPlayerCompatibilityV3 */";
     PlayerPatchReport report;
     const auto statusStart = script.rfind("\n;window.__stremioForkAutoplayPatched=");
-    if ((script.ends_with(marker) || script.ends_with(priorMarker) || script.ends_with(legacyMarker)) && statusStart != std::string::npos) {
+    if ((script.ends_with(marker) || script.ends_with(priorLibraryMarker) || script.ends_with(priorMarker) || script.ends_with(legacyMarker)) && statusStart != std::string::npos) {
         const auto status = script.substr(statusStart);
         report.autoplay = status.find("__stremioForkAutoplayPatched=true;") != std::string::npos;
         report.volume = status.find("__stremioForkVolumePatched=true;") != std::string::npos;
@@ -301,13 +345,19 @@ PlayerPatchReport PatchCommunityPlayer(std::string& script)
     report.volume = report.volume || apply("Maximum volume", PatchVolume);
     report.episodeBlur = report.episodeBlur || apply("Episode blur", PatchEpisodeSpoilerBlur);
     report.volumeFeedback = report.volumeFeedback || apply("Volume popup", PatchVolumeFeedback);
-    report.libraryDetails = apply("Library details", PatchLibraryDetails);
+    report.libraryDetails = report.libraryDetails || apply("Library details", PatchLibraryDetails);
+    bool customLists = false;
+    if (report.libraryDetails) {
+        try { customLists = PatchLibraryLists(script); }
+        catch (const std::regex_error&) { /* Hosted Library keeps its original layout. */ }
+    }
     const auto boolean = [](bool value) { return value ? "true" : "false"; };
     script += std::string("\n;window.__stremioForkAutoplayPatched=") + boolean(report.autoplay) +
         ";window.__stremioForkVolumePatched=" + boolean(report.volume) +
         ";window.__stremioForkEpisodeBlurPatched=" + boolean(report.episodeBlur) +
         ";window.__stremioForkVolumeFeedbackPatched=" + boolean(report.volumeFeedback) +
-        ";window.__stremioForkLibraryDetailsPatched=" + boolean(report.libraryDetails) + ";";
+        ";window.__stremioForkLibraryDetailsPatched=" + boolean(report.libraryDetails) +
+        ";window.__stremioForkCustomListsPatched=" + boolean(customLists) + ";";
     script += "window.__stremioForkCompatibility={autoplay:window.__stremioForkAutoplayPatched,volume:window.__stremioForkVolumePatched,episodeBlur:window.__stremioForkEpisodeBlurPatched,volumeFeedback:window.__stremioForkVolumeFeedbackPatched,libraryDetails:window.__stremioForkLibraryDetailsPatched};";
     script += "window.dispatchEvent(new CustomEvent('stremio-fork-compatibility',{detail:window.__stremioForkCompatibility}));";
     script += marker;

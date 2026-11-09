@@ -42,22 +42,30 @@ test('Every combination of upstream changes preserves other fixes and unrelated 
     const feedback = original.match(/null!==([\w$]+)\.state\.volume&&[\w$]+\?[\w$]+\.createElement\([\w$]+,\{muted:\1\.state\.muted,volume:\1\.state\.volume\}\):null/)[0];
     const feedbackPair = [feedback, feedback.replace(/&&[\w$]+\?/, '?')];
     assert.ok(fullBody.includes(feedbackPair[1]));
-    function librarySource(bundle) {
+    function moduleSources(bundle) {
         const context = {window: {}};
         const anchor = '(()=>{var e;o.g.importScripts';
         vm.runInNewContext(bundle.replace(anchor, 'window.libraryModules=a;return;' + anchor), context);
-        return Object.values(context.window.libraryModules).map(factory => factory.toString())
-            .find(source => source.includes('removable:"library"===') && source.includes('catalog.map'));
+        return Object.values(context.window.libraryModules).map(factory => factory.toString());
     }
-    const library = [librarySource(original), librarySource(fullBody)];
-    assert.ok(library[0] && library[1] && library[0] !== library[1]);
+    const [beforeModules, afterModules] = [moduleSources(original), moduleSources(fullBody)];
+    const libraryEdits = [
+        source => source.includes('removable:"library"===') && source.includes('catalog.map'),
+        source => source.includes('LIBRARY_PLAY') && source.includes('LibraryItemMarkAsWatched'),
+        source => source.includes('["board-content"]') && source.includes('["board-container"]')
+    ].map(predicate => {
+        const before = beforeModules.find(predicate), after = afterModules.find(predicate);
+        assert.ok(before && after && before !== after);
+        return [before, after];
+    });
+    const library = libraryEdits[0];
     const features = [
         {key: 'autoplay', edits: [autoplay, countdown], break: [autoplay[0], autoplay[0].replace('function(){', 'function (){')]},
         {key: 'volume', edits: [volume, keyboard, storagePair], break: [volume[0], volume[0].replace('function(', 'function (')]},
         {key: 'episodeBlur', edits: beforeEpisodes.map((source, index) => [source, afterEpisodes[index]]),
             break: [beforeEpisodes[0], beforeEpisodes[0].replaceAll('.blurred,', '.blurred /* upstream changed */,')]},
         {key: 'volumeFeedback', edits: [feedbackPair], break: [feedback, feedback.replace('volume&&', 'volume /* upstream changed */&&')]},
-        {key: 'libraryDetails', edits: [library], break: [library[0], library[0].replace('removable:"library"===', 'removable:/* upstream changed */"library"===')]}
+        {key: 'libraryDetails', edits: libraryEdits, break: [library[0], library[0].replace('removable:"library"===', 'removable:/* upstream changed */"library"===')]}
     ];
     for (let mask = 0; mask < 32; mask++) {
         let input = original, expectedBody = fullBody;
@@ -89,4 +97,28 @@ test('Every combination of upstream changes preserves other fixes and unrelated 
             assert.throws(() => execFileSync(executable, [inputFile, outputFile + '.strict'], {stdio: 'pipe'}),
                 'Release verification must still reject an incompatible current upstream interface');
     }
+    const libraryWithoutLists = library[1]
+        .replace(/\|\|window\.__stremioForkLists\?\.hasListRoute\(\)/, '')
+        .replace(/\(window\.__stremioForkLists\?\.library\.bind\(null,([\w$]+),([\w$]+),[\w$,]+\)\|\|\1\.createElement\.bind\(null,\2\)\)/, '$1.createElement.bind(null,$2)');
+    // A previous release's patched cache can be upgraded in place. Build its
+    // Library module from the old hook, keeping the detail-route override.
+    const oldLibrary = libraryWithoutLists.replace(/([\w$]+)\.createElement\.bind\(null,([\w$]+)\)\(/, '$1.createElement($2,');
+    const oldBody = fullBody.replace(library[1], oldLibrary)
+        .replace(libraryEdits[1][1], libraryEdits[1][0]).replace(libraryEdits[2][1], libraryEdits[2][0]);
+    const oldFooter = full.slice(footerStart(full)).replace(';window.__stremioForkCustomListsPatched=true', '')
+        .replace('CompatibilityV6', 'CompatibilityV5');
+    const checkPatch = (name, input) => {
+        const from = path.join(folder, name + '.js'), to = from + '.patched';
+        fs.writeFileSync(from, input);
+        execFileSync(executable, [from, to]);
+        return fs.readFileSync(to, 'utf8');
+    };
+    assert.equal(checkPatch('cache-v5', oldBody + oldFooter), full);
+    const originalBoard = libraryEdits[2][0];
+    const changedBoard = originalBoard.replace('["board-content"],onScroll:', '["board-content"],onScroll:/* upstream changed */');
+    assert.notEqual(changedBoard, originalBoard);
+    const guarded = checkPatch('changed-board', original.replace(originalBoard, changedBoard));
+    assert.equal(guarded.slice(0, footerStart(guarded)), oldBody.replace(originalBoard, changedBoard));
+    assert.ok(guarded.includes('__stremioForkCustomListsPatched=false;'));
+    assert.ok(guarded.includes('__stremioForkLibraryDetailsPatched=true;'));
 });

@@ -120,6 +120,18 @@ Picture-in-Picture is beside fullscreen at the top of the player and in the tray
 
 ## 📚 Keep your library
 
+### Custom lists in 2.0.0 Beta 1
+
+- Choose **Create list** in the Library toolbar, name it, then find it in the **All / Movie / Series** dropdown.
+- Open a title's three-dot menu and choose **Add to list**. Select any number of lists in the popup.
+- **Ctrl+click** posters to select several titles. Use the toolbar's **Add to list** button or open the three-dot menu on one of the selected titles.
+- **Anime** and **Live Action** start empty and have shortcuts between **Z–A** and **Most Watched**. **Watched** and **Unwatched** filter the Library to matching titles.
+- Home shows your lists after **Featured Movies**. Membership is saved locally for your signed-in account on this device.
+
+[Download 2.0.0 Beta 1](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.0.0-beta.1)
+
+### Library and add-on backup
+
 **Settings → Library & add-on backup → Export library & add-ons** produces:
 
 | File | What it contains |

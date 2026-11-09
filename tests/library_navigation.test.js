@@ -3,12 +3,14 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const {chromium} = require('playwright');
 const forkScript = fs.readFileSync('src/webview/fork-player.js', 'utf8');
+const listsScript = fs.readFileSync('src/webview/fork-lists.js', 'utf8');
+const {decodeLists, libraryRecords, itemProps} = require('../src/webview/fork-lists');
 const executablePath = [process.env.STREMIO_TEST_BROWSER,
     'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
     'C:/Program Files/Microsoft/Edge/Application/msedge.exe'].find(path => path && fs.existsSync(path));
 let assets;
 
-async function setup(withAppearance = false) {
+async function setup(withAppearance = false, withLists = false) {
     assets ||= (async () => {
         const home = await fetch('https://stremio.zarg.me/'); assert.ok(home.ok);
         const html = await home.text();
@@ -35,19 +37,26 @@ async function setup(withAppearance = false) {
         });
     }
     if (process.env.STREMIO_LIBRARY_TEST_ORIGINAL) bundle = original;
+    else if (withLists) assert.ok(native.includes('__stremioForkCustomListsPatched=true;'),
+        'Run the native bundle patcher before testing custom lists');
     const browser = await chromium.launch({executablePath, headless: true});
     try {
         const page = await browser.newPage({viewport: {width: 1280, height: 800}}), errors = [];
         page.on('pageerror', error => errors.push(error.message));
+        if (withLists) page.setDefaultTimeout(10000);
         await page.route('https://stremio.zarg.me/**', route => route.fulfill({contentType: 'text/html', body: `<html><head><style>${css}</style><style>body{margin:0;background:#222635;color:white}#app{height:100vh}.fixture-page{height:100vh;padding:30px}#details,#sources{padding:50px}#details [class*="video-container"]{width:400px}#sources [class*="stream-container"]{width:600px;min-height:100px}</style></head><body><div id="app"></div></body></html>`}));
         await page.addInitScript(() => {
             localStorage.setItem('localProfile', '{"maxVolume":"225","keep":"unchanged"}');
             localStorage.setItem('profile', '{"fixture":"account-storage-unchanged"}');
         });
         await page.goto('https://stremio.zarg.me/#/library/series');
+        if (withLists) {
+            await page.evaluate(() => {window.chrome.webview = {};});
+            await page.addScriptTag({content: listsScript});
+        }
         const anchor = '(()=>{var e;o.g.importScripts'; assert.ok(bundle.includes(anchor));
         await page.addScriptTag({content: bundle.replace(anchor, 'window.req=o;window.modules=a;return;' + anchor)});
-        await page.evaluate(withAppearance => {
+        await page.evaluate(({withAppearance, withLists}) => {
             const req = window.req, React = req(30758), ReactDOM = req(99576), h = React.createElement;
             const find = term => Object.values(window.modules).find(fn => fn.toString().includes(term));
             const load = (factory, overrides = {}) => {const module = {exports: {}}; factory(module, module.exports, Object.assign(id => Object.hasOwn(overrides, id) ? overrides[id] : req(id), req)); return module.exports;};
@@ -58,6 +67,8 @@ async function setup(withAppearance = false) {
             const LibItem = load(Object.values(window.modules).find(fn => fn.toString().includes('LIBRARY_PLAY') && fn.toString().includes('LibraryItemMarkAsWatched')),
                 {31187: {useServices: () => ({core})}, 63298: MetaItem, 32462: {t: key => key}});
             const components = req(84902), hooks = req(60350);
+            const nav = ({children, className}) => h('div', {className: 'fixture-page ' + className},
+                withAppearance && h(components.SearchBar, {title: 'Search', onChange: value => {window.searchValue = value;}}), children);
             const Video = load(Object.values(window.modules).find(fn => fn.toString().includes('seasonWatched') && fn.toString().includes('video-container')),
                 {73582: translation, 75394: {useRouteFocused: () => true}, 52600: () => ({settings: {hideSpoilers: false, interfaceLanguage: 'en'}})});
             const Stream = load(Object.values(window.modules).find(fn => fn.toString().includes('["stream-container"]') && fn.toString().includes('externalPlayer')),
@@ -66,24 +77,65 @@ async function setup(withAppearance = false) {
             let Library;
             load(Object.values(window.modules).find(fn => fn.toString().includes('removable:"library"===') && fn.toString().includes('catalog.map')), {
                 73582: translation,
-                60350: {useProfile: () => ({auth: {user: {id: 'test'}}}), useNotifications: () => ({items: {tt100: [1, 2]}}), routesRegexp: {},
+                60350: {useProfile: () => withLists ? window.fixtureProfile : ({auth: {user: {id: 'test'}}}), useNotifications: () => ({items: {tt100: [1, 2]}}), routesRegexp: {},
                     useOnScrollToBottom: () => () => {}, withCoreSuspender: component => {Library = component; return component;}},
-                78811: () => [{selected: {type: 'Ready', request: {page: 1}}, catalog: window.fixtureItems}, () => window.morePages++],
+                78811: (_, params) => [{selected: {type: withLists ? params.type : 'Ready', request: {page: 1}}, catalog: window.fixtureItems}, () => window.morePages++],
                 72715: () => {
+                    if (withLists) {
+                        const [path, query] = location.hash.split('?');
+                        const sort = new URLSearchParams(query).get('sort') || 'lastwatched';
+                        const link = (prefix, value) => prefix + '?sort=' + value;
+                        const navigate = value => {location.hash = value;};
+                        const typePath = ['#/library/series', '#/library/movie'].includes(path) ? path : '#/library';
+                        return [{value: link(typePath, sort), onSelect: navigate,
+                            options: [['', 'All'], ['/movie', 'Movie'], ['/series', 'Series']]
+                                .map(([type, label]) => ({value: link('#/library' + type, sort), label}))},
+                        {selected: [link(typePath, sort)], onSelect: navigate,
+                            options: [['lastwatched', 'Last Watched'], ['name', 'A–Z'], ['namereverse', 'Z–A'],
+                                ['timeswatched', 'Most Watched'], ['watched', 'Watched'], ['notwatched', 'Unwatched']]
+                                .map(([value, label]) => ({value: link(typePath, value), label}))}, true];
+                    }
                     const [type, setType] = React.useState('series');
                     const [sort, setSort] = React.useState('lastWatched');
                     return [{value: type, onSelect: setType, options: [{value: 'series', label: 'Series'}, {value: 'movie', label: 'Movies'}]},
                         {selected: [sort], onSelect: setSort, options: [{value: 'lastWatched', label: 'Last Watched'}, {value: 'name', label: 'Name'}]}, false];
                 },
-                84902: {...components, LibItem, MainNavBars: ({children, className}) => h('div', {className: 'fixture-page ' + className},
-                    withAppearance && h(components.SearchBar, {title: 'Search', onChange: value => {window.searchValue = value;}}), children),
-                    Chips: withAppearance ? components.Chips : () => null,
-                    MultiselectMenu: withAppearance ? components.MultiselectMenu : () => null,
+                84902: {...components, LibItem, MainNavBars: nav,
+                    Chips: withAppearance || withLists ? components.Chips : () => null,
+                    MultiselectMenu: withAppearance || withLists ? components.MultiselectMenu : () => null,
                     DelayedRenderer: ({children}) => children}
             });
             const poster = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300"><rect width="200" height="300" fill="#7272c2"/></svg>');
             window.fixtureItems = [{_id: 'tt100', type: 'series', name: 'Fixture Show', poster, posterShape: 'poster', progress: 37, watched: false,
                 deepLinks: {player: '#/player/cached-source', metaDetailsVideos: '#/detail/series/tt100', metaDetailsStreams: '#/detail/series/tt100/tt100%3A3%3A7'}}];
+            let Board;
+            if (withLists) {
+                const saved = (id, name, watched, type = 'series') => ({_id: id, name, type, poster, posterShape: 'poster',
+                    removed: false, temp: false, _mtime: '2024-01-01', state: {timesWatched: watched}});
+                const recent = {tt100: saved('tt100', 'Fixture Show', 0), tt200: saved('tt200', 'Another Show', 1)};
+                const older = {tt300: saved('tt300', 'Older Movie', 1, 'movie'), tt400: saved('tt400', 'Older Unwatched', 0)};
+                window.fixtureItems.push({...recent.tt200, watched: true, deepLinks: {metaDetailsVideos: '#/detail/series/tt200'}});
+                window.setFixtureAccount = uid => {
+                    window.fixtureProfile = {auth: {user: {_id: uid}}, settings: {streamingServerWarningDismissed: new Date(0)}};
+                    localStorage.setItem('profile', JSON.stringify(window.fixtureProfile));
+                    if (uid === 'test') {
+                        localStorage.setItem('library', JSON.stringify({uid, items: older}));
+                        localStorage.setItem('library_recent', JSON.stringify({uid, items: recent}));
+                    }
+                };
+                window.setFixtureAccount('test');
+                const translate = {string: key => key, catalogTitle: catalog => catalog.name + ' ' + (catalog.type === 'movie' ? 'Movies' : 'Series')};
+                const row = load(find('CATALOG_PREVIEW_SIZE-c.length'), {20107: () => translate});
+                const featuredItem = window.fixtureItems[0];
+                const catalog = (name, type) => ({name, type, content: {type: 'Ready', content: [featuredItem]}});
+                const boardFactory = Object.values(window.modules).find(factory => factory.toString().includes('["board-content"]') && factory.toString().includes('["board-container"]'));
+                Board = load(boardFactory, {60350: {...hooks, useProfile: () => window.fixtureProfile,
+                    useStreamingServer: () => ({settings: {type: 'Ready'}}), useNotifications: () => ({}),
+                    withCoreSuspender: component => component, getVisibleChildrenRange: () => null},
+                    84902: {...components, MainNavBars: nav, MetaRow: row, MetaItem, EventModal: () => null},
+                    20107: () => translate, 53993: () => ({items: []}),
+                    47649: () => [{catalogs: [catalog('Featured', 'series'), catalog('Featured', 'movie'), catalog('Popular', 'movie')]}, () => {}]});
+            }
             function App() {
                 const [hash, setHash] = React.useState(location.hash), [model, setModel] = React.useState('library');
                 const [revision, update] = React.useState(0);
@@ -91,6 +143,7 @@ async function setup(withAppearance = false) {
                 window.rerenderItems = items => {window.fixtureItems = items; update(value => value + 1);};
                 React.useEffect(() => {const changed = () => {setHash(location.hash); if (location.hash.startsWith('#/player/')) window.playRequests.push(location.hash);}; window.addEventListener('hashchange', changed); return () => window.removeEventListener('hashchange', changed);}, []);
                 if (hash.startsWith('#/player/')) return h('div', {id: 'player-request'}, hash);
+                if (Board && hash === '#/') return h(Board);
                 if (hash.startsWith('#/detail/')) {
                     if (hash.split('/').length >= 5) return h('div', {id: 'sources'}, h('h1', null, 'Choose source'), ...['a', 'b'].map((id, index) => h(Stream, {
                         key: id, videoId: 'tt100:3:7', addonName: 'Source ' + id.toUpperCase(), name: 'Source ' + id.toUpperCase(), description: index ? '2160p chosen source' : '1080p alternate source', progress: 37,
@@ -98,15 +151,161 @@ async function setup(withAppearance = false) {
                     return h('div', {id: 'details'}, h('h1', null, 'Fixture Show details'), h(Video, {id: 'tt100:3:7', title: 'Episode 7', season: 3, episode: 7, released: new Date('2020-01-01'), thumbnail: poster,
                         deepLinks: {player: null, metaDetailsStreams: '#/detail/series/tt100/tt100%3A3%3A7'}, onMarkVideoAsWatched: () => {}, onMarkSeasonAsWatched: () => {}}));
                 }
-                return h(Library, {model, urlParams: {type: 'series'}, queryParams: new URLSearchParams('sort=lastWatched'), 'data-revision': revision});
+                const [path, query] = hash.split('?');
+                return h(Library, {model, urlParams: {type: withLists ? path.split('/')[2] : 'series'},
+                    queryParams: new URLSearchParams(withLists ? query : 'sort=lastWatched'), 'data-revision': revision});
             }
             ReactDOM.createRoot(document.getElementById('app')).render(h(App));
-        }, withAppearance);
+        }, {withAppearance, withLists});
         const card = page.locator('[class*="meta-item-container"]').filter({hasText: 'Fixture Show'});
         await card.waitFor();
         return {browser, page, errors, card};
     } catch (error) {await browser.close(); throw error;}
 }
+
+test('List storage defaults, latest-record selection, and watched state work with older library records', () => {
+    const defaults = decodeLists(null);
+    assert.deepEqual(defaults.map(list => list.name), ['Anime', 'Live Action']);
+    defaults[0].items.push('id');
+    assert.deepEqual(decodeLists(null)[0].items, []);
+    const raw = JSON.stringify({version: 1, lists: [{id: 'anime', name: 'Anime', items: ['a', 'a']},
+        {id: 'custom', name: 'Weekend', items: ['a']}]});
+    assert.deepEqual(decodeLists(raw).map(list => [list.id, list.items]), [['anime', ['a']], ['live-action', []], ['custom', ['a']]]);
+    assert.throws(() => decodeLists('{"version":2,"lists":[]}'));
+    assert.throws(() => decodeLists('{"version":1,"lists":[{"id":"anime","name":"Anime","items":[1]}]}'));
+    const item = (id, date, state = {}) => ({_id: id, type: 'series', name: id, removed: false, temp: false, _mtime: date, state});
+    const first = item('a', '2023-01-01');
+    const latest = item('a', '2024-01-01', {timesWatched: 1, timeOffset: 30000, duration: 60000});
+    const gone = item('gone', '2024-01-01');
+    const recent = {uid: 'signed-in', items: {a: latest, gone: {...gone, removed: true}}};
+    const older = {uid: 'signed-in', items: {a: first, gone, older: item('older', '2015-01-01'), temp: {...item('temp', '2024-01-01'), temp: true}}};
+    const mismatch = {uid: 'someone-else', items: {foreign: item('foreign', '2024-01-01')}};
+    const data = libraryRecords('signed-in', [older, recent, mismatch]);
+    assert.deepEqual([...data.byId.keys()], ['a', 'older']);
+    assert.deepEqual(itemProps(data.byId.get('a')), {...itemProps(first), watched: true, progress: 50});
+    assert.equal(itemProps(data.byId.get('older')).watched, false);
+    assert.equal(libraryRecords('signed-in', [mismatch]).available, false);
+});
+
+test('Live Library creates lists, adds multiple titles to multiple lists, and places them after Featured Movies', async () => {
+    const {browser, page, errors, card} = await setup(false, true);
+    try {
+        const select = page.locator('[class*="select-input-container-"] [aria-haspopup="listbox"]');
+        const create = page.getByRole('button', {name: 'Create list'});
+        const toolbar = page.locator('[class*="selectable-inputs-container-"]');
+        const titles = () => page.locator('[class*="meta-item-container-"] [class*="title-label-"]').allTextContents();
+        const openList = async name => {
+            await select.click();
+            await page.getByRole('listbox').getByText(name, {exact: true}).click();
+        };
+        const chip = name => toolbar.locator('[data-value]').getByText(name, {exact: true});
+        const other = page.locator('[class*="meta-item-container-"]').filter({hasText: 'Another Show'});
+        assert.deepEqual(await toolbar.locator('[data-value]').allTextContents(),
+            ['Last Watched', 'A–Z', 'Z–A', 'Anime', 'Live Action', 'Most Watched', 'Watched', 'Unwatched']);
+        const createBox = await create.boundingBox(), selectBox = await select.boundingBox();
+        assert.ok(createBox.x > selectBox.x && Math.abs(createBox.y - selectBox.y) < selectBox.height);
+        await create.click();
+        const dialog = page.getByRole('dialog');
+        await dialog.getByLabel('List name').fill(' anime ');
+        await dialog.getByRole('button', {name: 'Create', exact: true}).click();
+        await dialog.getByRole('alert').getByText('A list with that name already exists.').waitFor();
+        await dialog.getByLabel('List name').fill('Weekend <Picks>');
+        await dialog.getByRole('button', {name: 'Create', exact: true}).click();
+        await page.getByText('This list is empty.').waitFor();
+        assert.match(new URL(page.url()).hash, /forkList=[a-z0-9-]+/);
+        await openList('All');
+        await card.waitFor();
+        await page.keyboard.down('Control');
+        await card.locator('[class*="poster-image-layer"]').click();
+        await other.locator('[class*="poster-image-layer"]').click();
+        await page.keyboard.up('Control');
+        await page.bringToFront();
+        assert.equal(await page.locator('[data-fork-list-selected]').count(), 2);
+        await page.getByRole('button', {name: 'Add to list (2)', exact: true}).click();
+        await dialog.getByText('Choose lists for 2 titles').waitFor();
+        await dialog.getByRole('checkbox', {name: 'Anime'}).check();
+        await dialog.getByRole('checkbox', {name: 'Weekend <Picks>'}).check();
+        await dialog.getByRole('button', {name: 'Add', exact: true}).click();
+        await dialog.waitFor({state: 'hidden'});
+        assert.equal(await page.locator('[data-fork-list-selected]').count(), 0);
+        await chip('Anime').click();
+        await page.waitForURL('**/#/library?forkList=anime');
+        await select.getByText('Anime', {exact: true}).waitFor();
+        assert.deepEqual(await titles(), ['Fixture Show', 'Another Show']);
+        await chip('A–Z').click();
+        await page.waitForURL('**/#/library?sort=name&forkList=anime');
+        await page.waitForFunction(() => document.querySelector('[class*="meta-item-container-"]').title === 'Another Show');
+        await openList('Weekend <Picks>');
+        await card.waitFor();
+        assert.deepEqual(await titles(), ['Fixture Show', 'Another Show']);
+        const menu = card.locator('[class*="menu-label-container"]');
+        await menu.click();
+        await page.getByText('Add to list', {exact: true}).click();
+        await dialog.getByText('Choose lists for 1 title').waitFor();
+        await dialog.getByRole('checkbox', {name: 'Live Action'}).check();
+        await dialog.getByRole('button', {name: 'Add', exact: true}).click();
+        await dialog.waitFor({state: 'hidden'});
+        await menu.click();
+        await page.getByText('Remove from this list', {exact: true}).click();
+        await card.waitFor({state: 'detached'});
+        await page.evaluate(() => {location.hash = '#/';});
+        const slot = page.locator('[data-fork-home-lists]');
+        await slot.getByText('Weekend <Picks>', {exact: true}).waitFor();
+        assert.deepEqual(await slot.locator('[class*="title-container-"]').allTextContents(),
+            ['Featured Movies', 'Anime', 'Live Action', 'Weekend <Picks>']);
+        assert.match(await slot.evaluate(node => node.previousElementSibling.innerText), /Featured Series/);
+        assert.match(await slot.evaluate(node => node.nextElementSibling.innerText), /Popular Movies/);
+        const animeRow = slot.locator('[class*="meta-row-container-"]').filter({hasText: 'Anime'});
+        assert.equal(await animeRow.locator('a[title="Fixture Show"]').getAttribute('href'), '#/detail/series/tt100');
+        await animeRow.getByText('BUTTON_SEE_ALL').click();
+        await card.waitFor();
+        assert.deepEqual(await titles(), ['Fixture Show', 'Another Show']);
+        assert.deepEqual(await page.evaluate(() => window.playRequests), []);
+        assert.deepEqual(await page.evaluate(() => window.dispatches), []);
+        await page.setViewportSize({width: 375, height: 800});
+        const narrow = await create.boundingBox();
+        assert.ok(narrow.x >= 0 && narrow.x + narrow.width <= 375);
+        assert.deepEqual(errors, []);
+    } catch (failure) {
+        console.error('List fixture:', page.url(), errors, await page.locator('body').innerText());
+        throw failure;
+    } finally {await browser.close();}
+});
+
+test('Watched and Unwatched exclude each other beyond the first page and custom lists stay with their account', async () => {
+    const {browser, page, errors} = await setup(false, true);
+    try {
+        const type = page.locator('[class*="select-input-container-"] [aria-haspopup="listbox"]');
+        await type.click();
+        await page.getByRole('listbox').getByText('All', {exact: true}).click();
+        const titles = () => page.locator('[class*="meta-item-container-"] [class*="title-label-"]').allTextContents();
+        const chip = name => page.locator('[class*="selectable-inputs-container-"] [data-value]').getByText(name, {exact: true});
+        await chip('Watched').click();
+        await page.locator('a[title="Older Movie"]').waitFor();
+        assert.deepEqual(await titles(), ['Another Show', 'Older Movie']);
+        await chip('Unwatched').click();
+        await page.locator('a[title="Older Unwatched"]').waitFor();
+        assert.deepEqual(await titles(), ['Fixture Show', 'Older Unwatched']);
+        await type.click();
+        await page.getByRole('listbox').getByText('Movie', {exact: true}).click();
+        await page.getByText('No matching titles.').waitFor();
+        assert.deepEqual(await titles(), []);
+        await page.getByRole('button', {name: 'Create list'}).click();
+        let dialog = page.getByRole('dialog');
+        await dialog.getByLabel('List name').fill('Private list');
+        await dialog.getByRole('button', {name: 'Create', exact: true}).click();
+        await dialog.waitFor({state: 'hidden'});
+        const privateRoute = new URL(page.url()).hash;
+        await page.evaluate(() => {window.setFixtureAccount('other'); window.rerenderItems([]);});
+        await page.waitForFunction(() => !document.querySelector('[aria-haspopup="listbox"]').textContent.includes('Private list'));
+        await page.evaluate(() => {location.hash = '#/';});
+        await page.locator('[data-fork-home-lists]').getByText('Anime', {exact: true}).waitFor();
+        assert.equal(await page.getByText('Private list', {exact: true}).count(), 0);
+        await page.evaluate(route => {window.setFixtureAccount('test'); location.hash = route;}, privateRoute);
+        await type.getByText('Private list', {exact: true}).waitFor();
+        assert.deepEqual(errors, []);
+    } finally {await browser.close();}
+});
 
 test('Live Library controls use squared corners and purple selection, and real posters glow on hover', async () => {
     const {browser, page, errors, card} = await setup(true);
