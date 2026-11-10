@@ -120,7 +120,7 @@ Picture-in-Picture is beside fullscreen at the top of the player and in the tray
 
 ## 📚 Keep your library
 
-### Library lists in 2.0.0 Beta 4
+### Library lists in 2.0.0 Beta 5
 
 - Choose **Create list** in the Library toolbar, name it, then find it in the **All / Movie / Series** dropdown.
 - Open a title's three-dot menu and choose **Add to list**. A title can belong to several custom lists and one automatic category.
@@ -132,7 +132,7 @@ Picture-in-Picture is beside fullscreen at the top of the player and in the tray
 - The primary and fallback web interfaces now use the same local lists. Older beta lists migrate when you open the corresponding interface. Switching Library views clears bulk selection, and older cards can resume the exact saved source from their three-dot menu.
 - If older browser data cannot be read, the Library shows a notice and keeps your saved lists available. When uninstalling, **Remove all data and configuration** also clears the device's saved custom lists and category corrections.
 
-[Download 2.0.0 Beta 4](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.0.0-beta.4)
+[Download 2.0.0 Beta 5](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.0.0-beta.5)
 
 ### Library and add-on backup
 

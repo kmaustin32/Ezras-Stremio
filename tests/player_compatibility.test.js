@@ -123,4 +123,12 @@ test('Every combination of upstream changes preserves other fixes and unrelated 
     assert.equal(guarded.slice(0, footerStart(guarded)), oldBody.replace(originalBoard, changedBoard));
     assert.ok(guarded.includes('__stremioForkCustomListsPatched=false;'));
     assert.ok(guarded.includes('__stremioForkLibraryDetailsPatched=true;'));
+
+    const boardHook = originalBoard.match(/[\w$]+\.createElement\("div",\{ref:[\w$]+,className:[\w$]+\["board-content"\],onScroll:[\w$]+\},/)?.[0];
+    assert.ok(boardHook);
+    const duplicateHook = `\n;void function(){return ${boardHook}null)};`;
+    const ambiguous = checkPatch('duplicate-board-hook', original + duplicateHook, ['--allow-partial']);
+    assert.equal(ambiguous.slice(0, footerStart(ambiguous)), oldBody + duplicateHook,
+        'A duplicate Home hook anywhere in the bundle must leave all custom list hooks untouched');
+    assert.ok(ambiguous.includes('__stremioForkCustomListsPatched=false;'));
 });

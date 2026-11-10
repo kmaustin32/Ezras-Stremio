@@ -3,6 +3,7 @@
 #include <cctype>
 #include <regex>
 #include <iterator>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -273,15 +274,36 @@ static bool PatchLibraryLists(std::string& script)
     const std::regex home(R"rx(([\w$]+)\.createElement\("div",(\{ref:[\w$]+,className:[\w$]+\["board-content"\],onScroll:[\w$]+\}),)rx");
     const std::regex redirect(R"rx(\|\|!([\w$]+)\.value\|\|\(window\.location=\1\.value\)(?=\},\[\1\.value,[\w$]+\.selected\]\),[\w$]+\.createElement\([\w$]+,\{className:[\w$]+\["library-container"\]))rx");
     std::smatch libraryMatch, cardMatch, menuMatch, homeMatch, redirectMatch;
-    const auto unique = [&](const std::regex& pattern, std::smatch& match) {
-        const auto first = std::sregex_iterator(script.begin(), script.end(), pattern);
-        const auto end = std::sregex_iterator();
-        if (first == end || std::next(first) != end) return false;
-        match = *first;
-        return true;
+    // Every pattern starts with its literal prefix, optionally preceded by
+    // an identifier. Check those starts only and still reject multiple matches.
+    const auto unique = [&](std::string_view prefix, const std::regex& pattern,
+                            std::smatch& match, bool leadingIdentifier = false) {
+        size_t previousEnd = 0;
+        for (auto offset = script.find(prefix); offset != std::string::npos;
+                offset = script.find(prefix, offset + prefix.size())) {
+            if (offset < previousEnd) continue;
+            auto start = offset;
+            if (leadingIdentifier) {
+                while (start > previousEnd) {
+                    const unsigned char c = script[start - 1];
+                    if (!std::isalnum(c) && c != '_' && c != '$') break;
+                    --start;
+                }
+            }
+            std::smatch candidate;
+            if (!std::regex_search(script.cbegin() + start, script.cend(), candidate,
+                    pattern, std::regex_constants::match_continuous)) continue;
+            if (!match.empty()) return false;
+            previousEnd = start + candidate.length();
+            match = std::move(candidate);
+        }
+        return !match.empty();
     };
-    if (!unique(library, libraryMatch) || !unique(card, cardMatch) ||
-        !unique(menu, menuMatch) || !unique(home, homeMatch) || !unique(redirect, redirectMatch)) return false;
+    if (!unique(".createElement(", library, libraryMatch, true) ||
+        !unique(".catalog.map(function(", card, cardMatch) ||
+        !unique(".createElement(", menu, menuMatch) ||
+        !unique(".createElement(", home, homeMatch, true) ||
+        !unique("||!", redirect, redirectMatch)) return false;
     const auto react = libraryMatch[1].str(), nav = libraryMatch[2].str();
     const std::string hooks = "window.__stremioForkLists";
     const auto libraryText = "(" + hooks + "?.library.bind(null," + react + "," + nav + "," +
@@ -300,7 +322,8 @@ static bool PatchLibraryLists(std::string& script)
     for (const auto& [match, replacement] : {std::pair{libraryMatch, libraryText},
             std::pair{menuMatch, menuText}, std::pair{homeMatch, homeText},
             std::pair{redirectMatch, "||" + hooks + "?.hasListRoute()" + redirectMatch.str()}})
-        edits.push_back({static_cast<size_t>(match.position()), static_cast<size_t>(match.length()), replacement});
+        edits.push_back({static_cast<size_t>(match[0].first - script.cbegin()),
+            static_cast<size_t>(match.length()), replacement});
     std::sort(edits.begin(), edits.end(), [](const Edit& a, const Edit& b) { return a.offset > b.offset; });
     for (const auto& edit : edits) script.replace(edit.offset, edit.length, edit.replacement);
     return true;
