@@ -522,11 +522,14 @@ test('Automatic lists use the full synced Library, update as records arrive, and
     const {browser, page, errors, indexRequests, boot, store} = await setup(false, true, options);
     try {
         const load = () => store.get('test');
-        const chip = name => page.locator('[class*="selectable-inputs-container-"] [data-value]').getByText(name, {exact: true});
-        const title = name => page.locator(`a[class*="meta-item-container-"][title="${name}"]`);
+        const library = page.locator('.fixture-page[class*="library-container-"]');
+        const chip = name => library.locator('[class*="selectable-inputs-container-"] [data-value]').getByText(name, {exact: true});
+        const title = name => library.locator(`a[class*="meta-item-container-"][title="${name}"]`);
+        const dropdown = library.locator('[class*="select-input-container-"] [aria-haspopup="listbox"]');
         const row = page.locator('[data-fork-home-lists] [class*="meta-row-container-"]').filter({hasText: 'Anime'});
         await row.getByTitle('Older Movie', {exact: true}).waitFor();
         await row.getByText('BUTTON_SEE_ALL', {exact: true}).click();
+        await dropdown.getByText('Anime', {exact: true}).waitFor();
         await title('Older Movie').waitFor();
         await title('Fixture Show').waitFor();
         assert.deepEqual(load(), {...options.seed, revision: 1});
@@ -563,7 +566,6 @@ test('Automatic lists use the full synced Library, update as records arrive, and
         await title('Older Unwatched').waitFor();
         assert.deepEqual(load(), saved);
         assert.equal(indexRequests.length, 1, 'Restart reuses the downloaded index');
-        const dropdown = page.locator('[class*="select-input-container-"] [aria-haspopup="listbox"]');
         await dropdown.click();
         await page.getByRole('listbox').getByText('Favorites', {exact: true}).click();
         await title('Fixture Show').waitFor();
