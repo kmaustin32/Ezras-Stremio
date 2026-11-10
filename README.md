@@ -23,7 +23,7 @@
 
 ## ✨ Made for your player
 
-Everything added to this fork, from the first mpv upgrade through **1.5.1**:
+Everything added to this fork, from the first mpv upgrade through **2.0.0**.
 
 | Feature | What you get |
 | --- | --- |
@@ -45,6 +45,8 @@ Everything added to this fork, from the first mpv upgrade through **1.5.1**:
 | ✅ **Custom watched colors** | **Settings → General → Secondary color** offers purple, amber, teal, dusty rose and sage. Amber is the default. The choice applies to watched tags and checkmark badges in both modes. |
 | ✨ **Poster hover and Library polish** | Show and movie covers zoom in a little more slowly, with a soft white glow in Light Mode and **#858B99** in Dark Mode. Library search, filters and sort chips share the squared corners of Settings dropdowns, and the selected sort uses the main purple. |
 | 🎟️ **Library shows open details** | Selecting a show in **Library** opens its episode details instead of immediately resuming a cached stream, so you can choose an episode and playback source. Movies, Continue Watching and explicit Play actions keep their behavior. |
+| 🗂️ **Custom Library lists** | Create lists, add a title to multiple lists, and **Ctrl+click** to select titles for a bulk edit. Lists appear on Home after Featured Movies. |
+| 🧭 **Automatic categories and separate sorting** | Anime and Live Action fill from the saved Library and remember your manual moves. Watched and Unwatched filter titles, and each list can be sorted independently. |
 | 📚 **Readable library & add-on backup** | Export a dated ZIP with an offline HTML report, CSV lists and structured JSON, preserving saved titles, add-on order/configurations and available playback history. |
 | ⚙️ **Clearer settings & shortcuts** | Long labels wrap, options have more breathing room, narrow windows stack controls, and Player Shortcuts lists every shipped input.conf binding plus the fork controls. |
 | 🌑 **A calmer Dark Mode** | **Dark Mode is the default** for new configurations, with a smooth diagonal app background gradient from **#0B0F18** in the upper left to **#161A26** in the lower right. Player icons, episode title, time labels, normal volume range and the volume popup speaker use **#858B99**. The popup background uses **#161A26 at 10% opacity**. Native playback keeps the web overlay transparent so video remains visible. Use the tray toggle to switch to white player controls in normal mode. |
@@ -65,9 +67,9 @@ Everything added to this fork, from the first mpv upgrade through **1.5.1**:
 
 | Download | How to use it |
 | --- | --- |
-| 📥 [**1.5.1 installer — recommended**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.5.1/Ezras-Stremio-1.5.1-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
-| 💼 [**1.5.1 portable ZIP**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.5.1/Ezras-Stremio-1.5.1-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
-| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v1.5.1/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
+| 📥 [**2.0.0 installer — recommended**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.0.0/Ezras-Stremio-2.0.0-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
+| 💼 [**2.0.0 portable ZIP**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.0.0/Ezras-Stremio-2.0.0-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
+| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.0.0/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
 
 Use files named **Ezras-Stremio** for this fork. Downloads marked **BUILD-ONLY** are archived build dependencies. Community package-manager listings install the upstream edition; use this fork's releases for these features.
 
@@ -120,19 +122,19 @@ Picture-in-Picture is beside fullscreen at the top of the player and in the tray
 
 ## 📚 Keep your library
 
-### Library lists in 2.0.0 Beta 5
+### Library lists
 
 - Choose **Create list** in the Library toolbar, name it, then find it in the **All / Movie / Series** dropdown.
 - Open a title's three-dot menu and choose **Add to list**. A title can belong to several custom lists and one automatic category.
 - **Ctrl+click** posters to select several titles. Use the toolbar's **Add to list** button or open the three-dot menu on one of the selected titles.
 - **All** is between **Z–A** and **Anime**. Select one Library view at a time and use **Last Watched**, **A–Z**, or **Z–A** within it. **Most Watched** starts ranked by watch count. **Watched** and **Unwatched** filter the Library.
 - **Anime** and **Live Action** fill from your saved Library, including older titles, at startup and as the Library changes. Anime IDs and a [public IMDb mapping index](https://github.com/Fribb/anime-lists) identify anime. **Live Action** is the catch-all for other titles, including unmatched titles and Western animation.
-- Use **Move to Anime** or **Move to Live Action** in the three-dot menu to save a correction. In-place updates keep your Beta 1 custom lists and category choices. Home shows the lists after **Featured Movies**.
+- Use **Move to Anime** or **Move to Live Action** in the three-dot menu to save a correction. In-place updates keep existing custom lists and category choices. Home shows the lists after **Featured Movies**.
 - Automatic categories rebuild from your Stremio Library on a new computer. Custom lists and manual moves are saved per account on each device.
-- The primary and fallback web interfaces now use the same local lists. Older beta lists migrate when you open the corresponding interface. Switching Library views clears bulk selection, and older cards can resume the exact saved source from their three-dot menu.
+- The primary and supported fallback web interfaces share the same local lists. Older beta lists migrate when you open the corresponding interface. Switching Library views clears bulk selection. Older cards can resume the exact saved source from their three-dot menu when one is available.
 - If older browser data cannot be read, the Library shows a notice and keeps your saved lists available. When uninstalling, **Remove all data and configuration** also clears the device's saved custom lists and category corrections.
 
-[Download 2.0.0 Beta 5](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.0.0-beta.5)
+[2.0.0 release notes](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.0.0)
 
 ### Library and add-on backup
 
