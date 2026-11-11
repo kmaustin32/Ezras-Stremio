@@ -213,7 +213,7 @@ async function setup(withAppearance = false, withLists = false, listFixture = {}
     } catch (error) {await browser.close(); throw error;}
 }
 
-test('Home doubles Continue Watching posters, keeps the other rows the same, and scrolls on narrow windows', async () => {
+test('Home enlarges Continue Watching posters by 50%, keeps the other rows the same, and scrolls on narrow windows', async () => {
     const {browser, page, errors} = await setup(false, true, {home: true, continueWatching: true});
     try {
         const row = page.locator('[class*="continue-watching-row-"] [class*="meta-items-container-"]');
@@ -236,7 +236,7 @@ test('Home doubles Continue Watching posters, keeps the other rows the same, and
                 return {after, before, otherBefore, otherAfter, scrollable, enabled};
             });
             assert.ok(dimensions.enabled);
-            for (let i = 0; i < 2; i++) assert.ok(Math.abs(dimensions.after[i] - 2 * dimensions.before[i]) <= 3,
+            for (let i = 0; i < 2; i++) assert.ok(Math.abs(dimensions.after[i] - 1.5 * dimensions.before[i]) <= 3,
                 `Continue Watching at ${width}px: ${JSON.stringify(dimensions)}`);
             assert.deepEqual(dimensions.otherAfter, dimensions.otherBefore);
             assert.ok(dimensions.scrollable);

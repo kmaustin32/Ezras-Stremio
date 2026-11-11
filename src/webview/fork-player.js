@@ -995,7 +995,7 @@
         // Measure the hosted layout at this width so its responsive card sizes and poster ratios carry over.
         const scroll = row.scrollLeft;
         row.removeAttribute('data-stremio-large-continue-watching');
-        const widths = cards.map((card, index) => card.offsetWidth + (posters[index]?.offsetWidth ?? 0));
+        const widths = cards.map((card, index) => card.offsetWidth + (posters[index]?.offsetWidth ?? 0) / 2);
         cards.forEach((card, index) => card.style.setProperty('--stremio-continue-card-width', widths[index] + 'px'));
         row.setAttribute('data-stremio-large-continue-watching', '');
         row.scrollLeft = scroll;
