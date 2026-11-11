@@ -133,7 +133,7 @@ Picture-in-Picture is beside fullscreen at the top of the player and in the tray
 
 1. Open **Local Profile & Search** from the Windows tray or the **Library & add-on backup** section in Settings.
 2. Under **Profile and sync**, enable Stremio copying. Return to Stremio and stay signed in while the initial Library copy finishes. You can also extract `Backup.json` from a saved backup ZIP and import it directly without signing in.
-3. Choose a folder and set a sync passphrase. For Google Drive, pick a folder inside **My Drive** in Google Drive for desktop. The same setup works with OneDrive, another desktop sync service, or a local folder.
+3. Choose a dedicated folder and set a sync passphrase. For Google Drive, pick a folder inside **My Drive** in Google Drive for desktop. A mirrored folder is available offline. The same setup works with OneDrive, another desktop sync service, or a local folder. [Google Drive folder settings](https://support.google.com/drive/answer/13401938)
 4. On another PC, pick the same synced folder and enter the same passphrase. The local Library stays available when the sync folder is unavailable.
 
 Search filters saved titles as you type. **Search catalogs** can find new titles through Cinemeta, the independent TMDB Addon, and compatible add-ons you configure. The bundled screen can play direct HTTP and HTTPS links from compatible sources. For the full Stremio player and other source types, open Stremio from the local screen.

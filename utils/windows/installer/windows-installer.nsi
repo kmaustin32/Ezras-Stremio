@@ -735,6 +735,7 @@ Section "uninstall"
     ; User chose to remove data - remove entire install folder (including .WebView2)
     RMDir /r "$INSTDIR"
     Call un.RemoveLibraryStore
+    Call un.RemoveLocalAccountStore
     Goto done
 
   keepUserData:
@@ -764,6 +765,23 @@ Function un.RemoveLibraryStore
     Delete "$1\*.json.tmp"
     RMDir "$1"
   libraryCleanupDone:
+FunctionEnd
+
+Function un.RemoveLocalAccountStore
+    ; Remove the Windows profile copy only. The chosen sync folder is external.
+    StrCmp "$LOCALAPPDATA" "" accountCleanupDone
+    StrCpy $1 "$LOCALAPPDATA\EzrasStremio"
+    System::Call 'kernel32::GetFileAttributesW(w r1)i.r0'
+    IntOp $0 $0 & 0x410
+    IntCmp $0 0x10 0 accountCleanupDone accountCleanupDone
+    StrCpy $1 "$1\Account"
+    System::Call 'kernel32::GetFileAttributesW(w r1)i.r0'
+    IntOp $0 $0 & 0x410
+    IntCmp $0 0x10 0 accountCleanupDone accountCleanupDone
+    Delete "$1\profile.json"
+    Delete "$1\profile.json.tmp"
+    RMDir "$1"
+  accountCleanupDone:
 FunctionEnd
 
 ; ------------------- ;

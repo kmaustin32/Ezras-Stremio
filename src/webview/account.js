@@ -65,9 +65,9 @@
             card.append(image, caption); row.append(card);
             return row;
         }));
-        $('enable').disabled = state.enabled;
-        $('enable').textContent = state.enabled ? 'Stremio copying enabled' : 'Enable Stremio copying';
+        $('enable').textContent = state.enabled ? 'Stop Stremio copying' : 'Enable Stremio copying';
         $('sync').disabled = $('disconnect').disabled = !state.connected;
+        $('folder').textContent = chosen || state.folder || '';
         $('addons').replaceChildren(...byPrefix('addon/').sort(([, a], [, b]) => a.order - b.order).map(([key, addon]) => {
             const item = element('li', addon.name || 'Add-on');
             item.append(' ', button('Remove', () => save('edit', {data: {[key]: null}})));
@@ -231,9 +231,13 @@
     $('pause').onclick = () => send('player', {command: 'pause'});
     $('fullscreen').onclick = () => send('player', {command: 'fullscreen'});
     document.addEventListener('keydown', event => {if (event.key === 'Escape' && active) stop();});
-    $('enable').onclick = () => save('enable', {}, 'Open Stremio while signed in to copy your account data to this PC.').catch(error => syncStatus(error.message));
+    $('enable').onclick = () => {
+        const action = state.enabled ? 'disable' : 'enable';
+        save(action, {}, state.enabled ? 'Stremio copying paused. Your local profile is still available.' :
+            'Open Stremio while signed in to copy your account data to this PC.').catch(error => syncStatus(error.message));
+    };
     $('pick').onclick = async () => {
-        try {const result = await call('pick'); if (result.folder) {$('folder').textContent = result.folder; chosen = true;}}
+        try {const result = await call('pick'); if (result.folder) {$('folder').textContent = result.folder; chosen = result.folder;}}
         catch (error) {syncStatus(error.message);}
     };
     $('connect').onsubmit = async event => {

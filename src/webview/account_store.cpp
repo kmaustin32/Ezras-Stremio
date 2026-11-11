@@ -196,6 +196,7 @@ json View(const json& state, bool localPage)
     json result = {{"enabled", state["enabled"]}, {"hasProfile", !state.at("records").empty()}};
     if (localPage) {
         result["connected"] = state.contains("syncFolder");
+        if (state.contains("syncFolder")) result["folder"] = state["syncFolder"];
         auto& data = result["data"] = json::object();
         for (const auto& [key, record] : state.at("records").items())
             if (!record.at("value").is_null()) data[key] = record["value"];
@@ -218,6 +219,7 @@ json HandleAccountRequest(const std::filesystem::path& directory, bool localPage
         if (!state.contains("device")) state["device"] = EncodeHex(Random(16));
         std::filesystem::create_directories(directory);
         if (action == "enable") state["enabled"] = true;
+        else if (action == "disable") state["enabled"] = false;
         else if (action == "disconnect") {
             state.erase("syncFolder");
             state.erase("syncKey");

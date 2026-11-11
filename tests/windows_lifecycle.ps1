@@ -50,6 +50,15 @@ try {
 
 $library = Join-Path $dataRoot 'Library'
 New-Item -ItemType Directory -Path $library -Force | Out-Null
+$account = Join-Path $dataRoot 'Account'
+New-Item -ItemType Directory -Path $account -Force | Out-Null
+$profile = Join-Path $account 'profile.json'
+$syncFolder = Join-Path $probeRoot 'simulated-drive'
+New-Item -ItemType Directory -Path $syncFolder -Force | Out-Null
+$syncFile = Join-Path $syncFolder 'Ezras-Stremio-test.ezra-profile'
+Set-Content -LiteralPath $profile -Value (@{syncFolder = $syncFolder} | ConvertTo-Json)
+Set-Content -LiteralPath "$profile.tmp" -Value 'test interrupted profile write'
+Set-Content -LiteralPath $syncFile -Value 'external test profile'
 $record = Join-Path $library (('a' * 64) + '.json')
 $temporaryRecord = "$record.tmp"
 $neighbor = Join-Path $dataRoot 'unrelated.txt'
@@ -64,10 +73,16 @@ Run-TestProcess $uninstaller "/S /keepdata _?=$install"
 if (-not (Test-Path -LiteralPath $record) -or -not (Test-Path -LiteralPath $temporaryRecord)) {
     throw 'The keep-data uninstall removed saved Library data.'
 }
+if (-not (Test-Path -LiteralPath $profile) -or -not (Test-Path -LiteralPath "$profile.tmp")) {
+    throw 'The keep-data uninstall removed the local profile.'
+}
 Run-TestProcess $installerPath "/S /nodesktopicon /D=$install"
 Run-TestProcess $uninstaller "/S _?=$install"
 if ((Test-Path -LiteralPath $library) -or -not (Test-Path -LiteralPath $neighbor)) {
     throw 'The remove-data uninstall did not clear just the Library store.'
+}
+if ((Test-Path -LiteralPath $account) -or -not (Test-Path -LiteralPath $syncFile)) {
+    throw 'The remove-data uninstall must clear the local profile and leave the chosen sync folder intact.'
 }
 
 Write-Host 'PASS: a second launch preserves settings, and both uninstall choices honor Library data.'
