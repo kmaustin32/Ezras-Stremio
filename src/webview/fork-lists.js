@@ -33,8 +33,35 @@
             ids.add(list.id);
             return {...list, items: [...new Set(list.items)]};
         });
-        return [...defaults.map(list => lists.find(saved => saved.id === list.id) || {...list, items: []}),
-            ...lists.filter(list => !defaults.some(base => base.id === list.id))];
+        for (const [index, list] of newDefaults().entries()) {
+            if (!ids.has(list.id)) lists.splice(index, 0, list);
+        }
+        return lists;
+    }
+
+    function previewListImport(current, saved) {
+        const incoming = decodeLists(saved);
+        const result = current.map(list => ({...list, items: [...list.items]}));
+        const rows = [];
+        for (const list of incoming) {
+            if (list.id === 'all' || smartLists.has(list.id)) throw new Error('A list ID is reserved.');
+            if (!categoryIds.has(list.id) && list.name.trim().length > 60) throw new Error('A list name is too long.');
+            const target = result.find(item => item.id === list.id || (!categoryIds.has(item.id) &&
+                !categoryIds.has(list.id) && item.name.trim().toLowerCase() === list.name.trim().toLowerCase()));
+            const members = new Set(target?.items ?? []);
+            const otherCategory = categoryIds.has(list.id) && result.find(item => item.id !== list.id && categoryIds.has(item.id));
+            const conflicting = new Set(otherCategory?.items ?? []);
+            let added = 0;
+            for (const id of list.items) {
+                if (members.has(id) || conflicting.has(id)) continue;
+                members.add(id);
+                added++;
+            }
+            if (target) target.items = [...members];
+            else result.push({id: list.id, name: list.name.trim(), home: list.home !== false, items: [...members]});
+            if (added || !target) rows.push({name: target?.name ?? list.name.trim(), action: target ? 'Merge' : 'Add', added});
+        }
+        return {lists: result, rows};
     }
 
     function libraryRecords(uid, buckets) {
@@ -341,6 +368,48 @@
                 h('button', {type: 'submit', disabled: busy || (!create && !chosen.size)}, create ? 'Create' : 'Add'))));
     }
 
+    function ManageLists({React, lists, close, save}) {
+        const h = React.createElement;
+        const [draft, setDraft] = React.useState(() => lists.map(({id, name, home}) => ({id, name, home: home !== false})));
+        const [busy, setBusy] = React.useState(false);
+        const [error, setError] = React.useState('');
+        const dialog = React.useRef(null);
+        React.useEffect(() => { dialog.current?.showModal(); }, []);
+        const edit = (id, values) => setDraft(items => items.map(item => item.id === id ? {...item, ...values} : item));
+        const move = (index, direction) => setDraft(items => {
+            const next = [...items], destination = index + direction;
+            [next[index], next[destination]] = [next[destination], next[index]];
+            return next;
+        });
+        return h('dialog', {ref: dialog, className: 'fork-list-dialog', 'aria-label': 'Manage lists',
+            onCancel: event => {event.preventDefault(); if (!busy) close();}},
+        h('form', {onSubmit: async event => {
+            event.preventDefault();
+            if (busy) return;
+            setBusy(true);
+            try { await save(draft); close(); }
+            catch (failure) {setError(failure.message); setBusy(false);}
+        }},
+        h('h2', null, 'Manage lists'),
+        h('div', {className: 'fork-list-management'}, draft.map((list, index) =>
+            h('div', {key: list.id},
+                categoryIds.has(list.id) ? h('strong', null, list.name) : h('input', {type: 'text', required: true,
+                    maxLength: 60, disabled: busy, value: list.name, 'aria-label': 'List name',
+                    onChange: event => edit(list.id, {name: event.target.value})}),
+                h('label', {className: 'fork-list-choice'}, h('input', {type: 'checkbox', checked: list.home, disabled: busy,
+                    onChange: event => edit(list.id, {home: event.target.checked})}), 'Show on Home'),
+                h('div', {className: 'fork-list-dialog-actions'},
+                    h('button', {type: 'button', disabled: busy || index === 0, onClick: () => move(index, -1)}, 'Move up'),
+                    h('button', {type: 'button', disabled: busy || index === draft.length - 1, onClick: () => move(index, 1)}, 'Move down'),
+                    !categoryIds.has(list.id) && h('button', {type: 'button', disabled: busy,
+                        onClick: () => setDraft(items => items.filter(item => item.id !== list.id))}, 'Delete'))))),
+        draft.length < lists.length && h('p', null, 'Saving removes the deleted lists. Their titles stay in your Library.'),
+        error && h('p', {role: 'alert'}, error),
+        h('div', {className: 'fork-list-dialog-actions'},
+            h('button', {type: 'button', disabled: busy, onClick: close}, 'Cancel'),
+            h('button', {type: 'submit', disabled: busy}, 'Save lists'))));
+    }
+
     const menuHandlers = new WeakMap();
 
     function LibraryLists({React, Nav, LibItem, notifications, styles, navProps, body, uid}) {
@@ -459,7 +528,9 @@
             React.cloneElement(sorting, {options: [...orderOptions, ...quick], selected: selectedChips, onSelect: selectChip}),
             h('div', {className: 'fork-list-toolbar-actions'},
                 selected.size > 0 && h('button', {type: 'button', onClick: () => add(selected)}, 'Add to list (' + selected.size + ')'),
-                h('button', {type: 'button', disabled: !canEdit, onClick: () => {setNotice(''); setDialog({mode: 'create'});}}, 'Create list')));
+                h('button', {type: 'button', disabled: !canEdit, onClick: () => {setNotice(''); setDialog({mode: 'create'});}}, 'Create list'),
+                h('button', {type: 'button', disabled: !canEdit,
+                    onClick: () => setDialog({mode: 'manage', lists})}, 'Manage lists')));
 
         let view = content;
         if (localMode) {
@@ -489,7 +560,27 @@
             (data?.error || notice) && h('p', {className: 'fork-list-notice', role: 'alert'}, data?.error || notice),
             data?.legacyUnreadable && h('p', {className: 'fork-list-notice', role: 'status'},
                 'Older Library lists could not be imported. Your current lists are available.'),
-            dialog && h(ListDialog, {React, mode: dialog.mode, lists, count: dialog.ids?.length,
+            dialog?.mode === 'manage' && h(ManageLists, {React, lists: dialog.lists, close: () => setDialog(null),
+                save: async draft => {
+                    const initial = new Map(dialog.lists.map(list => [list.id, list]));
+                    await changeLists(uid, current => {
+                        const byId = new Map(current.map(list => [list.id, list]));
+                        const ordered = draft.flatMap(list => {
+                            const saved = byId.get(list.id), original = initial.get(list.id);
+                            if (!saved) return [];
+                            return [{...saved, name: list.name === original.name ? saved.name : list.name.trim(),
+                                home: list.home === (original.home !== false) ? saved.home : list.home}];
+                        });
+                        ordered.push(...current.filter(list => !initial.has(list.id)));
+                        const names = ordered.map(list => list.name.trim().toLowerCase());
+                        if (names.includes('') || new Set(names).size !== names.length)
+                            throw new Error('Give each list a distinct name.');
+                        current.splice(0, current.length, ...ordered);
+                    });
+                    if (active && !draft.some(list => list.id === active.id))
+                        location.hash = libraryRoute('#/library', 'all', sort);
+                }}),
+            dialog && dialog.mode !== 'manage' && h(ListDialog, {React, mode: dialog.mode, lists, count: dialog.ids?.length,
                 close: () => setDialog(null), save: async value => {
                     let created;
                     await changeLists(uid, lists => {
@@ -526,7 +617,7 @@
                 (catalog?.type === 'movie' || /movies?/i.test(title));
         });
         const template = rows.find(row => row.props?.catalog?.content?.type === 'Ready' && row.props.itemComponent);
-        const lists = data.lists.map(list => {
+        const lists = data.lists.filter(list => list.home !== false).map(list => {
             const items = list.items.map(id => data.byId.get(id)).filter(Boolean).map(itemProps);
             const href = listLink(list.id);
             if (template) return h(template.type, {key: list.id, className: template.props.className,
@@ -547,12 +638,35 @@
     }
 
     if (typeof module !== 'undefined' && module.exports) {
-        module.exports = {decodeLists, libraryRecords, itemProps, imdbIds, classifyLists, moveTitles, streamRecords, cachedPlayerLink};
+        module.exports = {decodeLists, libraryRecords, itemProps, imdbIds, classifyLists, moveTitles, streamRecords, cachedPlayerLink, previewListImport};
         return;
     }
     if (window.top !== window.self || !window.chrome?.webview || window.__stremioForkLists ||
         !['stremio.zarg.me', 'zaarrg.github.io'].includes(location.hostname)) return;
     window.__stremioForkLists = {
+        async exportLists() {
+            const uid = accountId(parse(localStorage.getItem('profile')));
+            if (!uid) return null;
+            const entry = loadLists(uid);
+            await entry.ready;
+            if (!entry.record || accountId(parse(localStorage.getItem('profile'))) !== uid)
+                throw new Error('Your saved lists are unavailable. Open Library and try again.');
+            return {version: 1, lists: decodeLists(entry.record).map(({id, name, items, home}) => ({id, name, items, home}))};
+        },
+        async previewImport(saved) {
+            const uid = accountId(parse(localStorage.getItem('profile')));
+            if (!uid) throw new Error('Sign in before importing Library lists.');
+            const entry = loadLists(uid);
+            await entry.ready;
+            if (!entry.record || accountId(parse(localStorage.getItem('profile'))) !== uid)
+                throw new Error('Your saved lists are unavailable.');
+            const revision = entry.record.revision;
+            const preview = previewListImport(decodeLists(entry.record), saved);
+            return {rows: preview.rows, apply: () => changeLists(uid, current => {
+                if (entry.record.revision !== revision) throw new Error('Your lists changed. Open the backup again to refresh the preview.');
+                current.splice(0, current.length, ...preview.lists);
+            })};
+        },
         hasListRoute() {
             return /^#\/library(?:\/[^/?]*)?\?/.test(location.hash) && routeParams().has('forkList');
         },

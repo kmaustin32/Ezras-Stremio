@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <optional>
 #include "../core/globals.h"
 #include "../utils/crashlog.h"
 #include "../utils/helpers.h"
@@ -65,6 +66,62 @@ static nlohmann::json mpvNodeToJson(const mpv_node* node)
 // File lifecycle and skip requests are both handled on the window thread.
 static unsigned long long skipMediaSerial = 0;
 static bool skipMediaLoaded = false;
+static constexpr uint64_t shaderReplyBase = 0x455A5200;
+
+static bool IsCurrentFile(const std::string& serial)
+{
+    return g_mpv && skipMediaLoaded && serial == std::to_string(skipMediaSerial);
+}
+
+static std::optional<std::string> ReadMpvString(const char* name)
+{
+    char* value = mpv_get_property_string(g_mpv, name);
+    if (!value) return std::nullopt;
+    std::string result(value);
+    mpv_free(value);
+    return result;
+}
+
+void ApplySeriesPicture(const std::vector<std::string>& args)
+{
+    if (args.size() != 3 || !IsCurrentFile(args[0])) return;
+    const auto& shader = args[1];
+    if (shader.size() == 1 && shader[0] >= '1' && shader[0] <= '8') {
+        const auto current = ReadMpvString("glsl-shaders");
+        if (current && mpv_set_property_string(g_mpv, "file-local-options/glsl-shaders", current->c_str()) >= 0)
+            HandleMpvCommand({"keypress", "CTRL+" + shader});
+    }
+    for (const auto mode : {DisplayMode::Fit, DisplayMode::Crop, DisplayMode::Stretch}) {
+        if (args[2] == DisplayModeName(mode)) {
+            ApplyDisplayMode(g_mpv, mode);
+            NotifyDisplayModeState(true);
+            break;
+        }
+    }
+}
+
+void ApplySeriesTrack(const std::vector<std::string>& args)
+{
+    if (args.size() != 3 || !IsCurrentFile(args[0]) ||
+        (args[1] != "aid" && args[1] != "sid") || args[2].empty() || args[2].size() > 8 ||
+        (args[2].find_first_not_of("0123456789") != std::string::npos && !(args[1] == "sid" && args[2] == "no"))) return;
+    const std::string property = "file-local-options/" + args[1];
+    if (mpv_set_property_string(g_mpv, property.c_str(), args[2].c_str()) < 0)
+        AppendToCrashLog("[MPV]: Could not apply a series track preference");
+}
+
+void ResumeChangedSource(const std::vector<std::string>& args)
+{
+    if (args.size() != 2 || !IsCurrentFile(args[0]) || args[1].empty() || args[1].size() > 8 ||
+        args[1].find_first_not_of("0123456789") != std::string::npos) return;
+    int seekable = 0;
+    double duration = 0;
+    const double seconds = std::stod(args[1]);
+    if (mpv_get_property(g_mpv, "seekable", MPV_FORMAT_FLAG, &seekable) < 0 || !seekable ||
+        mpv_get_property(g_mpv, "duration", MPV_FORMAT_DOUBLE, &duration) < 0 || seconds <= 0 || seconds >= duration)
+        return;
+    HandleMpvCommand({"seek", args[1], "absolute+exact"});
+}
 
 void NotifySkipMedia()
 {
@@ -151,6 +208,21 @@ void HandleMpvEvents()
                 AppendToCrashLog("[MPV]: Could not reset video to 100% volume and Fit");
             skipMediaLoaded = true;
             NotifySkipMedia();
+            if (g_webview) {
+                json playback = {{"serial", std::to_string(skipMediaSerial)}};
+                mpv_node tracks{};
+                if (mpv_get_property(g_mpv, "track-list", MPV_FORMAT_NODE, &tracks) >= 0) {
+                    playback["tracks"] = json::array();
+                    for (const auto& track : mpvNodeToJson(&tracks)) {
+                        if (!track.is_object() || !track.contains("id") || !track.contains("type")) continue;
+                        json entry = {{"id", track["id"]}, {"type", track["type"]}};
+                        if (track.contains("lang")) entry["lang"] = track["lang"];
+                        playback["tracks"].push_back(std::move(entry));
+                    }
+                    mpv_free_node_contents(&tracks);
+                }
+                SendToJS("fork-file-loaded", playback);
+            }
             [[fallthrough]];
         case MPV_EVENT_VIDEO_RECONFIG:
         {
@@ -217,6 +289,12 @@ void HandleMpvEvents()
             SendToJS("mpv-prop-change", j);
             break;
         }
+        case MPV_EVENT_COMMAND_REPLY:
+            if (g_webview && ev->reply_userdata > shaderReplyBase && ev->reply_userdata <= shaderReplyBase + 8) {
+                SendToJS("fork-shader-command", {{"key", std::to_string(ev->reply_userdata - shaderReplyBase)},
+                    {"accepted", ev->error >= 0}});
+            }
+            break;
         case MPV_EVENT_END_FILE:
         {
             skipMediaLoaded = false;
@@ -266,7 +344,11 @@ void HandleMpvCommand(const std::vector<std::string>& args)
     std::vector<const char*> command;
     for (const auto& arg : args) command.push_back(arg.c_str());
     command.push_back(nullptr);
-    mpv_command_async(g_mpv, 0, command.data());
+    uint64_t reply = 0;
+    if (args.size() == 2 && args[0] == "keypress" && args[1].size() == 6 &&
+        args[1].starts_with("CTRL+") && args[1].back() >= '1' && args[1].back() <= '8')
+        reply = shaderReplyBase + (args[1].back() - '0');
+    mpv_command_async(g_mpv, reply, command.data());
 }
 
 void HandleMpvSetProp(const std::vector<std::string>& args)

@@ -1,5 +1,5 @@
 #pragma comment(linker, "/SUBSYSTEM:WINDOWS")
-#pragma comment(linker, "/ENTRY:mainCRTStartup")
+#pragma comment(linker, "/ENTRY:wmainCRTStartup")
 
 #include "discord_rpc.h"
 #include <windows.h>
@@ -8,6 +8,7 @@
 #include <iostream>
 #include <shellscalingapi.h>
 #include <sstream>
+#include <string_view>
 
 #include "core/globals.h"
 #include "mpv/player.h"
@@ -22,7 +23,7 @@
 #include "utils/helpers.h"
 #include "webview/webview.h"
 // This started as 1-week project so please don't take the code to seriously
-int main(int argc, char *argv[]) {
+int wmain(int argc, wchar_t *argv[]) {
   // DPI
   if (IsWindowsVersionOrGreater(10, 0, 14393)) {
     typedef BOOL(WINAPI * SetDpiCtxFn)(DPI_AWARENESS_CONTEXT);
@@ -38,14 +39,14 @@ int main(int argc, char *argv[]) {
 
   // parse cmd line
   for (int i = 1; i < argc; i++) {
-    std::string arg(argv[i]);
-    if (arg.rfind("--webui-url=", 0) == 0) {
-      g_webuiUrls.insert(g_webuiUrls.begin(), Utf8ToWstring(arg.substr(12)));
-    } else if (arg.rfind("--autoupdater-endpoint=", 0) == 0) {
-      g_updateUrl = arg.substr(23);
-    } else if (arg == "--streaming-server-disabled") {
+    const std::wstring_view arg(argv[i]);
+    if (arg.starts_with(L"--webui-url=")) {
+      g_webuiUrls.insert(g_webuiUrls.begin(), std::wstring(arg.substr(12)));
+    } else if (arg.starts_with(L"--autoupdater-endpoint=")) {
+      g_updateUrl = WStringToUtf8(std::wstring(arg.substr(23)));
+    } else if (arg == L"--streaming-server-disabled") {
       g_streamingServer = false;
-    } else if (arg == "--autoupdater-force-full") {
+    } else if (arg == L"--autoupdater-force-full") {
       g_autoupdaterForceFull = true;
     }
   }

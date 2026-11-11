@@ -8,7 +8,7 @@
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 
 // Helper for single-instance
-bool CheckSingleInstance(int argc, char* argv[], std::wstring &outProtocolArg);
+bool CheckSingleInstance(int argc, wchar_t* argv[], std::wstring &outProtocolArg);
 bool FocusExistingInstance(const std::wstring& protocolArg);
 
 // Our "ToggleFullScreen" logic

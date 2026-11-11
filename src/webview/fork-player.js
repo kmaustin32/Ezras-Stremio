@@ -978,6 +978,7 @@
         updatePip(player);
         updateCompatibility(player);
         updateSkipButton(player);
+        window.__ezrasPlayback?.update(player, state.active);
         const controls = player?.querySelector('[class*="control-bar-buttons-menu-container"]');
         if (!controls || !state.active) {
             button?.remove();

@@ -62,7 +62,7 @@
         if (profile.addonsLocked === true) throw new Error('Your installed add-on list is unavailable. Open Add-ons and try again.');
         const installed = addons(profile.addons);
         const libraryItems = [...items.values()].sort((a, b) => a.name.localeCompare(b.name) || a._id.localeCompare(b._id));
-        return {format: 'ezras-stremio-backup', version: 1, applicationVersion: '2.0.0', exportedAt: now.toISOString(),
+        return {format: 'ezras-stremio-backup', version: 1, applicationVersion: '2.1.0-beta.1', exportedAt: now.toISOString(),
             source: 'local snapshot', localLibraryParts: buckets,
             notes: [buckets === 2 ? 'Includes both recent and older library records saved on this device.' :
                 'Only one of the two local library parts was available. Recent or older titles may be missing. Open Library while online and export again.',
@@ -90,7 +90,7 @@
             <aside><strong>Local snapshot</strong><p>${escape(backup.notes.join(' '))}</p></aside>
             <h2>Saved shows and movies</h2>${table(header, rows)}${saved.length ? '' : '<p>No saved titles.</p>'}
             <h2>Installed Stremio add-ons</h2>${table(['Order', 'Name', 'Version', 'ID', 'Official'], backup.addons.map((a, i) => [i + 1, a.manifest.name, a.manifest.version, a.manifest.id, a.flags.official ? 'Yes' : 'No']))}
-            <h2>Keeping and recovering your list</h2><p>Library.csv opens in a spreadsheet. Backup.json preserves identifiers, available playback/watched state, removed/temporary library records, and configured add-on installation URLs. Automatic restore is not included in this version. A removed or temporary record is not listed as a saved title above.</p>
+            <h2>Keeping and recovering your list</h2><p>Library.csv opens in a spreadsheet. Backup.json preserves identifiers, available playback/watched state, removed/temporary library records, and configured add-on installation URLs. If this backup contains custom lists, the app can import them and their manual categories. A removed or temporary record is not listed as a saved title above.</p>
             <p>Keep the ZIP and Backup.json private: add-on URLs can contain access keys. Your Stremio login token and password are not included. Installation URLs are omitted from this report and the CSV files.</p></html>`;
         return {'Library.html': html, 'Library.csv': csv([header, ...rows]),
             'Addons.csv': csv([['Order', 'Name', 'Version', 'ID', 'Official'], ...backup.addons.map((a, i) => [i + 1, a.manifest.name, a.manifest.version, a.manifest.id, a.flags.official ? 'Yes' : 'No'])]),
@@ -98,18 +98,49 @@
     }
 
     // Standard ZIP "store" format, UTF-8 contents, standard CRCs, no CDN/library.
+    function crc(data) {
+        let value = 0xffffffff;
+        for (const byte of data) {
+            value ^= byte;
+            for (let i = 0; i < 8; ++i) value = (value >>> 1) ^ (value & 1 ? 0xedb88320 : 0);
+        }
+        return (value ^ 0xffffffff) >>> 0;
+    }
+
+    function readListBackup(buffer) {
+        if (buffer.byteLength > 48 * 1024 * 1024) throw new Error('This backup is too large.');
+        const bytes = new Uint8Array(buffer), view = new DataView(buffer);
+        const decode = new TextDecoder('utf-8', {fatal: true});
+        let json = bytes;
+        if (view.byteLength >= 4 && view.getUint32(0, true) === 0x04034b50) {
+            json = null;
+            let offset = 0;
+            while (offset + 30 <= bytes.length && view.getUint32(offset, true) === 0x04034b50) {
+                const flags = view.getUint16(offset + 6, true), method = view.getUint16(offset + 8, true);
+                const size = view.getUint32(offset + 18, true), nameLength = view.getUint16(offset + 26, true);
+                const start = offset + 30 + nameLength + view.getUint16(offset + 28, true);
+                const next = start + size;
+                if (flags & ~0x800 || method || size !== view.getUint32(offset + 22, true) || next > bytes.length)
+                    throw new Error('Choose a ZIP created by Ezra’s Stremio.');
+                if (decode.decode(bytes.subarray(offset + 30, offset + 30 + nameLength)) === 'Backup.json') {
+                    if (json) throw new Error('This ZIP contains more than one Backup.json.');
+                    json = bytes.subarray(start, next);
+                    if (crc(json) !== view.getUint32(offset + 14, true)) throw new Error('Backup.json is damaged.');
+                }
+                offset = next;
+            }
+        }
+        if (!json) throw new Error('Backup.json is missing.');
+        const backup = JSON.parse(decode.decode(json));
+        if (backup?.format !== 'ezras-stremio-backup' || backup.version !== 1 || !backup.customLists)
+            throw new Error('This backup does not contain custom Library lists.');
+        return backup.customLists;
+    }
+
     function zip(entries) {
         const encode = new TextEncoder();
         const parts = [], central = [];
         let offset = 0, centralSize = 0;
-        const crc = data => {
-            let value = 0xffffffff;
-            for (const byte of data) {
-                value ^= byte;
-                for (let i = 0; i < 8; ++i) value = (value >>> 1) ^ (value & 1 ? 0xedb88320 : 0);
-            }
-            return (value ^ 0xffffffff) >>> 0;
-        };
         const header = size => { const bytes = new Uint8Array(size); return [bytes, new DataView(bytes.buffer)]; };
         for (const [name, content] of Object.entries(entries)) {
             const filename = encode.encode(name), data = encode.encode(content), checksum = crc(data);
@@ -133,7 +164,7 @@
     }
 
     if (typeof module === 'object' && module.exports) {
-        module.exports = {collect, files, zip};
+        module.exports = {collect, files, zip, readListBackup};
         return;
     }
     if (window.top !== window.self || !window.chrome?.webview || window.__stremioForkBackup ||
@@ -146,20 +177,71 @@
         busy = true; problem = false; statusText = 'Preparing local backup…'; render();
         try {
             const backup = collect(localStorage);
+            let listWarning = '';
+            try {
+                const lists = await window.__stremioForkLists?.exportLists();
+                if (lists) backup.customLists = lists;
+            } catch {
+                listWarning = 'Custom lists were unavailable. Open Library and export again. ';
+                backup.notes.push(listWarning.trim());
+            }
             const blob = zip(files(backup));
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url; link.download = `Ezras-Stremio-backup-${backup.exportedAt.replace(/[:.]/g, '-')}.zip`;
             link.hidden = true; document.body.append(link); link.click(); link.remove();
             setTimeout(() => URL.revokeObjectURL(url), 60000);
-            problem = backup.localLibraryParts !== 2;
+            problem = backup.localLibraryParts !== 2 || Boolean(listWarning);
             statusText = `Download prepared: ${quantity(backup.counts.savedTitles, 'saved title')} and ${quantity(backup.counts.addons, 'add-on')}. Local snapshot; account synchronization was not checked. ` +
-                (problem ? 'One library part was unavailable; titles may be missing. Open Library while online and export again. ' : '') + 'Keep the ZIP private.';
+                (backup.localLibraryParts !== 2 ? 'One library part was unavailable. Open Library while online and export again. ' : '') +
+                listWarning + 'Keep the ZIP private.';
         } catch (error) {
             problem = true;
             statusText = error instanceof Error && /^(Your |The saved |Unrecognized |No library )/.test(error.message)
                 ? error.message : 'The backup could not be prepared. Your data was not changed. Please try again.';
         } finally { busy = false; render(); }
+    }
+
+    async function reviewImport(file) {
+        if (!file || busy) return;
+        const bridge = window.__stremioForkLists;
+        busy = true; problem = false; statusText = 'Reading custom lists…'; render();
+        try {
+            if (!bridge) throw new Error('Library lists are unavailable on this interface.');
+            if (file.size > 48 * 1024 * 1024) throw new Error('This backup is too large.');
+            const preview = await bridge.previewImport(readListBackup(await file.arrayBuffer()));
+            if (!preview.rows.length) {statusText = 'This backup adds no lists or memberships.'; return;}
+            const dialog = document.createElement('dialog');
+            dialog.className = 'fork-list-dialog';
+            dialog.setAttribute('aria-label', 'Import Library lists');
+            const title = document.createElement('h2'); title.textContent = 'Import Library lists';
+            const help = document.createElement('p'); help.textContent = 'Your current titles, add-ons, and manual category choices stay in place.';
+            const rows = document.createElement('ul');
+            for (const row of preview.rows) {
+                const item = document.createElement('li');
+                item.textContent = row.action + ' ' + row.name + ' · ' + row.added +
+                    (row.added === 1 ? ' membership added' : ' memberships added');
+                rows.append(item);
+            }
+            const actions = document.createElement('div'); actions.className = 'fork-list-dialog-actions';
+            const cancel = document.createElement('button'); cancel.textContent = 'Cancel';
+            const apply = document.createElement('button'); apply.textContent = 'Import lists';
+            cancel.onclick = () => dialog.close();
+            dialog.addEventListener('cancel', event => {if (apply.disabled) event.preventDefault();});
+            dialog.addEventListener('close', () => dialog.remove(), {once: true});
+            apply.onclick = async () => {
+                apply.disabled = cancel.disabled = true;
+                try {await preview.apply(); statusText = 'Library lists imported.';}
+                catch (error) {problem = true; statusText = error.message;}
+                dialog.close(); render();
+            };
+            actions.append(cancel, apply);
+            dialog.append(title, help, rows, actions);
+            document.body.append(dialog);
+            statusText = '';
+            dialog.showModal();
+        } catch (error) {problem = true; statusText = error instanceof SyntaxError ? 'Backup.json could not be read.' : error.message;}
+        finally {busy = false; render();}
     }
 
     function render() {
@@ -172,14 +254,19 @@
             const title = document.createElement('h2'); title.textContent = 'Library & add-on backup';
             title.style.cssText = 'font:inherit;font-weight:600;margin:0 0 12px';
             const detail = document.createElement('p');
-            detail.textContent = 'Save the shows, movies and installed Stremio add-ons stored on this device in one ZIP. Open Library and Add-ons while online first for the latest saved data. Includes an offline report, spreadsheet lists and a structured backup. Keep the ZIP private: add-on URLs may contain access keys. Automatic restore is not included.';
+            detail.textContent = 'Save titles, installed add-ons, and custom Library lists in one ZIP. Import custom lists from a backup to merge their memberships and manual categories. Keep the ZIP private because add-on URLs may contain access keys.';
             detail.style.cssText = 'margin:0 0 16px;max-width:70ch;opacity:.85';
             const button = document.createElement('button'); button.type = 'button'; button.textContent = 'Export library & add-ons';
             button.style.cssText = 'font:inherit;white-space:normal;max-width:100%;padding:12px 20px;border:0;border-radius:8px;background:#7272c2;color:white;cursor:pointer';
             button.addEventListener('click', download);
+            const importButton = document.createElement('button'); importButton.type = 'button'; importButton.textContent = 'Import custom lists';
+            importButton.style.cssText = button.style.cssText + ';margin:8px';
+            const file = document.createElement('input'); file.type = 'file'; file.accept = '.zip,.json'; file.hidden = true;
+            importButton.addEventListener('click', () => file.click());
+            file.addEventListener('change', () => {const selected = file.files[0]; file.value = ''; reviewImport(selected);});
             const status = document.createElement('p'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
             status.style.cssText = 'margin:12px 0 0;overflow-wrap:anywhere';
-            section.append(title, detail, button, status); container.prepend(section);
+            section.append(title, detail, button, importButton, file, status); container.prepend(section);
         }
         const button = section.querySelector('button');
         if (button.disabled !== busy) button.disabled = busy;

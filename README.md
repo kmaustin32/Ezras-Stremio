@@ -65,6 +65,8 @@ Everything added to this fork, from the first mpv upgrade through **2.0.0**.
 
 **Windows 10/11 x64** · [All releases](https://github.com/kmaustin32/Ezras-Stremio/releases)
 
+The **2.1.0 Beta 1** prerelease adds list management and import, picture and playback settings, per-series preferences, source switching, and playback diagnostics. The fork version appears alongside the version numbers in Settings. [Beta downloads and notes](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.1.0-beta.1)
+
 | Download | How to use it |
 | --- | --- |
 | 📥 [**2.0.0 installer — recommended**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.0.0/Ezras-Stremio-2.0.0-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |

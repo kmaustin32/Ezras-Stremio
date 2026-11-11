@@ -496,6 +496,61 @@ test('Unreadable older data on the fallback host leaves saved lists visible and 
     assert.equal(await page.evaluate(() => localStorage.getItem('stremio-fork-custom-lists:test')), '{broken');
 });
 
+test('Manage lists saves names, Home visibility, order, and deletions without removing Library titles', async t => {
+    const seed = {version: 1, lists: [
+        {id: 'weekend', name: 'Weekend', items: ['tt100']},
+        {id: 'favorites', name: 'Favorites', items: ['tt200']}
+    ]};
+    const {browser, page, store} = await setup(false, true, {seed});
+    t.after(() => browser.close());
+    await page.getByRole('button', {name: 'Manage lists'}).click();
+    const dialog = page.getByRole('dialog', {name: 'Manage lists'});
+    const weekend = dialog.getByRole('textbox').nth(0);
+    const favorites = dialog.getByRole('textbox').nth(1);
+    assert.equal(await weekend.inputValue(), 'Weekend');
+    assert.equal(await favorites.inputValue(), 'Favorites');
+    await weekend.fill('Weekend picks');
+    const row = dialog.locator('.fork-list-management > div').nth(2);
+    await row.getByLabel('Show on Home').uncheck();
+    await row.getByRole('button', {name: 'Move up'}).click();
+    await dialog.locator('.fork-list-management > div').last().getByRole('button', {name: 'Delete'}).click();
+    await dialog.getByRole('button', {name: 'Save lists'}).click();
+    await dialog.waitFor({state: 'detached'});
+    const saved = store.get('test').lists;
+    assert.deepEqual(saved.map(list => list.id), ['anime', 'weekend', 'live-action']);
+    assert.deepEqual(saved.find(list => list.id === 'weekend'), {id: 'weekend', name: 'Weekend picks', items: ['tt100'], home: false});
+    await page.getByTitle('Another Show', {exact: true}).waitFor();
+    await page.evaluate(() => {location.hash = '#/';});
+    const home = page.locator('[data-fork-home-lists]');
+    await home.getByText('Anime', {exact: true}).waitFor();
+    assert.equal(await home.getByText('Weekend picks', {exact: true}).count(), 0);
+});
+
+test('The backup UI previews list membership before importing into the signed-in Library', async t => {
+    const {browser, page, store} = await setup(false, true);
+    t.after(() => browser.close());
+    await page.getByRole('button', {name: 'Manage lists'}).and(page.locator(':enabled')).waitFor();
+    await page.evaluate(() => {
+        const settings = document.createElement('div');
+        settings.className = 'settings-container-fixture';
+        const sections = document.createElement('div'); sections.className = 'sections-container-fixture';
+        settings.append(sections); document.body.append(settings);
+    });
+    await page.addScriptTag({path: 'src/webview/fork-backup.js'});
+    const backup = {format: 'ezras-stremio-backup', version: 1, customLists: {version: 1,
+        lists: [{id: 'saved-for-later', name: 'Saved for later', items: ['tt100']}]}, addons: [{transportUrl: 'https://example.invalid/secret'}]};
+    await page.locator('#stremio-fork-backup input[type="file"]').setInputFiles({
+        name: 'Backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(backup))
+    });
+    const preview = page.getByRole('dialog', {name: 'Import Library lists'});
+    await preview.getByText('Add Saved for later · 1 membership added', {exact: true}).waitFor();
+    assert.doesNotMatch(await preview.innerText(), /secret/);
+    assert.ok(!store.get('test').lists.some(list => list.id === 'saved-for-later'));
+    await preview.getByRole('button', {name: 'Import lists'}).click();
+    await page.getByText('Library lists imported.', {exact: true}).waitFor();
+    assert.deepEqual(store.get('test').lists.find(list => list.id === 'saved-for-later').items, ['tt100']);
+});
+
 test('A failed Library compatibility patch shows a warning on Library and Home', async () => {
     const {browser, page, errors} = await setup(false, true);
     try {

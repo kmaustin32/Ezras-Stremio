@@ -41,6 +41,8 @@ $mutex = [Threading.Mutex]::new($false, 'SingleInstanceMtx_StremioWebShell', [re
 try {
     if (-not $created) { throw 'The single-instance mutex is already in use.' }
     Run-TestProcess (Join-Path $probeApp 'stremio.exe')
+    python "$PSScriptRoot/windows_unicode_launch.py" (Join-Path $probeApp 'stremio.exe')
+    if ($LASTEXITCODE) { throw 'Unicode second-launch forwarding failed.' }
     if ((Get-FileHash -LiteralPath $config).Hash -ne $before) { throw 'A second launch overwrote saved settings.' }
 } finally {
     $mutex.Dispose()

@@ -47,7 +47,7 @@ bool FocusExistingInstance(const std::wstring &protocolArg)
     return false;
 }
 
-bool CheckSingleInstance(int argc, char* argv[], std::wstring &outProtocolArg)
+bool CheckSingleInstance(int argc, wchar_t* argv[], std::wstring &outProtocolArg)
 {
     g_hMutex = CreateMutexW(nullptr, FALSE, L"SingleInstanceMtx_StremioWebShell");
     if(!g_hMutex){
@@ -60,14 +60,10 @@ bool CheckSingleInstance(int argc, char* argv[], std::wstring &outProtocolArg)
     const bool alreadyRunning = GetLastError() == ERROR_ALREADY_EXISTS;
     std::wstring protocolArg;
     for(int i=1; i<argc; ++i){
-        int size_needed = MultiByteToWideChar(CP_UTF8, 0, argv[i], -1, NULL, 0);
-        if(size_needed > 0){
-            std::wstring argW(size_needed - 1, 0);
-            MultiByteToWideChar(CP_UTF8, 0, argv[i], -1, &argW[0], size_needed);
-            if(argW.rfind(L"stremio://",0)==0 || argW.rfind(L"magnet:",0)==0 || FileExists(argW)) {
-                protocolArg = argW;
-                break;
-            }
+        const std::wstring arg(argv[i]);
+        if(arg.starts_with(L"stremio://") || arg.starts_with(L"magnet:") || FileExists(arg)) {
+            protocolArg = arg;
+            break;
         }
     }
 
@@ -190,10 +186,23 @@ void HandleEvent(const std::string &ev, std::vector<std::string> &args)
         NotifySkipMedia();
     } else if (ev == "seek-skip-segment") {
         SeekSkipSegment(args);
+    } else if (ev == "set-fork-series-picture") {
+        ApplySeriesPicture(args);
+    } else if (ev == "set-fork-series-track") {
+        ApplySeriesTrack(args);
+    } else if (ev == "resume-fork-source") {
+        ResumeChangedSource(args);
     } else if (ev == "cycle-display-mode") {
         if (HasNativeVideo() && !CycleDisplayMode(g_mpv))
             AppendToCrashLog("[MPV]: Could not change display mode");
         NotifyDisplayModeState(HasNativeVideo());
+    } else if (ev == "set-fork-display-mode" && args.size() == 1 && HasNativeVideo()) {
+        for (const auto mode : {DisplayMode::Fit, DisplayMode::Crop, DisplayMode::Stretch}) {
+            if (args[0] != DisplayModeName(mode)) continue;
+            if (!ApplyDisplayMode(g_mpv, mode)) AppendToCrashLog("[MPV]: Could not change display mode");
+            NotifyDisplayModeState(HasNativeVideo());
+            break;
+        }
     } else if(ev=="mpv-command"){
         // Allow list check
         std::string cmdName = args.empty() ? "" : ToLowerStr(args[0]);

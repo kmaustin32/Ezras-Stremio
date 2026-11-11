@@ -16,6 +16,9 @@ void HandleMpvSetProp(const std::vector<std::string>& args);
 void HandleMpvObserveProp(const std::vector<std::string>& args);
 void NotifySkipMedia();
 void SeekSkipSegment(const std::vector<std::string>& args);
+void ApplySeriesPicture(const std::vector<std::string>& args);
+void ApplySeriesTrack(const std::vector<std::string>& args);
+void ResumeChangedSource(const std::vector<std::string>& args);
 
 // For pausing
 void pauseMPV(bool allowed);
