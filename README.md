@@ -23,7 +23,7 @@
 
 ## ✨ Made for your player
 
-Everything added to this fork, from the first mpv upgrade through **2.0.0**.
+Everything added to this fork, from the first mpv upgrade through **2.1.1**.
 
 | Feature | What you get |
 | --- | --- |
@@ -38,16 +38,18 @@ Everything added to this fork, from the first mpv upgrade through **2.0.0**.
 | ⏲️ **One control timeout everywhere** | Immediately after animation speed, **Settings → Player → Controls → Control player timeout** offers **0.5**, **1 by default**, **2**, **5** and **Never hide**. Saved on this device and applied immediately during playback and pause, after mouse or keyboard activity. Never hide keeps controls and the pointer available in both states. |
 | 🔊 **Volume that follows your settings** | New videos start at 100%, or a lower selected maximum. Changing Maximum Volume rescales the slider and updates mpv's actual boost limit, including above the old 130% cap. The normal range matches the player controls; the boosted range fades from orange to red. Toolbar and popup sliders stay synchronized. |
 | ⌨ **Volume keys that stay on volume** | **Up / Down** change volume in 5% steps during playback and pause without moving focus into the toolbar. Menus, editors and focused sliders keep their own keyboard behavior; Tab/Enter and existing shortcuts remain available. |
-| 🔈 **Reliable volume feedback** | The original speaker popup appears on volume changes even while paused, with visible controls or with Never hide enabled. Its own 1.5-second timer resets on each change; moving the mouse does not dismiss it. Read-only feedback lets video clicks pass through. |
+| 🔈 **Quiet startup and volume feedback** | Automatic startup volume resets keep the speaker popup hidden. Manual changes show the popup, even during pause or with Never hide enabled, and restart its 1.5-second timer. |
+| ℹ️ **Translucent info drawer** | Press **I** for the episode or movie information drawer. Its background uses **6% transparency** in both themes, with fully opaque text and controls. |
 | ⏭️ **Reliable autoplay control** | Turning off Auto play next episode stops automatic advancement and cancels its countdown. Manual Next and watch-progress handling remain available. |
 | 🎬 **Skip Intro & Skip Outro** | A translucent button fades in above the seek bar during a labeled intro or outro. Enable **Settings → Player → Controls → Look up skip timestamps** for optional [TheIntroDB](https://theintrodb.org/) coverage for videos without those chapters. A skip that ends the episode follows your autoplay preference. |
 | 🙈 **Consistent spoiler protection** | Unwatched episode thumbnails stay blurred on show pages, in the episode drawer and in the next-episode popup, including alternate images and anime using absolute episode numbers. Watched-state and setting changes update existing images. |
 | ✅ **Custom watched colors** | **Settings → General → Secondary color** offers purple, amber, teal, dusty rose and sage. Amber is the default. The choice applies to watched tags and checkmark badges in both modes. |
 | ✨ **Poster hover and Library polish** | Show and movie covers zoom in a little more slowly, with a soft white glow in Light Mode and **#858B99** in Dark Mode. Library search, filters and sort chips share the squared corners of Settings dropdowns, and the selected sort uses the main purple. |
 | 🎟️ **Library shows open details** | Selecting a show in **Library** opens its episode details instead of immediately resuming a cached stream, so you can choose an episode and playback source. Movies, Continue Watching and explicit Play actions keep their behavior. |
-| 🗂️ **Custom Library lists** | Create lists, add a title to multiple lists, and **Ctrl+click** to select titles for a bulk edit. Lists appear on Home after Featured Movies. |
+| 🗂️ **Custom Library lists** | Create lists, add a title to multiple lists, and **Ctrl+click** to select titles for a bulk edit. Manage list names, order, and visibility on Home from the Library toolbar. |
 | 🧭 **Automatic categories and separate sorting** | Anime and Live Action fill from the saved Library and remember your manual moves. Watched and Unwatched filter titles, and each list can be sorted independently. |
-| 📚 **Readable library & add-on backup** | Export a dated ZIP with an offline HTML report, CSV lists and structured JSON, preserving saved titles, add-on order/configurations and available playback history. |
+| 📚 **Readable library & add-on backup** | Export a dated ZIP with an offline HTML report, CSV lists and structured JSON. Preview and merge custom list memberships and manual category assignments from a backup. |
+| 🎨 **Picture and playback panel** | Confirm shader changes, adjust border blur and framing, save per-series preferences, change sources with optional resume, and copy playback diagnostics. |
 | ⚙️ **Clearer settings & shortcuts** | Long labels wrap, options have more breathing room, narrow windows stack controls, and Player Shortcuts lists every shipped input.conf binding plus the fork controls. |
 | 🌑 **A calmer Dark Mode** | **Dark Mode is the default** for new configurations, with a smooth diagonal app background gradient from **#0B0F18** in the upper left to **#161A26** in the lower right. Player icons, episode title, time labels, normal volume range and the volume popup speaker use **#858B99**. The popup background uses **#161A26 at 10% opacity**. Native playback keeps the web overlay transparent so video remains visible. Use the tray toggle to switch to white player controls in normal mode. |
 | 🟣 **A matching playback bar** | The seek bar and its handle, selected navigation icons, episode-thumbnail progress and playback-source progress and the add-on loading bar use **#7272c2** in both modes. Volume keeps its orange-to-red boost indicator. |
@@ -65,15 +67,13 @@ Everything added to this fork, from the first mpv upgrade through **2.0.0**.
 
 **Windows 10/11 x64** · [All releases](https://github.com/kmaustin32/Ezras-Stremio/releases)
 
-The **2.1.0 Beta 1** prerelease adds list management and import, picture and playback settings, per-series preferences, source switching, and playback diagnostics. The fork version appears alongside the version numbers in Settings. [Beta downloads and notes](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.1.0-beta.1)
-
-**2.1.1 Beta 2** keeps the volume popup hidden from the moment a video opens and gives the **I**-key info drawer a subtly translucent background. [Beta downloads and notes](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.1.1-beta.2)
+The fork version appears alongside the other version numbers in Settings. Windows preserves Unicode filenames when opening local videos. [2.1.1 release notes](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.1.1)
 
 | Download | How to use it |
 | --- | --- |
-| 📥 [**2.0.0 installer — recommended**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.0.0/Ezras-Stremio-2.0.0-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
-| 💼 [**2.0.0 portable ZIP**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.0.0/Ezras-Stremio-2.0.0-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
-| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.0.0/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
+| 📥 [**2.1.1 installer — recommended**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.1/Ezras-Stremio-2.1.1-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
+| 💼 [**2.1.1 portable ZIP**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.1/Ezras-Stremio-2.1.1-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
+| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.1/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
 
 Use files named **Ezras-Stremio** for this fork. Downloads marked **BUILD-ONLY** are archived build dependencies. Community package-manager listings install the upstream edition; use this fork's releases for these features.
 
@@ -118,6 +118,7 @@ The same list is available in **Settings → Player Shortcuts**. These are the s
 | **K** or **left click** | Play / pause |
 | **Up / Down** | Raise / lower volume by 5% during native playback. Menus and focused editing controls retain their normal keys. |
 | **Ctrl+S** | Toggle subtitles during playback without waking the player controls. |
+| **I** | Open or close the information drawer |
 | **J / L** | Seek backward / forward 10 seconds |
 | **[ / ]** | Decrease / increase playback speed by 0.25 |
 | **Tab** | Use the bundled anime-intro skip script after the intro starts |
@@ -129,6 +130,7 @@ Picture-in-Picture is beside fullscreen at the top of the player and in the tray
 ### Library lists
 
 - Choose **Create list** in the Library toolbar, name it, then find it in the **All / Movie / Series** dropdown.
+- Use **Manage lists** to rename, reorder, or delete lists and choose which ones appear on Home.
 - Open a title's three-dot menu and choose **Add to list**. A title can belong to several custom lists and one automatic category.
 - **Ctrl+click** posters to select several titles. Use the toolbar's **Add to list** button or open the three-dot menu on one of the selected titles.
 - **All** is between **Z–A** and **Anime**. Select one Library view at a time and use **Last Watched**, **A–Z**, or **Z–A** within it. **Most Watched** starts ranked by watch count. **Watched** and **Unwatched** filter the Library.
@@ -149,11 +151,13 @@ Picture-in-Picture is beside fullscreen at the top of the player and in the tray
 | `Library.html` | A human-readable, offline report of saved shows, movies and installed Stremio add-ons. Use browser Find or Print to PDF. |
 | `Library.csv` | Saved titles in a spreadsheet-friendly UTF-8 list. |
 | `Addons.csv` | Installed Stremio add-ons in their original order. |
-| `Backup.json` | A versioned snapshot with add-on configurations/installation URLs, recent and older library records, and available watched/playback state. |
+| `Backup.json` | A versioned snapshot with add-on configurations and installation URLs, library records, available watch progress, custom lists, and manual category assignments. |
 
 The export reads the data already saved on this device. Open Library and Add-ons online first so the account can synchronize; export itself does not contact the account server. Missing library parts are flagged, and unreadable data or account mismatches fail visibly.
 
-Keep the ZIP and JSON private: configured add-on URLs can contain access keys. Login credentials and account details are excluded. This backs up **Stremio add-ons**, not browser extensions. Automatic import/restore is not included. [More about the backup format →](docs/FORK.md#library-and-add-on-backup)
+Use **Import Library lists** to preview and merge list memberships and manual category assignments into your signed-in Library. Full library and add-on restoration remains manual.
+
+Keep the ZIP and JSON private because configured add-on URLs can contain access keys. [More about the backup format →](docs/FORK.md#library-and-add-on-backup)
 
 ## 🌟 The community foundation
 

@@ -274,18 +274,19 @@ mismatches and a locked add-on list fail visibly instead of silently truncating.
 
 The report lists current saved titles and installed Stremio add-ons, preserving
 add-on order and separate configurations. JSON also retains removed/temporary
-records and available playback/watched state. It has a format ID and schema
-version for future import tooling; automatic restore is not implemented.
+records and available playback/watched state, plus custom lists and manual
+category assignments when available. **Import Library lists** previews and
+merges these lists and assignments into the signed-in account. Full Library
+and add-on restoration remains manual.
 
 Keep the ZIP and JSON private: configured add-on URLs can contain access keys.
 Those URLs appear only in JSON. Stremio login credentials, account details and
 unrelated local storage are never exported. This backs up Stremio add-ons,
 not browser extensions or their internal settings.
 
-The implementation is isolated in `src/webview/fork-backup.js` and embedded
-with the existing fork script by CMake. It reads only the three expected
-storage entries, adds its own Settings section, and leaves community-owned
-DOM, stored data, playback and streaming code unchanged.
+The backup interface lives in `src/webview/fork-backup.js` and is embedded by
+CMake. It reads the Library and profile snapshots plus the fork's list store.
+Imports write to the list store after confirmation.
 
 For a release, pass the successful Windows run ID, exact source SHA, and version
 to the manual **Publish tested Windows build** workflow. A maintainer must

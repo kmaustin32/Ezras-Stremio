@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 env:
-  FORK_RELEASE_VERSION: 2.1.1-beta.2
+  FORK_RELEASE_VERSION: 2.1.1
 
 jobs:
   build:
