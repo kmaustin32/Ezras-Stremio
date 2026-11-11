@@ -1,4 +1,6 @@
 #include "webview.h"
+#include <atomic>
+#include <memory>
 #include <string>
 #include <thread>
 #include <cmath>
@@ -17,6 +19,147 @@
 #include "ForkWebAssets.h"
 #include "player_resources.h"
 #include "library_store.h"
+#include "account_store.h"
+
+namespace {
+struct AccountResponse { std::wstring source; nlohmann::json data; };
+std::atomic<unsigned> accountRequests = 0;
+std::wstring selectedProfileFolder;
+
+void ReplyAccount(std::wstring_view source, const json& data)
+{
+    wil::unique_cotaskmem_string current;
+    if (!g_webview || FAILED(g_webview->get_Source(&current)) || !current) return;
+    const std::wstring_view active(current.get());
+    if (source.substr(0, source.find(L'#')) != active.substr(0, active.find(L'#'))) return;
+    const auto message = SerializeWebMessage({{"type", 1}, {"object", "transport"}, {"id", 3030},
+        {"args", {"ezra-account-result", data}}});
+    g_webview->PostWebMessageAsString(message.c_str());
+}
+
+void SetupLocalProfileResources(ICoreWebView2Environment* environment)
+{
+    g_webview->AddWebResourceRequestedFilter(L"https://ezras-stremio.invalid/*", COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
+    EventRegistrationToken token;
+    g_webview->add_WebResourceRequested(Microsoft::WRL::Callback<ICoreWebView2WebResourceRequestedEventHandler>(
+        [env = wil::com_ptr<ICoreWebView2Environment>(environment)](ICoreWebView2*, ICoreWebView2WebResourceRequestedEventArgs* args) -> HRESULT {
+            wil::com_ptr<ICoreWebView2WebResourceRequest> request;
+            wil::unique_cotaskmem_string uri;
+            if (FAILED(args->get_Request(&request)) || !request || FAILED(request->get_Uri(&uri)) || !uri) return S_OK;
+            const std::wstring_view url(uri.get());
+            const bool html = url == LocalProfileUrl;
+            if (!html && url != L"https://ezras-stremio.invalid/profile.js") return S_OK;
+            const auto body = WStringToUtf8(html ? kLocalProfileHtml : kLocalProfileJs);
+            wil::com_ptr<IStream> stream;
+            stream.attach(SHCreateMemStream(reinterpret_cast<const BYTE*>(body.data()), static_cast<UINT>(body.size())));
+            wil::com_ptr<ICoreWebView2WebResourceResponse> response;
+            if (stream && SUCCEEDED(env->CreateWebResourceResponse(stream.get(), 200, L"OK", html ?
+                L"Content-Type: text/html; charset=utf-8\r\nCache-Control: no-store\r\nContent-Security-Policy: frame-ancestors 'none'; base-uri 'none'; default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src https:; img-src https: data:; form-action 'none'" :
+                L"Content-Type: application/javascript; charset=utf-8\r\nCache-Control: no-store", &response))) args->put_Response(response.get());
+            return S_OK;
+        }).Get(), &token);
+}
+
+void AccountMessage(const std::wstring& source, json request)
+{
+    const bool local = source == LocalProfileUrl;
+    if (!local && LibraryStoreOrigin(source).empty() && !source.starts_with(L"https://web.stremio.com/")) return;
+    if (!request.is_object() || !request.contains("id") || !request["id"].is_string() ||
+        request["id"].get_ref<const std::string&>().size() != 36 || !request.contains("action") || !request["action"].is_string()) return;
+    const auto id = request["id"];
+    const auto action = request["action"].get<std::string>();
+    if (action == "open" && !local) { OpenLocalProfile(); return; }
+    if (local && action == "online") {
+        if (!g_webuiUrls.empty() && g_webview) {
+            std::vector<std::string> stop{"stop"}; HandleEvent("mpv-command", stop);
+            if (g_webuiUrl.empty()) g_webuiUrl = g_webuiUrls.front();
+            g_webview->Navigate(g_webuiUrl.c_str());
+        }
+        return;
+    }
+    if (local && action == "ready") {
+        std::vector<std::string> args;
+        HandleEvent("app-ready", args);
+        for (const auto* name : {"time-pos", "duration", "pause"}) {
+            args = {name}; HandleEvent("mpv-observe-prop", args);
+        }
+        return;
+    }
+    if (local && action == "player") {
+        if (!request.contains("command") || !request["command"].is_string()) return;
+        const auto command = request["command"].get<std::string>();
+        if (command == "load" && request.contains("url") && request["url"].is_string()) {
+            const auto url = request["url"].get<std::string>();
+            if (url.size() > 8192 || (!url.starts_with("https://") && !url.starts_with("http://"))) return;
+            const double resume = request.contains("resume") && request["resume"].is_number() ? request["resume"].get<double>() : 0;
+            std::vector<std::string> args{"loadfile", url};
+            if (resume > 0 && resume <= 1000000) args.insert(args.end(), {"replace", "-1", "start=+" + std::to_string(resume)});
+            HandleEvent("mpv-command", args);
+            args = {"pause", "no"}; HandleEvent("mpv-set-prop", args);
+        } else if (command == "stop" || command == "pause") {
+            std::vector<std::string> args = command == "stop" ? std::vector<std::string>{"stop"} : std::vector<std::string>{"cycle", "pause"};
+            HandleEvent("mpv-command", args);
+        } else if (command == "fullscreen") ToggleFullScreen(g_hWnd, !g_isFullscreen);
+        return;
+    }
+    if (local && action == "pick") {
+        std::wstring selected;
+        const auto apartment = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+        if (SUCCEEDED(apartment)) {
+            {
+                wil::com_ptr<IFileOpenDialog> picker;
+                if (SUCCEEDED(CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, __uuidof(IFileOpenDialog), picker.put_void()))) {
+                    picker->SetOptions(FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST);
+                    picker->SetTitle(L"Choose a folder for encrypted profile sync");
+                    wil::com_ptr<IShellItem> item;
+                    wil::unique_cotaskmem_string path;
+                    if (SUCCEEDED(picker->Show(g_hWnd)) && SUCCEEDED(picker->GetResult(&item)) &&
+                        SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &path)) && path) selected = path.get();
+                }
+            }
+            CoUninitialize();
+        }
+        if (selected.empty()) ReplyAccount(source, {{"id", id}, {"cancelled", true}});
+        else {
+            selectedProfileFolder = std::move(selected);
+            ReplyAccount(source, {{"id", id}, {"folder", WStringToUtf8(selectedProfileFolder)}});
+        }
+        return;
+    }
+    if (local && action == "connect") request["folder"] = WStringToUtf8(selectedProfileFolder);
+    wil::unique_cotaskmem_string dataDirectory;
+    if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &dataDirectory)) || !dataDirectory) {
+        ReplyAccount(source, {{"id", id}, {"error", "Local profile storage is unavailable."}});
+        return;
+    }
+    if (accountRequests.fetch_add(1) >= 6) {
+        --accountRequests;
+        ReplyAccount(source, {{"id", id}, {"error", "Profile sync is busy. Try again shortly."}});
+        return;
+    }
+    const auto directory = std::filesystem::path(dataDirectory.get()) / L"EzrasStremio" / L"Account";
+    std::thread([window = g_hWnd, source, directory, local, request = std::move(request), id] {
+        auto result = std::make_unique<AccountResponse>(AccountResponse{source, HandleAccountRequest(directory, local, request)});
+        result->data["id"] = id;
+        --accountRequests;
+        if (PostMessageW(window, WM_LOCAL_PROFILE_RESULT, 0, reinterpret_cast<LPARAM>(result.get()))) result.release();
+    }).detach();
+}
+}
+
+void CompleteLocalProfileRequest(LPARAM result)
+{
+    const std::unique_ptr<AccountResponse> response(reinterpret_cast<AccountResponse*>(result));
+    if (response) ReplyAccount(response->source, response->data);
+}
+
+void OpenLocalProfile()
+{
+    if (!g_webview) return;
+    std::vector<std::string> stop{"stop"}; HandleEvent("mpv-command", stop);
+    g_webview->Navigate(LocalProfileUrl);
+    ShowWindow(g_hWnd, SW_SHOW);
+}
 
 static std::wstring EmbeddedBrandImage(int resourceId)
 {
@@ -353,6 +496,7 @@ void InitWebView2(HWND hWnd)
                         (g_useDarkTheme ? L"true;" : L"false;") + WithBrandImages(kForkPlayerScript);
                     g_webview->AddScriptToExecuteOnDocumentCreated(forkScript.c_str(), nullptr);
                     SetupPlayerResources(environment.get(), g_webview.get(), hWnd);
+                    SetupLocalProfileResources(environment.get());
 
                     SetupWebMods();
 
@@ -404,7 +548,7 @@ static void SetupWebMessageHandler()
             std::wcout << L"[WEBVIEW]: Navigation try to " << finalUri << std::endl;
 
             // Add back to stremio button if not on stremio
-            if (finalUri.find(g_webuiUrl) == std::wstring::npos) {
+            if (finalUri != LocalProfileUrl && finalUri.find(g_webuiUrl) == std::wstring::npos) {
                 const std::wstring backScript = WithBrandImages(INJECTED_BUTTON_SCRIPT);
                 sender->ExecuteScript(backScript.c_str(), nullptr);
             }
@@ -421,6 +565,10 @@ static void SetupWebMessageHandler()
                 }
             } else {
                 std::cout<<"[WEBVIEW]: Navigation failed\n";
+                if (finalUri != LocalProfileUrl && (finalUri == g_webuiUrl || !LibraryStoreOrigin(finalUri).empty())) {
+                    OpenLocalProfile();
+                    return S_OK;
+                }
                 if(g_hSplash && !g_waitStarted.exchange(true)) {
                     WaitAndRefreshIfNeeded();
                 }
@@ -553,6 +701,13 @@ static void SetupWebMessageHandler()
             if(!msgRaw) return S_OK;
             std::wstring wstr(msgRaw.get());
             std::string str = WStringToUtf8(wstr);
+            constexpr std::string_view accountPrefix = "ezra-account:";
+            if (str.starts_with(accountPrefix)) {
+                wil::unique_cotaskmem_string source;
+                if (str.size() <= 24 * 1024 * 1024 && SUCCEEDED(args->get_Source(&source)) && source)
+                    AccountMessage(source.get(), json::parse(str.substr(accountPrefix.size()), nullptr, false));
+                return S_OK;
+            }
             constexpr std::string_view listPrefix = "fork-library-store:";
             if (str.starts_with(listPrefix)) {
                 // This narrow bridge is only for the two Library front ends.
@@ -638,7 +793,7 @@ static void SetupWebMessageHandler()
                 args->get_Uri(&uri);
                 std::wstring destination(uri.get());
 
-                if (!URLContainsAny(destination)) {
+                if (destination != LocalProfileUrl && !URLContainsAny(destination)) {
                     args->put_Cancel(TRUE);
                     ShellExecuteW(nullptr, L"open", uri.get(), nullptr, nullptr, SW_SHOWNORMAL);
                 }

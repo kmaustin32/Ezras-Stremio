@@ -1,2 +1,4 @@
 #pragma once
 inline constexpr wchar_t kForkPlayerScript[] = LR"FORKJS(@FORK_PLAYER_SCRIPT@)FORKJS";
+inline constexpr wchar_t kLocalProfileHtml[] = LR"PROFILE(@ACCOUNT_HTML@)PROFILE";
+inline constexpr wchar_t kLocalProfileJs[] = LR"PROFILE(@ACCOUNT_JS@)PROFILE";

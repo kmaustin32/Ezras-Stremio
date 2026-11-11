@@ -466,6 +466,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         break;
     }
+    case WM_LOCAL_PROFILE_RESULT:
+        CompleteLocalProfileRequest(lParam);
+        break;
     case WM_REACHABILITY_DONE: {
         // wParam is a pointer to a std::wstring we allocated in the thread
         std::wstring* pUrl = reinterpret_cast<std::wstring*>(wParam);
@@ -478,10 +481,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             }
             else
             {
-                MessageBoxW(nullptr,
-                            L"All endpoints are unreachable",
-                            L"WebView2 Initialization Error",
-                            MB_ICONERROR | MB_OK);
+                OpenLocalProfile();
             }
             delete pUrl;
         }
@@ -518,6 +518,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         {
         case ID_TRAY_BORDER_BLUR:
             ToggleAmbientBorders();
+            break;
+        case ID_TRAY_LOCAL_PROFILE:
+            OpenLocalProfile();
             break;
         case ID_TRAY_DISPLAY_MODE:
         {

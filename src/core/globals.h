@@ -66,6 +66,7 @@ extern std::unordered_set<std::string> g_mpvSetPropAllowlist;
 
 // custom messages
 #define WM_MPV_WAKEUP (WM_APP + 2)
+#define WM_LOCAL_PROFILE_RESULT (WM_APP + 13)
 #define WM_TRAYICON   (WM_APP + 1)
 
 // Node server
@@ -85,6 +86,7 @@ extern wil::com_ptr<ICoreWebView2_21>         g_webview;
 #define ID_TRAY_ALWAYSONTOP       1002
 #define ID_TRAY_CLOSE_ON_EXIT     1003
 #define ID_TRAY_USE_DARK_THEME    1004
+#define ID_TRAY_LOCAL_PROFILE     1025
 #define ID_TRAY_PAUSE_MINIMIZED   1005
 #define ID_TRAY_PAUSE_FOCUS_LOST  1006
 #define ID_TRAY_PICTURE_IN_PICTURE 1007

@@ -11,12 +11,19 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-player.js"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-backup.js"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-lists.js"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-playback.js")
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-playback.js"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/account-model.js"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/account.html"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/account.js")
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-player.js" FORK_PLAYER_SCRIPT)
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-backup.js" FORK_BACKUP_SCRIPT)
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-lists.js" FORK_LISTS_SCRIPT)
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-playback.js" FORK_PLAYBACK_SCRIPT)
-string(APPEND FORK_PLAYER_SCRIPT "\n${FORK_BACKUP_SCRIPT}\n${FORK_LISTS_SCRIPT}\n${FORK_PLAYBACK_SCRIPT}")
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/account-model.js" ACCOUNT_MODEL)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/account.html" ACCOUNT_HTML)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/account.js" ACCOUNT_JS)
+string(APPEND FORK_PLAYER_SCRIPT "\n${ACCOUNT_MODEL}\n${FORK_BACKUP_SCRIPT}\n${FORK_LISTS_SCRIPT}\n${FORK_PLAYBACK_SCRIPT}")
+string(PREPEND ACCOUNT_JS "${ACCOUNT_MODEL}\n")
 foreach(mode fit crop stretch)
     set(icon "${CMAKE_CURRENT_SOURCE_DIR}/images/player/video-scale-${mode}.svg")
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${icon}")
@@ -28,6 +35,9 @@ endforeach()
 # MSVC limits individual wide string literals. Keep the embedded script in
 # adjacent per-line literals while preserving its exact text.
 string(REPLACE "\n" "\n)FORKJS\"\nLR\"FORKJS(" FORK_PLAYER_SCRIPT "${FORK_PLAYER_SCRIPT}")
+foreach(asset ACCOUNT_HTML ACCOUNT_JS)
+    string(REPLACE "\n" "\n)PROFILE\"\nLR\"PROFILE(" ${asset} "${${asset}}")
+endforeach()
 configure_file(cmake/ForkWebAssets.h.in generated/ForkWebAssets.h @ONLY)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/player_bundle_patch.cpp"
@@ -103,6 +113,7 @@ set(SOURCES
         src/webview/player_bundle_patch.cpp
         src/webview/player_resources.cpp
         src/webview/library_store.cpp
+        src/webview/account_store.cpp
         src/ui/mainwindow.h
         src/ui/mainwindow.cpp
         src/resource.h
@@ -123,6 +134,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         Msimg32.lib
         winhttp.lib
         shlwapi.lib
+        crypt32.lib
+        ole32.lib
         nlohmann_json::nlohmann_json
         unofficial::webview2::webview2
         OpenSSL::SSL
@@ -138,6 +151,9 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE STREMIO_PLAYER_PATCH_REVISION
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(account-store-tests tests/account_store_test.cpp src/webview/account_store.cpp)
+    target_link_libraries(account-store-tests PRIVATE nlohmann_json::nlohmann_json OpenSSL::Crypto crypt32.lib)
+    add_test(NAME account-store COMMAND account-store-tests)
     add_executable(config-tests tests/config_test.cpp src/utils/config.cpp src/core/globals.cpp)
     target_link_libraries(config-tests PRIVATE nlohmann_json::nlohmann_json unofficial::webview2::webview2 ole32.lib)
     add_test(NAME theme-default-and-preferences COMMAND config-tests)

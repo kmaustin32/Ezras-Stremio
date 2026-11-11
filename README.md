@@ -67,6 +67,8 @@ Everything added to this fork, from the first mpv upgrade through **2.1.1**.
 
 **Windows 10/11 x64** · [All releases](https://github.com/kmaustin32/Ezras-Stremio/releases)
 
+**3.0.0 Beta 1** adds a bundled Local Profile & Search screen and encrypted folder sync. [Beta downloads and notes](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v3.0.0-beta.1)
+
 The fork version appears alongside the other version numbers in Settings. Windows preserves Unicode filenames when opening local videos. [2.1.1 release notes](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.1.1)
 
 | Download | How to use it |
@@ -126,6 +128,17 @@ The same list is available in **Settings → Player Shortcuts**. These are the s
 Picture-in-Picture is beside fullscreen at the top of the player and in the tray menu. The community's general keyboard shortcuts remain available.
 
 ## 📚 Keep your library
+
+### Local profile and Google Drive sync · 3.0.0 Beta
+
+1. Open **Local Profile & Search** from the Windows tray or the **Library & add-on backup** section in Settings.
+2. Under **Profile and sync**, enable Stremio copying. Return to Stremio and stay signed in while the initial Library copy finishes. You can also extract `Backup.json` from a saved backup ZIP and import it directly without signing in.
+3. Choose a folder and set a sync passphrase. For Google Drive, pick a folder inside **My Drive** in Google Drive for desktop. The same setup works with OneDrive, another desktop sync service, or a local folder.
+4. On another PC, pick the same synced folder and enter the same passphrase. The local Library stays available when the sync folder is unavailable.
+
+Search filters saved titles as you type. **Search catalogs** can find new titles through Cinemeta, the independent TMDB Addon, and compatible add-ons you configure. The bundled screen can play direct HTTP and HTTPS links from compatible sources. For the full Stremio player and other source types, open Stremio from the local screen.
+
+The beta copies data from Stremio into the local profile. Changes made in the local profile sync between your installations through the folder. Stremio account credentials are excluded, and files in the sync folder are encrypted. Keep your sync passphrase somewhere you can recover it.
 
 ### Library lists
 

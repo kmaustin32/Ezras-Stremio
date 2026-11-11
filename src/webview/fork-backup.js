@@ -62,7 +62,7 @@
         if (profile.addonsLocked === true) throw new Error('Your installed add-on list is unavailable. Open Add-ons and try again.');
         const installed = addons(profile.addons);
         const libraryItems = [...items.values()].sort((a, b) => a.name.localeCompare(b.name) || a._id.localeCompare(b._id));
-        return {format: 'ezras-stremio-backup', version: 1, applicationVersion: '2.1.1', exportedAt: now.toISOString(),
+        return {format: 'ezras-stremio-backup', version: 1, applicationVersion: '3.0.0-beta.1', exportedAt: now.toISOString(),
             source: 'local snapshot', localLibraryParts: buckets,
             notes: [buckets === 2 ? 'Includes both recent and older library records saved on this device.' :
                 'Only one of the two local library parts was available. Recent or older titles may be missing. Open Library while online and export again.',
@@ -171,6 +171,33 @@
         !['stremio.zarg.me', 'zaarrg.github.io', 'web.stremio.com'].includes(location.hostname)) return;
     window.__stremioForkBackup = true;
     let busy = false, statusText = '', problem = false, scheduled = false;
+    const profileModel = window.__ezraProfileModel;
+    const localProfile = profileModel?.bridge(window.chrome.webview);
+    let mirroring = false;
+
+    async function mirrorLocalProfile() {
+        if (!localProfile || mirroring) return;
+        mirroring = true;
+        try {
+            const status = await localProfile.call('status');
+            if (!status.enabled) return;
+            const profile = JSON.parse(localStorage.getItem('profile') || 'null');
+            const uid = profile?.auth?.user?._id ?? profile?.auth?.user?.id;
+            if (typeof uid !== 'string' || !uid) return;
+            const backup = collect(localStorage);
+            try {backup.customLists = await window.__stremioForkLists?.exportLists();} catch { /* Retry lists on the next copy. */ }
+            const latest = JSON.parse(localStorage.getItem('profile') || 'null')?.auth?.user;
+            if ((latest?._id ?? latest?.id) !== uid) return;
+            const result = await localProfile.call('mirror', {account: await profileModel.digest(uid),
+                data: await profileModel.snapshot(backup), completeAddons: true, completeLists: Boolean(backup.customLists)});
+            const label = document.getElementById('ezra-profile-copy-status');
+            if (label) label.textContent = result.syncWarning || 'Your local profile is up to date with this device.';
+        } catch (error) {
+            const label = document.getElementById('ezra-profile-copy-status');
+            if (label) label.textContent = error.message;
+        }
+        finally {mirroring = false;}
+    }
 
     async function download() {
         if (busy) return;
@@ -267,6 +294,13 @@
             const status = document.createElement('p'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
             status.style.cssText = 'margin:12px 0 0;overflow-wrap:anywhere';
             section.append(title, detail, button, importButton, file, status); container.prepend(section);
+            if (localProfile) {
+                const local = document.createElement('button'); local.type = 'button';
+                local.textContent = 'Open Local Profile & Search'; local.style.cssText = importButton.style.cssText;
+                const copyStatus = document.createElement('p'); copyStatus.id = 'ezra-profile-copy-status';
+                local.onclick = () => localProfile.send('open');
+                section.append(local, copyStatus);
+            }
         }
         const button = section.querySelector('button');
         if (button.disabled !== busy) button.disabled = busy;
@@ -285,6 +319,10 @@
             requestAnimationFrame(() => { scheduled = false; render(); });
         }).observe(document.documentElement, {childList: true, subtree: true});
         render();
+        if (localProfile) {
+            setTimeout(mirrorLocalProfile, 1500);
+            setInterval(mirrorLocalProfile, 45000);
+        }
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, {once: true});
     else start();

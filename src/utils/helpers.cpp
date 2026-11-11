@@ -136,16 +136,15 @@ std::wstring GetFirstReachableUrl() {
             return url;
         }
     }
-    // Fallback to first URL or handle error
-    return g_webuiUrls.empty() ? L"" : g_webuiUrls[0];
+    return {};
 }
 
 bool URLContainsAny(const std::wstring& url) {
-    if (std::find(g_domainWhitelist.begin(), g_domainWhitelist.end(), g_webuiUrl) == g_domainWhitelist.end()) {
+    if (!g_webuiUrl.empty() && std::find(g_domainWhitelist.begin(), g_domainWhitelist.end(), g_webuiUrl) == g_domainWhitelist.end()) {
         g_domainWhitelist.push_back(g_webuiUrl);
     }
     return std::any_of(g_domainWhitelist.begin(), g_domainWhitelist.end(), [&](const std::wstring& sub) {
-        return url.find(sub) != std::wstring::npos;
+        return !sub.empty() && url.find(sub) != std::wstring::npos;
     });
 }
 

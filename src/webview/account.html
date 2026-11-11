@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ezra's Stremio Local Profile</title>
+<style>
+:root{color-scheme:dark;font:16px 'Segoe UI',sans-serif;color:#e7e9f3;background:transparent}
+*{box-sizing:border-box}body{margin:0}header,main{width:min(1100px,100% - 2rem);margin:auto}
+header{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:1.5rem 0;border-bottom:1px solid #353952}
+header h1{margin:0;font-size:1.2rem}main{padding:1.4rem 0 3rem}body:not(.playing){background:linear-gradient(135deg,#0b0f18,#161a26);min-height:100vh}
+button,input,select{font:inherit;color:inherit;border:1px solid #7272c2;border-radius:7px;padding:.55rem .8rem;background:#1d2233}
+button{cursor:pointer}button.primary{background:#5b5baa;color:#fff}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #c5c5ff;outline-offset:2px}
+button:disabled{opacity:.55;cursor:default}input[type=search],input[type=url]{width:min(26rem,100%)}
+.row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center}.status{min-height:1.5rem;color:#c1c4dc}
+section,details{margin-top:1.25rem}details{padding:1rem;border:1px solid #353952;border-radius:10px;background:#161b29}
+summary{cursor:pointer;font-weight:600}h2{font-size:1.15rem}h3{font-size:1rem}p{line-height:1.55}small{color:#c1c4dc}
+#results{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:.8rem;padding:0;list-style:none}
+#results button{width:100%;height:100%;text-align:left;display:grid;grid-template-columns:44px 1fr;gap:.6rem;border-color:#353952;align-items:center}
+#results img{width:44px;height:65px;object-fit:cover;border-radius:4px}.poster{background:#282b44;border-radius:4px;height:65px}
+#details{border-top:1px solid #353952;padding-top:1rem}label{display:block;margin:.55rem 0}.row label{margin:0}
+#player-controls{display:none}.playing header,.playing main{display:none}.playing #player-controls{display:flex;position:fixed;bottom:0;left:0;right:0;padding:1rem;background:#0b0f18df}
+@media(max-width:550px){header{align-items:flex-start;flex-direction:column}button,input,select{max-width:100%}}
+</style>
+<script src="/profile.js" defer></script>
+</head>
+<body>
+<header><h1>Ezra’s Stremio · Local Profile</h1><button id="online" type="button">Open Stremio</button></header>
+<main>
+    <form id="search" class="row" role="search">
+        <label for="query">Find a movie or show</label>
+        <input id="query" type="search" maxlength="120" placeholder="Search by title">
+        <button type="submit" class="primary">Search catalogs</button>
+        <select id="list" aria-label="Library list"><option value="">All saved titles</option></select>
+    </form>
+    <p id="notice" class="status" role="status"></p>
+    <h2 id="results-title">Saved Library</h2>
+    <ul id="results" aria-labelledby="results-title"></ul>
+    <section id="details" hidden></section>
+    <details id="sync-settings">
+        <summary>Profile and sync</summary>
+        <p>Copy your Library, watch progress, lists, and add-ons to this PC while Stremio is available.</p>
+        <div class="row"><button id="enable" type="button">Enable Stremio copying</button><button id="import" type="button">Import Backup.json</button><input id="file" type="file" accept=".json,application/json" hidden></div>
+        <p>Choose a folder in Google Drive for desktop, OneDrive, another sync app, or a local drive. Use the same folder and passphrase on each PC.</p>
+        <form id="connect">
+            <div class="row"><button id="pick" type="button">Choose folder</button><span id="folder"></span></div>
+            <label for="passphrase">Sync passphrase</label>
+            <input id="passphrase" type="password" minlength="12" maxlength="512" autocomplete="off" required>
+            <button type="submit" class="primary">Connect and sync</button>
+        </form>
+        <p id="sync-status" class="status" role="status"></p>
+        <div class="row"><button id="sync" type="button">Sync now</button><button id="disconnect" type="button">Disconnect folder</button></div>
+    </details>
+    <details>
+        <summary>Catalogs and add-ons</summary>
+        <p>Search uses your saved add-ons that support catalog search. Cinemeta and the independent TMDB Addon are available as fallbacks.</p>
+        <form id="addon" class="row"><label for="manifest">Add-on manifest URL</label><input id="manifest" type="url" placeholder="https://…/manifest.json" required><button type="submit">Add</button></form>
+        <ul id="addons"></ul>
+    </details>
+</main>
+<section id="player-controls" class="row" aria-label="Playback controls">
+    <button id="back" type="button">Back to Library</button><button id="pause" type="button">Pause</button><button id="fullscreen" type="button">Fullscreen</button><span id="time"></span>
+</section>
+</body>
+</html>
