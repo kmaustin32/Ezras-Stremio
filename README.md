@@ -69,6 +69,8 @@ Everything added to this fork, from the first mpv upgrade through **2.1.1**.
 
 **3.0.0 Beta 1** adds a bundled Local Profile & Search screen and encrypted folder sync. [Beta downloads and notes](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v3.0.0-beta.1)
 
+**3.0.1 Beta 1** doubles the poster size in **Home → Continue Watching** and adds 1 px to the poster hover border throughout the app. [Beta downloads and notes](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v3.0.1-beta.1)
+
 The fork version appears alongside the other version numbers in Settings. Windows preserves Unicode filenames when opening local videos. [2.1.1 release notes](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.1.1)
 
 | Download | How to use it |

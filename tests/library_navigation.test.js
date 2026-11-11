@@ -82,7 +82,7 @@ async function setup(withAppearance = false, withLists = false, listFixture = {}
                 localStorage.setItem('stremio-fork-custom-lists:test', JSON.stringify(seed));
         }, listFixture.seed);
         await page.goto('https://stremio.zarg.me/' + (listFixture.home ? '#/' : '#/library/series'));
-        const fixture = ({withAppearance, withLists}) => {
+        const fixture = ({withAppearance, withLists, continueWatching}) => {
             const req = window.req, React = req(30758), ReactDOM = req(99576), h = React.createElement;
             const find = term => Object.values(window.modules).find(fn => fn.toString().includes(term));
             const load = (factory, overrides = {}) => {const module = {exports: {}}; factory(module, module.exports, Object.assign(id => Object.hasOwn(overrides, id) ? overrides[id] : req(id), req)); return module.exports;};
@@ -158,8 +158,10 @@ async function setup(withAppearance = false, withLists = false, listFixture = {}
                 Board = load(boardFactory, {60350: {...hooks, useProfile: () => window.fixtureProfile,
                     useStreamingServer: () => ({settings: {type: 'Ready'}}), useNotifications: () => ({}),
                     withCoreSuspender: component => component, getVisibleChildrenRange: () => null},
-                    84902: {...components, MainNavBars: nav, MetaRow: row, MetaItem, EventModal: () => null},
-                    20107: () => translate, 53993: () => ({items: []}),
+                    84902: {...components, MainNavBars: nav, MetaRow: row, MetaItem, ContinueWatchingItem: MetaItem, EventModal: () => null},
+                    20107: () => translate, 53993: () => ({items: continueWatching ? Array.from({length: 7}, (_, index) => ({
+                        ...featuredItem, _id: 'cw' + index, name: 'Continue ' + index, deepLinks: {player: '#/player/continue-' + index}
+                    })) : []}),
                     47649: () => [{catalogs: [catalog('Featured', 'series'), catalog('Featured', 'movie'), catalog('Popular', 'movie')]}, () => {}]});
             }
             function App() {
@@ -201,7 +203,7 @@ async function setup(withAppearance = false, withLists = false, listFixture = {}
             const anchor = '(()=>{var e;o.g.importScripts';
             assert.ok(bundle.includes(anchor));
             await page.addScriptTag({content: bundle.replace(anchor, 'window.req=o;window.modules=a;return;' + anchor)});
-            await page.evaluate(fixture, {withAppearance, withLists});
+            await page.evaluate(fixture, {withAppearance, withLists, continueWatching: listFixture.continueWatching});
         }
         await boot();
         const card = page.locator('[class*="meta-item-container"]').filter({hasText: 'Fixture Show'});
@@ -210,6 +212,42 @@ async function setup(withAppearance = false, withLists = false, listFixture = {}
         return {browser, page, errors, card, indexRequests, boot, store};
     } catch (error) {await browser.close(); throw error;}
 }
+
+test('Home doubles Continue Watching posters, keeps the other rows the same, and scrolls on narrow windows', async () => {
+    const {browser, page, errors} = await setup(false, true, {home: true, continueWatching: true});
+    try {
+        const row = page.locator('[class*="continue-watching-row-"] [class*="meta-items-container-"]');
+        await row.waitFor();
+        await page.addScriptTag({content: forkScript});
+        for (const width of [1280, 620, 375]) {
+            await page.setViewportSize({width, height: 800});
+            await row.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+            const dimensions = await row.evaluate(node => {
+                const selector = '[class*="poster-container-"]';
+                const first = node.querySelector(selector);
+                const other = node.closest('[class*="board-content-"]').querySelector('[class*="board-row-poster-"] ' + selector);
+                const attribute = 'data-stremio-large-continue-watching';
+                const size = poster => [poster.offsetWidth, poster.offsetHeight];
+                const after = size(first), otherAfter = size(other), scrollable = node.scrollWidth > node.clientWidth;
+                const enabled = node.hasAttribute(attribute);
+                node.removeAttribute(attribute);
+                const before = size(first), otherBefore = size(other);
+                if (enabled) node.setAttribute(attribute, '');
+                return {after, before, otherBefore, otherAfter, scrollable, enabled};
+            });
+            assert.ok(dimensions.enabled);
+            for (let i = 0; i < 2; i++) assert.ok(Math.abs(dimensions.after[i] - 2 * dimensions.before[i]) <= 3,
+                `Continue Watching at ${width}px: ${JSON.stringify(dimensions)}`);
+            assert.deepEqual(dimensions.otherAfter, dimensions.otherBefore);
+            assert.ok(dimensions.scrollable);
+            assert.ok(await row.evaluate(node => {
+                node.scrollLeft = 200;
+                return node.scrollLeft > 0 && document.documentElement.scrollWidth === innerWidth;
+            }));
+        }
+        assert.deepEqual(errors, []);
+    } finally {await browser.close();}
+});
 
 test('List storage defaults, latest-record selection, and watched state work with older library records', () => {
     const defaults = decodeLists(null);
@@ -691,6 +729,11 @@ test('Live Library controls use squared corners and purple selection, and real p
             return shadow.includes(`rgba(${color}, 0.7)`) && shadow.includes(`rgba(${color}, 0.45)`);
         }, color);
         await waitForGlow('133, 139, 153');
+        const ring = await frame.evaluate(node => ({
+            spread: Number(getComputedStyle(node).boxShadow.match(/0px 0px 0px ([\d.]+)px/)?.[1]),
+            previous: parseFloat(getComputedStyle(document.documentElement).fontSize) * .125
+        }));
+        assert.ok(Math.abs(ring.spread - ring.previous - 1) < .02, 'The hover ring also grows by 1px outside Home');
         await page.evaluate(() => window.setForkTheme(false));
         await waitForGlow('255, 255, 255');
         await page.evaluate(() => window.setForkTheme(true));
