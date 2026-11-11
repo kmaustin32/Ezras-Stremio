@@ -353,7 +353,9 @@ test('Live Library creates lists, adds multiple titles to multiple lists, and pl
         assert.equal(await animeRow.locator('a[title="Another Show"]').getAttribute('href'), '#/detail/series/tt200');
         assert.equal(await animeRow.locator('a[title="Fixture Show"]').count(), 0);
         await animeRow.getByText('BUTTON_SEE_ALL').click();
-        await other.waitFor();
+        const library = page.locator('[class*="library-container-"]');
+        await library.getByTitle('Another Show', {exact: true}).waitFor();
+        await slot.waitFor({state: 'detached'});
         assert.deepEqual(await titles(), ['Another Show', 'Older Movie']);
         assert.deepEqual(await page.evaluate(() => window.playRequests), []);
         assert.deepEqual(await page.evaluate(() => window.dispatches), []);
