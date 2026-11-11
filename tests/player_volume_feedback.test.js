@@ -64,6 +64,7 @@ async function setup(clock = false) {
             const Indicator = load(find('displayName="VolumeChangeIndicator"'), {27708: VolumeSlider});
             const Button = req(4723).default, Icon = req(4672).default, player = req(39031);
             const toolbar = load(find('"seek-bar":"seek-bar-'));
+            const infoStyles = load(find('"side-drawer-meta-preview":"side-drawer-meta-preview-'));
             const runtime = {state: {volume: 100, muted: false, paused: false, time: 20000, subtitlesTracks: [{}], extraSubtitlesTracks: [], audioTracks: []}, setProp: (name, value) => {
                 window.volumeCommands.push([name, value]); window.setVolume(value);
             }};
@@ -75,7 +76,7 @@ async function setup(clock = false) {
             window.setSavedSubtitle = id => {preferences.subtitleId = id;};
             const scope = {Oe: runtime, le: preferences, l: React, G: Indicator, de: true, lt: false, at: false, At: false,
                 Te: {seekTimeDuration: 10000, seekShortTimeDuration: 1000, escExitFullscreen: true},
-                te: {metaItem: null}, Ae: {statistics: null}, De: () => {}, kt: value => window.seeks.push(value),
+                te: {metaItem: {type: 'Ready'}}, Ae: {statistics: null}, De: () => {}, kt: value => window.seeks.push(value),
                 It: () => {}, vt: () => window.setPaused(false), Wt: () => window.setPaused(true),
                 Vt: id => selectSubtitle('embedded', id), Ht: id => selectSubtitle('extra', id), we: () => window.setMenu(true),
                 J: {active: true, send: (name, args) => window.messages.push({args: [name, args]})}};
@@ -84,7 +85,9 @@ async function setup(clock = false) {
             function App() {
                 const [volume, setVolume] = React.useState(100), [paused, setPaused] = React.useState(false);
                 const [hidden, setHidden] = React.useState(false), [menu, setMenu] = React.useState(false), [maximum, setMaximum] = React.useState(225);
+                const [info, setInfo] = React.useState(false);
                 Object.assign(runtime.state, {volume, paused}); Object.assign(scope, {lt: menu, At: hidden});
+                scope._t = () => setInfo(visible => !visible);
                 window.setVolume = value => {runtime.state.volume = value; setVolume(value); window.native('mpv-prop-change', {name: 'volume', data: value});};
                 window.setPaused = value => {setPaused(value); window.native('mpv-prop-change', {name: 'pause', data: value});};
                 window.setUpstreamHidden = setHidden; window.setMenu = setMenu;
@@ -99,6 +102,8 @@ async function setup(clock = false) {
                     h('div', {id: 'bottom', className: player.layer + ' ' + player['control-bar-layer']}, button('pause', 'Pause'),
                         h(VolumeSlider, {className: toolbar['volume-slider'], volume, onVolumeChangeRequested: scope.bt}),
                         h('div', {className: toolbar['control-bar-buttons-menu-container']}, button('options', 'Options'))),
+                    info ? h('div', {id: 'info', className: [infoStyles['side-drawer'], player.layer, player['side-drawer-layer']].join(' ')},
+                        h('div', {id: 'info-title', className: infoStyles.info}, 'Episode information')) : null,
                     menu ? h('div', {id: 'menu', role: 'menu', className: player['menu-layer']}, button('menu-one', 'First'), button('menu-two', 'Second'),
                         h('input', {id: 'editor', onKeyDown: event => event.stopPropagation()}),
                         h('input', {id: 'range', type: 'range', defaultValue: 50, onKeyDown: event => event.stopPropagation()}),
@@ -218,6 +223,61 @@ test('The real volume popup survives visible controls, pause, mouse movement and
         await tick(650); assert.equal(await popup.count(), 0);
         assert.equal(await page.locator('#player').getAttribute('data-stremio-controls'), 'visible', 'Never hide still keeps the toolbar visible');
         assert.ok(await page.locator('#subtitle').isVisible());
+        assert.deepEqual(errors, []);
+    } finally {await browser.close();}
+});
+
+test('Starting another video silently resets the volume and subsequent manual changes still show feedback', async () => {
+    const {browser, page, errors, tick, popup} = await setup(true);
+    try {
+        await page.keyboard.press('ArrowUp'); await tick(32);
+        assert.ok(await popup.isVisible());
+        for (const maximum of [225, 75]) {
+            const startupVolume = Math.min(100, maximum);
+            await page.evaluate(({maximum, startupVolume}) => {
+                window.setMaximum(maximum);
+                window.native('fork-file-loaded', {startupVolume});
+                window.setVolume(startupVolume);
+                window.native('mpv-prop-change', {name: 'volume', data: startupVolume});
+            }, {maximum, startupVolume});
+            await tick(32);
+            assert.equal(await page.evaluate(() => window.snapshot().volume), startupVolume);
+            assert.equal(await popup.isVisible(), false, 'Startup and duplicate observations remain silent');
+            await page.keyboard.press('ArrowDown'); await tick(32);
+            assert.equal(await page.evaluate(() => window.snapshot().volume), startupVolume - 5);
+            assert.ok(await popup.isVisible(), 'The first manual volume change shows the popup immediately');
+            await page.keyboard.press('ArrowUp'); await tick(32);
+            assert.ok(await popup.isVisible(), 'Returning to the startup volume is also shown');
+        }
+        await page.evaluate(() => window.native('fork-file-loaded', {startupVolume: 75}));
+        await tick(32);
+        assert.equal(await popup.isVisible(), false, 'A new file already at its startup volume hides old feedback');
+        await page.keyboard.press('ArrowDown'); await tick(32);
+        assert.ok(await popup.isVisible());
+        assert.deepEqual(errors, []);
+    } finally {await browser.close();}
+});
+
+test('The I shortcut opens a subtly translucent info drawer in both themes', async () => {
+    const {browser, page, errors, tick} = await setup(true);
+    try {
+        for (const dark of [true, false]) {
+            await page.evaluate(dark => window.native('theme-changed', {dark}), dark);
+            await page.keyboard.press('i'); await tick(32);
+            const drawer = page.locator('#info');
+            assert.ok(await drawer.isVisible());
+            const style = await drawer.evaluate(el => {
+                const computed = getComputedStyle(el);
+                const context = document.createElement('canvas').getContext('2d');
+                context.fillStyle = computed.backgroundColor;
+                context.fillRect(0, 0, 1, 1);
+                return {alpha: context.getImageData(0, 0, 1, 1).data[3], opacity: computed.opacity,
+                    textOpacity: getComputedStyle(el.querySelector('#info-title')).opacity, blur: computed.backdropFilter};
+            });
+            assert.deepEqual(style, {alpha: 224, opacity: '1', textOpacity: '1', blur: 'blur(15px)'});
+            await page.keyboard.press('i'); await tick(32);
+            assert.equal(await drawer.count(), 0);
+        }
         assert.deepEqual(errors, []);
     } finally {await browser.close();}
 });

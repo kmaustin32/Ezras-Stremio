@@ -11,6 +11,7 @@
     const icons = {fit: '__FORK_FIT_SVG__', crop: '__FORK_CROP_SVG__', stretch: '__FORK_STRETCH_SVG__'};
     let state = {mode: 'fit', active: false};
     let volume = 100;
+    let startupVolume = null;
     let muted = false;
     let maximum = 130;
     let pipEnabled = false;
@@ -915,6 +916,10 @@
             }
             [class*="player-container"] [class*="volume-change-indicator"],
             [class*="player-container"] [class*="volume-change-indicator"] * {pointer-events:none!important}
+            html[data-stremio-startup-volume] [class*="player-container"] [class*="volume-change-indicator"] {display:none!important}
+            [class*="player-container"] [class*="side-drawer-layer-"] {
+                background-color:color-mix(in srgb,var(--modal-background-color) 88%,transparent);
+            }
             html[data-stremio-dark-theme] [class*="volume-change-indicator"] {background-color:rgba(22,26,38,.1)!important}
             html[data-stremio-dark-theme] [class*="volume-change-indicator"] [class*="volume-icon"] {
                 color:#858B99!important;
@@ -1039,6 +1044,14 @@
             schedule();
             return;
         }
+        if (payload?.args?.[0] === 'fork-file-loaded') {
+            const initial = payload.args[1]?.startupVolume;
+            if (!Number.isFinite(initial)) return;
+            // Let the upstream slider update immediately and keep its popup hidden until volume changes again.
+            startupVolume = initial;
+            document.documentElement.setAttribute('data-stremio-startup-volume', '');
+            return;
+        }
         if (payload?.args?.[0] === 'skip-media-changed') {
             skipMedia?.request?.abort();
             const media = payload.args[1];
@@ -1065,9 +1078,13 @@
                 schedule();
                 return;
             }
-            if (property?.name === 'volume' && typeof property.data === 'number' && Number.isFinite(property.data))
+            if (property?.name === 'volume' && Number.isFinite(property.data)) {
+                if (startupVolume !== null && property.data !== startupVolume) {
+                    startupVolume = null;
+                    document.documentElement.removeAttribute('data-stremio-startup-volume');
+                }
                 volume = property.data;
-            else if (property?.name === 'mute' && typeof property.data === 'boolean') muted = property.data;
+            } else if (property?.name === 'mute' && typeof property.data === 'boolean') muted = property.data;
             else if (property?.name === 'pause' && typeof property.data === 'boolean') {
                 if (paused !== property.data) controlActivity();
                 paused = property.data;
@@ -1106,6 +1123,8 @@
     window.addEventListener('stremio-fork-compatibility', event => receiveCompatibility(event.detail));
     window.addEventListener('resize', schedule);
     window.addEventListener('hashchange', () => {
+        startupVolume = null;
+        document.documentElement.removeAttribute('data-stremio-startup-volume');
         applyLibraryRoute();
         if (skipMedia?.hash !== location.hash) skipMedia?.request?.abort();
         schedule();

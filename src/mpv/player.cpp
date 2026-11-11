@@ -202,14 +202,16 @@ void HandleMpvEvents()
             NotifySkipMedia();
             break;
         case MPV_EVENT_FILE_LOADED:
+        {
             // Each video starts at normal full volume, independently of the last video.
-            g_currentVolume = (std::min)(100.0, MaximumPlayerVolume());
+            const double startupVolume = (std::min)(100.0, MaximumPlayerVolume());
+            g_currentVolume = startupVolume;
             if (!ApplyVideoStartDefaults(g_mpv))
                 AppendToCrashLog("[MPV]: Could not reset video to 100% volume and Fit");
             skipMediaLoaded = true;
             NotifySkipMedia();
             if (g_webview) {
-                json playback = {{"serial", std::to_string(skipMediaSerial)}};
+                json playback = {{"serial", std::to_string(skipMediaSerial)}, {"startupVolume", startupVolume}};
                 mpv_node tracks{};
                 if (mpv_get_property(g_mpv, "track-list", MPV_FORMAT_NODE, &tracks) >= 0) {
                     playback["tracks"] = json::array();
@@ -224,6 +226,7 @@ void HandleMpvEvents()
                 SendToJS("fork-file-loaded", playback);
             }
             [[fallthrough]];
+        }
         case MPV_EVENT_VIDEO_RECONFIG:
         {
             int64_t width = 0;
