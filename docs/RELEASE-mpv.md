@@ -1,14 +1,14 @@
-## Ezra's Stremio 2.1.1 Beta 1
+## Ezra's Stremio 2.1.1 Beta 2
 
-- Starting a video resets the volume without showing the volume popup. Volume changes during playback still show it.
-- The information drawer opened with **I** has a slightly translucent background in both themes. Its text and controls stay fully opaque.
+- The volume popup stays hidden from the moment the player opens, including the brief period before mpv finishes loading. Manual volume changes still show it.
+- The information drawer opened with **I** uses 6% background transparency in both themes. Its text and controls stay fully opaque.
 
-This beta builds on [2.1.0 Beta 1](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.1.0-beta.1).
+This beta corrects the startup flash from [2.1.1 Beta 1](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.1.1-beta.1).
 
 ### Windows downloads
 
-- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.1-beta.1/Ezras-Stremio-2.1.1-beta.1-x64.exe)
-- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.1-beta.1/Ezras-Stremio-2.1.1-beta.1-x64.zip)
-- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.1-beta.1/SHA256SUMS.txt)
+- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.1-beta.2/Ezras-Stremio-2.1.1-beta.2-x64.exe)
+- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.1-beta.2/Ezras-Stremio-2.1.1-beta.2-x64.zip)
+- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.1-beta.2/SHA256SUMS.txt)
 
 Use Windows 10 or 11 x64. If upgrading with the installer, retain your configuration to keep your custom mpv settings.

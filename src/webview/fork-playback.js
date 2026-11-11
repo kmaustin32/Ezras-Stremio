@@ -1,6 +1,6 @@
 (() => {
     'use strict';
-    const version = '2.1.1-beta.1';
+    const version = '2.1.1-beta.2';
     const shaderNames = {'1': 'Anime4K A', '2': 'Anime4K B', '3': 'Anime4K C', '4': 'Anime4K A+A',
         '5': 'Anime4K B+B', '6': 'Anime4K C+A', '7': 'FSR', '8': 'Off', custom: 'Custom shaders'};
     const modes = {fit: 'Fit', crop: 'Crop', stretch: 'Stretch'};

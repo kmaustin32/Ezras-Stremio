@@ -199,6 +199,7 @@ void HandleMpvEvents()
         case MPV_EVENT_START_FILE:
             ++skipMediaSerial;
             skipMediaLoaded = false;
+            if (g_webview) SendToJS("fork-file-loading", nlohmann::json::object());
             NotifySkipMedia();
             break;
         case MPV_EVENT_FILE_LOADED:
@@ -360,7 +361,8 @@ void HandleMpvSetProp(const std::vector<std::string>& args)
         try {
             size_t consumed = 0;
             const double volume = std::stod(args[1], &consumed);
-            if (consumed == args[1].size()) ApplyPlayerVolume(g_mpv, volume);
+            if (consumed == args[1].size() && ApplyPlayerVolume(g_mpv, volume) && g_webview)
+                SendToJS("fork-volume-requested", {{"volume", std::clamp(volume, 0.0, MaximumPlayerVolume())}});
         } catch (const std::exception&) { /* Ignore invalid volume requests. */ }
         return;
     }

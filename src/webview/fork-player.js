@@ -12,6 +12,7 @@
     let state = {mode: 'fit', active: false};
     let volume = 100;
     let startupVolume = null;
+    let playbackPath = '';
     let muted = false;
     let maximum = 130;
     let pipEnabled = false;
@@ -918,7 +919,7 @@
             [class*="player-container"] [class*="volume-change-indicator"] * {pointer-events:none!important}
             html[data-stremio-startup-volume] [class*="player-container"] [class*="volume-change-indicator"] {display:none!important}
             [class*="player-container"] [class*="side-drawer-layer-"] {
-                background-color:color-mix(in srgb,var(--modal-background-color) 88%,transparent);
+                background-color:color-mix(in srgb,var(--modal-background-color) 94%,transparent);
             }
             html[data-stremio-dark-theme] [class*="volume-change-indicator"] {background-color:rgba(22,26,38,.1)!important}
             html[data-stremio-dark-theme] [class*="volume-change-indicator"] [class*="volume-icon"] {
@@ -1031,6 +1032,19 @@
         requestAnimationFrame(update);
     }
 
+    function setVolumeInitialization(value) {
+        startupVolume = value;
+        document.documentElement.toggleAttribute('data-stremio-startup-volume', value !== null);
+    }
+
+    function trackPlaybackRoute() {
+        const path = location.hash.split('?')[0];
+        if (path === playbackPath) return;
+        playbackPath = path;
+        // The hosted player can mount feedback before mpv sends any file events.
+        setVolumeInitialization(path.startsWith('#/player/') ? 'loading' : null);
+    }
+
     window.chrome.webview.addEventListener('message', event => {
         let payload;
         try { payload = typeof event.data === 'string' ? JSON.parse(event.data) : event.data; } catch { return; }
@@ -1044,12 +1058,18 @@
             schedule();
             return;
         }
+        if (payload?.args?.[0] === 'fork-file-loading') {
+            if (playbackPath.startsWith('#/player/')) setVolumeInitialization('loading');
+            return;
+        }
         if (payload?.args?.[0] === 'fork-file-loaded') {
             const initial = payload.args[1]?.startupVolume;
-            if (!Number.isFinite(initial)) return;
-            // Let the upstream slider update immediately and keep its popup hidden until volume changes again.
-            startupVolume = initial;
-            document.documentElement.setAttribute('data-stremio-startup-volume', '');
+            if (playbackPath.startsWith('#/player/') && Number.isFinite(initial)) setVolumeInitialization(initial);
+            return;
+        }
+        if (payload?.args?.[0] === 'fork-volume-requested') {
+            const requested = payload.args[1]?.volume;
+            if (startupVolume !== null && Number.isFinite(requested) && requested !== volume) setVolumeInitialization(null);
             return;
         }
         if (payload?.args?.[0] === 'skip-media-changed') {
@@ -1079,10 +1099,7 @@
                 return;
             }
             if (property?.name === 'volume' && Number.isFinite(property.data)) {
-                if (startupVolume !== null && property.data !== startupVolume) {
-                    startupVolume = null;
-                    document.documentElement.removeAttribute('data-stremio-startup-volume');
-                }
+                if (typeof startupVolume === 'number' && property.data !== startupVolume) setVolumeInitialization(null);
                 volume = property.data;
             } else if (property?.name === 'mute' && typeof property.data === 'boolean') muted = property.data;
             else if (property?.name === 'pause' && typeof property.data === 'boolean') {
@@ -1101,6 +1118,7 @@
     });
 
     function start() {
+        trackPlaybackRoute();
         receiveCompatibility(window.__stremioForkCompatibility);
         startTheme();
         adjustSettingsLayout();
@@ -1122,9 +1140,12 @@
     window.addEventListener('stremio-fork-volume-limit', event => applyVolumeLimit(event.detail));
     window.addEventListener('stremio-fork-compatibility', event => receiveCompatibility(event.detail));
     window.addEventListener('resize', schedule);
+    window.addEventListener('hashchange', trackPlaybackRoute, true);
+    document.addEventListener('playing', event => {
+        if (startupVolume === 'loading' && event.target instanceof HTMLVideoElement &&
+            event.target.closest('[class*="player-container"]')) setVolumeInitialization(null);
+    }, true);
     window.addEventListener('hashchange', () => {
-        startupVolume = null;
-        document.documentElement.removeAttribute('data-stremio-startup-volume');
         applyLibraryRoute();
         if (skipMedia?.hash !== location.hash) skipMedia?.request?.abort();
         schedule();

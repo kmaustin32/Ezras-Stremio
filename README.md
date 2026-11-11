@@ -67,7 +67,7 @@ Everything added to this fork, from the first mpv upgrade through **2.0.0**.
 
 The **2.1.0 Beta 1** prerelease adds list management and import, picture and playback settings, per-series preferences, source switching, and playback diagnostics. The fork version appears alongside the version numbers in Settings. [Beta downloads and notes](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.1.0-beta.1)
 
-**2.1.1 Beta 1** keeps the startup volume reset quiet and gives the **I**-key info drawer a subtly translucent background. [Beta downloads and notes](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.1.1-beta.1)
+**2.1.1 Beta 2** keeps the volume popup hidden from the moment a video opens and gives the **I**-key info drawer a subtly translucent background. [Beta downloads and notes](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.1.1-beta.2)
 
 | Download | How to use it |
 | --- | --- |

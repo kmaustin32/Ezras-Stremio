@@ -63,7 +63,7 @@ test('The panel shows the fork version, confirms shaders, saves series preferenc
         for (const [name, data] of Object.entries({'time-pos': 93.5, seekable: true, 'current-vo': 'gpu-next'}))
             window.native('mpv-prop-change', {name, data});
     });
-    assert.match(await page.locator('#versions').innerText(), /Ezra's Stremio 2\.1\.1-beta\.1/);
+    assert.match(await page.locator('#versions').innerText(), /Ezra's Stremio 2\.1\.1-beta\.2/);
     await page.getByRole('button', {name: 'Picture', exact: true}).click();
     await page.getByLabel('Shaders', {exact: true}).selectOption('7');
     await page.getByText('Applying FSR…').waitFor();

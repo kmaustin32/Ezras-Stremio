@@ -66,7 +66,9 @@ async function setup(clock = false) {
             const toolbar = load(find('"seek-bar":"seek-bar-'));
             const infoStyles = load(find('"side-drawer-meta-preview":"side-drawer-meta-preview-'));
             const runtime = {state: {volume: 100, muted: false, paused: false, time: 20000, subtitlesTracks: [{}], extraSubtitlesTracks: [], audioTracks: []}, setProp: (name, value) => {
-                window.volumeCommands.push([name, value]); window.setVolume(value);
+                window.volumeCommands.push([name, value]);
+                window.native('fork-volume-requested', {volume: value});
+                window.setVolume(value);
             }};
             window.volumeCommands = []; window.subtitleCommands = []; window.seeks = []; window.buttonClicks = 0; window.frameClicks = 0;
             const selectSubtitle = (kind, id) => {
@@ -117,7 +119,10 @@ async function setup(clock = false) {
         await page.locator('#bottom [class*="volume-slider"]').evaluate(el => el.id = 'toolbar-volume');
         await page.addScriptTag({content: shortcuts});
         await page.addScriptTag({content: fork});
-        await page.evaluate(() => window.native('display-mode-changed', {mode: 'fit', active: true}));
+        await page.evaluate(() => {
+            window.native('fork-file-loaded', {startupVolume: 100});
+            window.native('display-mode-changed', {mode: 'fit', active: true});
+        });
         if (clock) {await page.clock.runFor(32); await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 100));}
         else await page.waitForFunction(() => document.getElementById('player').hasAttribute('data-stremio-controls'));
         const tick = async milliseconds => clock ? page.clock.runFor(milliseconds) : page.waitForTimeout(milliseconds);
@@ -234,12 +239,28 @@ test('Starting another video silently resets the volume and subsequent manual ch
         assert.ok(await popup.isVisible());
         for (const maximum of [225, 75]) {
             const startupVolume = Math.min(100, maximum);
-            await page.evaluate(({maximum, startupVolume}) => {
+            await page.evaluate(maximum => { location.hash = '#/player/clip-' + maximum; }, maximum);
+            await page.waitForURL('**/#/player/clip-' + maximum);
+            await tick(32);
+            await page.evaluate(maximum => {
                 window.setMaximum(maximum);
+                window.setVolume(maximum - 15);
+            }, maximum);
+            await tick(32);
+            assert.equal(await popup.isVisible(), false, 'Opening the player suppresses the early popup before any file event');
+            await page.evaluate(() => {
+                window.native('fork-file-loading', {});
+                window.setVolume(65);
+            });
+            await tick(32);
+            assert.equal(await popup.isVisible(), false, 'Initial observations stay quiet while mpv is loading');
+            await page.keyboard.press('ArrowDown'); await tick(32);
+            assert.ok(await popup.isVisible(), 'A manual change during buffering still shows feedback');
+            await page.evaluate(startupVolume => {
                 window.native('fork-file-loaded', {startupVolume});
                 window.setVolume(startupVolume);
                 window.native('mpv-prop-change', {name: 'volume', data: startupVolume});
-            }, {maximum, startupVolume});
+            }, startupVolume);
             await tick(32);
             assert.equal(await page.evaluate(() => window.snapshot().volume), startupVolume);
             assert.equal(await popup.isVisible(), false, 'Startup and duplicate observations remain silent');
@@ -249,6 +270,9 @@ test('Starting another video silently resets the volume and subsequent manual ch
             await page.keyboard.press('ArrowUp'); await tick(32);
             assert.ok(await popup.isVisible(), 'Returning to the startup volume is also shown');
         }
+        await page.evaluate(() => window.native('fork-file-loading', {}));
+        await tick(32);
+        assert.equal(await popup.isVisible(), false, 'Reloading a source on the same route also hides old feedback');
         await page.evaluate(() => window.native('fork-file-loaded', {startupVolume: 75}));
         await tick(32);
         assert.equal(await popup.isVisible(), false, 'A new file already at its startup volume hides old feedback');
@@ -274,7 +298,7 @@ test('The I shortcut opens a subtly translucent info drawer in both themes', asy
                 return {alpha: context.getImageData(0, 0, 1, 1).data[3], opacity: computed.opacity,
                     textOpacity: getComputedStyle(el.querySelector('#info-title')).opacity, blur: computed.backdropFilter};
             });
-            assert.deepEqual(style, {alpha: 224, opacity: '1', textOpacity: '1', blur: 'blur(15px)'});
+            assert.deepEqual(style, {alpha: 240, opacity: '1', textOpacity: '1', blur: 'blur(15px)'});
             await page.keyboard.press('i'); await tick(32);
             assert.equal(await drawer.count(), 0);
         }
