@@ -161,3 +161,41 @@ test('Chapter-only playback sends no timestamp request and hides prompts for amb
     await absent();
     assert.deepEqual(requests, []);
 });
+
+test('A close TheIntroDB release match supplies both skips across player query changes', async t => {
+    const {page, media, time, prompt, seeks, label} = await setup(t, {lookup: true});
+    // Reproduces the 4-second difference returned by the public API for this episode.
+    await page.route('https://api.theintrodb.org/**', request => request.fulfill({json: {
+        type: 'tv', season: 1, episode: 1, group_duration_ms: 3696000,
+        intro: [{start_ms: 473681, end_ms: 571154}], credits: [{start_ms: 3630040, end_ms: null}]
+    }}));
+    await media({duration: 3700, 'time-pos': 480});
+    await label('Skip Intro');
+    await page.evaluate(() => {location.hash += '?streamingServerUrl=http%3A%2F%2Flocalhost%3A11470';});
+    await time(3650);
+    await label('Skip Outro');
+    await prompt.click();
+    assert.deepEqual(await seeks(), [['seek-skip-segment', ['1', '3630.04', '3700']]]);
+});
+
+test('Late chapter metadata updates the current file without reusing its chapters for the next route', async t => {
+    const {page, media, time, prompt, seeks, label, absent} = await setup(t);
+    await media({seekable: false});
+    await media({chapters: [], 'time-pos': 8});
+    await absent();
+    const chapters = [{title: 'Intro', time: 5}, {title: 'Episode', time: 15}, {title: 'Credits', time: 90}];
+    await media({chapters, 'time-pos': 8});
+    await label('Skip Intro');
+    const next = route.replace('%3A1%3A1', '%3A1%3A2');
+    await page.evaluate(next => {location.hash = next;}, next);
+    await absent();
+    await media({chapters, 'time-pos': 8});
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    assert.equal(await prompt.count(), 0);
+    await media({serial: '2', chapters, 'time-pos': 95});
+    await label('Skip Outro');
+    await prompt.click();
+    assert.deepEqual(await seeks(), [['seek-skip-segment', ['2', '90', '120']]]);
+    await time(120);
+    await absent();
+});

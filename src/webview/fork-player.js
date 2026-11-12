@@ -191,8 +191,12 @@
         return Number.isFinite(start) && Number.isFinite(end) && start >= 0 && start < end && end <= duration;
     }
 
-    function skipLookupQuery(hash, duration) {
-        const route = hash.match(/^#\/player\/[^/]+\/[^/]*\/[^/]*\/(series|movie)\/(tt\d{7,12})\/([^/?]+)(?:\?.*)?$/);
+    function playerPath() {
+        return location.hash.split('?')[0];
+    }
+
+    function skipLookupQuery(path, duration) {
+        const route = path.match(/^#\/player\/[^/]+\/[^/]*\/[^/]*\/(series|movie)\/(tt\d{7,12})\/([^/]+)$/);
         if (!route) return null;
         const [, type, id, video] = route;
         const query = new URLSearchParams({imdb_id: id, duration_ms: String(Math.round(duration * 1000)),
@@ -212,7 +216,7 @@
         media.local = chapterSkips(media.chapters, media.duration);
         media.remote = [];
         media.request?.abort();
-        const query = skipLookupEnabled && skipLookupQuery(media.hash, media.duration);
+        const query = skipLookupEnabled && skipLookupQuery(media.path, media.duration);
         const missing = ['intro', 'outro'].filter(kind => !media.local.some(segment => segment.kind === kind));
         if (!query || !missing.length) return;
         const request = new AbortController();
@@ -221,9 +225,11 @@
             credentials: 'omit', referrerPolicy: 'no-referrer',
             signal: AbortSignal.any([request.signal, AbortSignal.timeout(5000)])
         }).then(response => response.ok ? response.json() : null).then(result => {
-            if (!result || request.signal.aborted || skipMedia !== media || media.hash !== location.hash ||
+            // The service returns a representative runtime for a release group.
+            const toleranceMs = Math.max(1000, Math.min(5000, media.duration * 5));
+            if (!result || request.signal.aborted || skipMedia !== media || media.path !== playerPath() ||
                 !Number.isFinite(result.group_duration_ms) ||
-                Math.abs(result.group_duration_ms - media.duration * 1000) > 1000) return;
+                Math.abs(result.group_duration_ms - media.duration * 1000) > toleranceMs) return;
             if (query.has('season') && (result.type !== 'tv' || result.season !== Number(query.get('season')) ||
                 result.episode !== Number(query.get('episode')))) return;
             if (!query.has('season') && result.type !== 'movie') return;
@@ -246,7 +252,7 @@
     }
 
     function currentSkip() {
-        if (!skipMedia || skipMedia.hash !== location.hash || !Number.isFinite(skipMedia.time)) return null;
+        if (!skipMedia || skipMedia.path !== playerPath() || !Number.isFinite(skipMedia.time)) return null;
         const {local, remote, time} = skipMedia;
         const containsTime = segment => segment.start <= time && time < segment.end;
         return local.find(containsTime) || remote.find(containsTime) || null;
@@ -295,7 +301,7 @@
 
     function updateSkipLookup(enabled) {
         skipLookupEnabled = enabled;
-        if (skipMedia?.duration > 0 && skipMedia.hash === location.hash) prepareSkips(skipMedia);
+        if (skipMedia?.duration > 0 && skipMedia.path === playerPath()) prepareSkips(skipMedia);
         schedule();
     }
 
@@ -1069,7 +1075,7 @@
     }
 
     function trackPlaybackRoute() {
-        const path = location.hash.split('?')[0];
+        const path = playerPath();
         if (path === playbackPath) return;
         playbackPath = path;
         // The hosted player can mount feedback before mpv sends any file events.
@@ -1104,10 +1110,12 @@
             return;
         }
         if (payload?.args?.[0] === 'skip-media-changed') {
-            skipMedia?.request?.abort();
             const media = payload.args[1];
+            const path = playerPath();
+            if (skipMedia && media?.seekable && skipMedia.serial === media.serial && skipMedia.path !== path) return;
+            skipMedia?.request?.abort();
             skipMedia = media?.seekable === true && typeof media.serial === 'string' ? {
-                serial: media.serial, hash: location.hash, time: media['time-pos'], duration: media.duration,
+                serial: media.serial, path, time: media['time-pos'], duration: media.duration,
                 chapters: Array.isArray(media.chapters) ? media.chapters : [], local: [], remote: []
             } : null;
             if (skipMedia?.duration > 0) prepareSkips(skipMedia);
@@ -1178,7 +1186,7 @@
     }, true);
     window.addEventListener('hashchange', () => {
         applyLibraryRoute();
-        if (skipMedia?.hash !== location.hash) skipMedia?.request?.abort();
+        if (skipMedia?.path !== playerPath()) skipMedia?.request?.abort();
         schedule();
     });
     window.addEventListener('storage', event => {

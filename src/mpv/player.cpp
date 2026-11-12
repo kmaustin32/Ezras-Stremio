@@ -66,6 +66,8 @@ static nlohmann::json mpvNodeToJson(const mpv_node* node)
 // File lifecycle and skip requests are both handled on the window thread.
 static unsigned long long skipMediaSerial = 0;
 static bool skipMediaLoaded = false;
+static nlohmann::json lastSkipMetadata;
+static constexpr uint64_t skipMetadataObserver = 0x455A5100;
 static constexpr uint64_t shaderReplyBase = 0x455A5200;
 
 static bool IsCurrentFile(const std::string& serial)
@@ -123,25 +125,33 @@ void ResumeChangedSource(const std::vector<std::string>& args)
     HandleMpvCommand({"seek", args[1], "absolute+exact"});
 }
 
-void NotifySkipMedia()
+static void PublishSkipMedia(bool force)
 {
     if (!g_webview) return;
     nlohmann::json media = {{"serial", std::to_string(skipMediaSerial)}, {"seekable", false}};
     int seekable = 0;
     if (g_mpv && skipMediaLoaded && mpv_get_property(g_mpv, "seekable", MPV_FORMAT_FLAG, &seekable) >= 0 && seekable) {
         media["seekable"] = true;
-        for (const char* property : {"duration", "time-pos"}) {
-            double value = 0;
-            if (mpv_get_property(g_mpv, property, MPV_FORMAT_DOUBLE, &value) >= 0)
-                media[property] = value;
-        }
+        double duration = 0;
+        if (mpv_get_property(g_mpv, "duration", MPV_FORMAT_DOUBLE, &duration) >= 0)
+            media["duration"] = duration;
         mpv_node chapters{};
         if (mpv_get_property(g_mpv, "chapter-list", MPV_FORMAT_NODE, &chapters) >= 0) {
             media["chapters"] = mpvNodeToJson(&chapters);
             mpv_free_node_contents(&chapters);
         }
     }
+    if (!force && media == lastSkipMetadata) return;
+    lastSkipMetadata = media;
+    double position = 0;
+    if (seekable && mpv_get_property(g_mpv, "time-pos", MPV_FORMAT_DOUBLE, &position) >= 0)
+        media["time-pos"] = position;
     SendToJS("skip-media-changed", media);
+}
+
+void NotifySkipMedia()
+{
+    PublishSkipMedia(true);
 }
 
 void SeekSkipSegment(const std::vector<std::string>& args)
@@ -237,6 +247,10 @@ void HandleMpvEvents()
         }
         case MPV_EVENT_PROPERTY_CHANGE:
         {
+            if (ev->reply_userdata == skipMetadataObserver) {
+                if (skipMediaLoaded) PublishSkipMedia(false);
+                break;
+            }
             mpv_event_property* prop=(mpv_event_property*)ev->data;
             if(!prop||!prop->name)break;
 
@@ -421,6 +435,8 @@ bool InitMPV(HWND hwnd)
         AppendToCrashLog("[MPV]: Initialize failed");
         return false;
     }
+    for (const char* property : {"seekable", "chapter-list", "duration"})
+        mpv_observe_property(g_mpv, skipMetadataObserver, property, MPV_FORMAT_NODE);
 
     if (!ApplyBorderBlurPreference(g_mpv, ReadBorderBlurPreference(
             cfg + L"\\stremio-settings.ini"))) {
