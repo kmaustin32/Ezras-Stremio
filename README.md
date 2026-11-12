@@ -23,7 +23,7 @@
 
 ## ✨ Made for your player
 
-Everything added to this fork, from the first mpv upgrade through **2.1.3**.
+Everything added to this fork, from the first mpv upgrade through **2.1.4**.
 
 | Feature | What you get |
 | --- | --- |
@@ -41,7 +41,7 @@ Everything added to this fork, from the first mpv upgrade through **2.1.3**.
 | 🔈 **Quiet startup and volume feedback** | Automatic startup volume resets keep the speaker popup hidden. Manual changes show the popup, even during pause or with Never hide enabled, and restart its 1.5-second timer. |
 | ℹ️ **Translucent info drawer** | Press **I** for the episode or movie information drawer. Its background uses **6% transparency** in both themes, with fully opaque text and controls. |
 | ⏭️ **Reliable autoplay control** | Turning off Auto play next episode stops automatic advancement and cancels its countdown. Manual Next and watch-progress handling remain available. |
-| 🎬 **Skip Intro & Skip Outro** | A translucent button fades in above the seek bar during a labeled intro or outro. Enable **Settings → Player → Controls → Look up skip timestamps** for optional [TheIntroDB](https://theintrodb.org/) coverage for videos without those chapters. A skip that ends the episode follows your autoplay preference. |
+| 🎬 **Skip Intro & Skip Outro** | A translucent button fades in above the seek bar during a recognized intro or outro. It uses labeled chapters and supports the numbered opening, two acts, credits, and preview layout used by some anime releases. Turn on **Settings → Player → Controls → Look up skip timestamps** for optional [TheIntroDB](https://theintrodb.org/) coverage. A skip that ends the episode follows your autoplay preference. |
 | 🙈 **Consistent spoiler protection** | Unwatched episode thumbnails stay blurred on show pages, in the episode drawer and in the next-episode popup, including alternate images and anime using absolute episode numbers. Watched-state and setting changes update existing images. |
 | ✅ **Custom watched colors** | **Settings → General → Secondary color** offers purple, amber, teal, dusty rose and sage. Amber is the default. The choice applies to watched tags and checkmark badges in both modes. |
 | ✨ **Poster hover and Library polish** | Show and movie covers zoom in a little more slowly, with a soft white glow in Light Mode and **#858B99** in Dark Mode. Library search, filters and sort chips share the squared corners of Settings dropdowns, and the selected sort uses the main purple. |
@@ -73,11 +73,13 @@ The fork version appears alongside the other version numbers in Settings. Window
 
 **2.1.3** restores **Skip Intro** and **Skip Outro** when embedded chapters arrive after playback starts or TheIntroDB returns a close runtime match. [2.1.3 release notes](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.1.3)
 
+**2.1.4** recognizes the numbered chapter layout in the tested Inuyasha source and makes the optional skip lookup switch visible in Player settings on both the community and official web interfaces. [2.1.4 release notes](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.1.4)
+
 | Download | How to use it |
 | --- | --- |
-| 📥 [**2.1.3 installer — recommended**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.3/Ezras-Stremio-2.1.3-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
-| 💼 [**2.1.3 portable ZIP**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.3/Ezras-Stremio-2.1.3-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
-| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.3/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
+| 📥 [**2.1.4 installer — recommended**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.4/Ezras-Stremio-2.1.4-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
+| 💼 [**2.1.4 portable ZIP**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.4/Ezras-Stremio-2.1.4-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
+| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.4/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
 
 Use files named **Ezras-Stremio** for this fork. Downloads marked **BUILD-ONLY** are archived build dependencies. Community package-manager listings install the upstream edition; use this fork's releases for these features.
 

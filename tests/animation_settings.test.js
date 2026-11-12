@@ -70,6 +70,27 @@ async function setup(saved, savedTimeout, useClock = false) {
     return {browser, page, select, boot, show, overlay, settled, errors};
 }
 
+test('Skip timestamp lookup has a visible On/Off switch in Player Controls and retains its choice', async () => {
+    const {browser, page, boot, errors} = await setup();
+    try {
+        const player = page.locator('#player-section');
+        const lookup = player.getByRole('switch', {name: 'Look up skip timestamps', exact: true});
+        const state = player.locator('#stremio-fork-skip-state');
+        await lookup.waitFor({state: 'visible'});
+        assert.ok((await lookup.boundingBox()).width > 25);
+        assert.equal(await state.innerText(), 'Off');
+        await lookup.press('Space');
+        await state.filter({hasText: 'On'}).waitFor();
+        assert.ok(await lookup.isChecked());
+        await page.reload(); await boot();
+        assert.ok(await lookup.isChecked());
+        await state.click();
+        await state.filter({hasText: 'Off'}).waitFor();
+        assert.equal(await page.evaluate(() => localStorage.getItem('stremio-fork-skip-lookup')), 'false');
+        assert.deepEqual(errors, []);
+    } finally {await browser.close();}
+});
+
 test('Player animation setting offers every requested speed, changes real transitions, and survives reload without changing other preferences', async () => {
     const {browser, page, select, boot, show, overlay, settled, errors} = await setup();
     try {

@@ -18,14 +18,14 @@ const body = `<html><style>
     <div class="control-bar-layer-fixture"><div class="seek-bar-container-fixture"></div></div>
 </div></body></html>`;
 
-async function setup(t, {lookup = false, reducedMotion = 'no-preference'} = {}) {
+async function setup(t, {lookup = false, reducedMotion = 'no-preference', host = 'stremio.zarg.me'} = {}) {
     const browser = await chromium.launch({executablePath, headless: true});
     t.after(() => browser.close());
     const page = await browser.newPage({viewport: {width: 1280, height: 720}, reducedMotion});
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     t.after(() => assert.deepEqual(errors, []));
-    await page.route('https://stremio.zarg.me/**', request => request.fulfill({contentType: 'text/html', body}));
+    await page.route(`https://${host}/**`, request => request.fulfill({contentType: 'text/html', body}));
     await page.addInitScript(({lookup}) => {
         if (lookup) localStorage.setItem('stremio-fork-skip-lookup', 'true');
         localStorage.setItem('stremio-fork-control-animation-duration', '0');
@@ -37,7 +37,7 @@ async function setup(t, {lookup = false, reducedMotion = 'no-preference'} = {}) 
             postMessage: message => window.messages.push(JSON.parse(message).args)
         }};
     }, {lookup});
-    await page.goto('https://stremio.zarg.me/' + route);
+    await page.goto(`https://${host}/` + route);
     await page.addScriptTag({content: script});
     const native = (name, value) => page.evaluate(([name, value]) => window.native(name, value), [name, value]);
     const media = overrides => native('skip-media-changed', {serial: '1', seekable: true, duration: 120,
@@ -163,12 +163,22 @@ test('Chapter-only playback sends no timestamp request and hides prompts for amb
 });
 
 test('A close TheIntroDB release match supplies both skips across player query changes', async t => {
-    const {page, media, time, prompt, seeks, label} = await setup(t, {lookup: true});
+    const {page, media, time, prompt, seeks, label} = await setup(t, {host: 'web.stremio.com'});
     // Reproduces the 4-second difference returned by the public API for this episode.
     await page.route('https://api.theintrodb.org/**', request => request.fulfill({json: {
         type: 'tv', season: 1, episode: 1, group_duration_ms: 3696000,
         intro: [{start_ms: 473681, end_ms: 571154}], credits: [{start_ms: 3630040, end_ms: null}]
     }}));
+    await page.evaluate(() => document.body.insertAdjacentHTML('beforeend', `
+        <div id="settings-fixture"><button data-section="player">Player</button>
+        <div class="section-hcYuV"><div class="label-wXG3e">Player</div>
+        <div class="category-GP0hI"><div class="heading-XePFl"><span class="label-N_O2v">Subtitles</span></div>
+        <div class="option-vFOAS"><div class="heading-dYMDt"><span class="label-qI6Vh">Language</span></div>
+        <div class="content-P2T0i"><button>Default</button></div></div></div></div></div>`));
+    const lookup = page.getByRole('switch', {name: 'Look up skip timestamps', exact: true});
+    await lookup.press('Space');
+    assert.ok(await lookup.isChecked());
+    await page.locator('#settings-fixture').evaluate(element => element.remove());
     await media({duration: 3700, 'time-pos': 480});
     await label('Skip Intro');
     await page.evaluate(() => {location.hash += '?streamingServerUrl=http%3A%2F%2Flocalhost%3A11470';});
@@ -198,4 +208,44 @@ test('Late chapter metadata updates the current file without reusing its chapter
     assert.deepEqual(await seeks(), [['seek-skip-segment', ['2', '90', '120']]]);
     await time(120);
     await absent();
+});
+
+test('The numbered Inuyasha chapters skip the opening and credits while preserving the preview', async t => {
+    const {media, time, prompt, seeks, label, absent} = await setup(t);
+    const duration = 1467.466;
+    const chapters = [0.125, 95.637, 860.985, 1331.205, 1427.092]
+        .map((time, index) => ({title: `Chapter ${index + 6}`, time}));
+    await media({duration, chapters, 'time-pos': 20});
+    await label('Skip Intro');
+    await prompt.click();
+    await time(95.637);
+    await absent();
+    await time(1350);
+    await label('Skip Outro');
+    await prompt.click();
+    await time(1427.092);
+    await absent();
+    assert.deepEqual(await seeks(), [
+        ['seek-skip-segment', ['1', '0.125', '95.637']],
+        ['seek-skip-segment', ['1', '1331.205', '1427.092']]
+    ]);
+    const ambiguous = chapters.map((chapter, index) => index === 1 ? {...chapter, time: 215} : chapter);
+    await media({serial: '2', duration, chapters: ambiguous, 'time-pos': 20});
+    await time(1350);
+    await absent();
+});
+
+test('Explicit intro end markers and annotated credits use their chapter boundaries', async t => {
+    const {media, time, prompt, seeks, label} = await setup(t);
+    const chapters = [{title: 'Chapter 1', time: 0}, {title: 'Opening (End)', time: 24},
+        {title: 'ED – Theme title', time: 95}, {title: 'Preview', time: 110}];
+    await media({chapters, 'time-pos': 12});
+    await label('Skip Intro');
+    await prompt.click();
+    await time(100);
+    await label('Skip Outro');
+    await prompt.click();
+    assert.deepEqual(await seeks(), [
+        ['seek-skip-segment', ['1', '0', '24']], ['seek-skip-segment', ['1', '95', '110']]
+    ]);
 });

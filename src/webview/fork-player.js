@@ -176,19 +176,50 @@
     }
 
     function chapterSkips(chapters, duration) {
+        const introName = '(?:intro(?:duction)?|opening(?: (?:credits|theme|song))?|op|オープニング)';
+        const outroName = '(?:outro|ending(?: (?:credits|theme|song))?|end credits|credits|ed|エンディング)';
+        const annotation = '(?:\\s*\\d+)?(?:\\s*(?:[-:]\\s*.+|\\([^)]*\\)|\\[[^\\]]*\\]))?';
+        const intro = new RegExp(`^${introName}${annotation}$`, 'i');
+        const outro = new RegExp(`^${outroName}${annotation}$`, 'i');
+        const introEnd = new RegExp(`^(?:end of ${introName}|${introName}(?:\\s+|\\s*[-:]\\s*|\\s*\\()end\\)?)$`, 'i');
         return chapters.flatMap((chapter, index) => {
-            const title = typeof chapter?.title === 'string' ? chapter.title.trim() : '';
-            const intro = /^(?:intro(?:duction)?|opening(?: (?:credits|theme))?|op)(?:\s*\d+)?$/i.test(title);
-            const outro = /^(?:outro|ending(?: (?:credits|theme))?|end credits|credits|ed)(?:\s*\d+)?$/i.test(title);
-            if (!intro && !outro) return [];
+            const title = typeof chapter?.title === 'string' ? chapter.title.normalize('NFKC').trim()
+                .replace(/[–—]/g, '-').replace(/\s+/g, ' ') : '';
+            if (introEnd.test(title)) {
+                const previous = chapters[index - 1];
+                if (previous?.title && !/^chapter\s+\d+$/i.test(previous.title.trim())) return [];
+                const start = previous?.time ?? 0;
+                const end = chapter.time;
+                // An explicit end marker can stand in for an unlabeled opening chapter.
+                return end <= 300 && end - start <= 180 && validSkip(start, end, duration) ? [{kind: 'intro', start, end}] : [];
+            }
+            const isIntro = intro.test(title);
+            const isOutro = outro.test(title) && !/\bend\)?$/i.test(title);
+            if (!isIntro && !isOutro) return [];
             const start = chapter.time;
-            const end = index + 1 < chapters.length ? chapters[index + 1]?.time : outro ? duration : null;
-            return validSkip(start, end, duration) ? [{kind: intro ? 'intro' : 'outro', start, end}] : [];
+            const end = index + 1 < chapters.length ? chapters[index + 1]?.time : isOutro ? duration : null;
+            return validSkip(start, end, duration) ? [{kind: isIntro ? 'intro' : 'outro', start, end}] : [];
         });
     }
 
     function validSkip(start, end, duration) {
         return Number.isFinite(start) && Number.isFinite(end) && start >= 0 && start < end && end <= duration;
+    }
+
+    function numberedEpisodeSkips(chapters, duration, path) {
+        if (!/^#\/player\/[^/]+\/[^/]*\/[^/]*\/series\//.test(path) ||
+            chapters.length !== 5 || duration < 1200 || duration > 1650) return [];
+        const numbers = chapters.map(chapter => typeof chapter?.title === 'string'
+            ? /^chapter\s+(\d{1,6})$/i.exec(chapter.title.trim())?.[1] : undefined);
+        if (!numbers.every((number, index) => number !== undefined && Number(number) === Number(numbers[0]) + index)) return [];
+        const [opening, firstPart, secondPart, credits, preview] = chapters.map(chapter => chapter.time);
+        const songLength = seconds => seconds >= 60 && seconds <= 120;
+        // Some anime releases use sequential chapter names for the opening, two acts, credits and preview.
+        if (!(opening <= 2 && songLength(firstPart - opening) && secondPart - firstPart >= 180 &&
+            credits - secondPart >= 180 && songLength(preview - credits) &&
+            duration - preview >= 10 && duration - preview <= 75 &&
+            validSkip(opening, firstPart, duration) && validSkip(credits, preview, duration))) return [];
+        return [{kind: 'intro', start: opening, end: firstPart}, {kind: 'outro', start: credits, end: preview}];
     }
 
     function playerPath() {
@@ -214,6 +245,7 @@
 
     function prepareSkips(media) {
         media.local = chapterSkips(media.chapters, media.duration);
+        if (!media.local.length) media.local = numberedEpisodeSkips(media.chapters, media.duration, media.path);
         media.remote = [];
         media.request?.abort();
         const query = skipLookupEnabled && skipLookupQuery(media.path, media.duration);
@@ -336,28 +368,34 @@
     }
 
     function updateControlSettings() {
-        for (const settings of document.querySelectorAll('[class*="settings-container"]')) {
+        const roots = Array.from(document.querySelectorAll('[class*="settings-container"]'));
+        if (location.hostname === 'web.stremio.com') roots.push(document);
+        for (const settings of roots) {
+            // The official fallback uses different Settings components from the community page.
+            const official = settings === document;
             const playerLabel = settings.querySelector('[data-section="player"]')?.textContent.trim();
             if (!playerLabel) continue;
-            const section = Array.from(settings.querySelectorAll('[class*="section-container"]')).find(candidate =>
-                candidate.querySelector(':scope > [class*="section-title"]')?.textContent.trim() === playerLabel);
-            if (!section) continue;
+            const titleSelector = official ? ':scope > [class^="label-"]' : ':scope > [class*="section-title"]';
+            const sections = settings.querySelectorAll(official ? '[class^="section-"]:has(> [class^="category-"])' : '[class*="section-container"]');
+            const titleNode = Array.from(sections, section => section.querySelector(titleSelector))
+                .find(title => title?.textContent.trim() === playerLabel);
+            if (!titleNode) continue;
+            const section = titleNode.parentElement;
             let group = section.querySelector('#stremio-fork-animation-setting');
             if (!group) {
-                const row = section.querySelector(':scope > [class*="option-container"]');
-                const name = row?.querySelector('[class*="option-name-container"]');
-                const input = row?.querySelector('[class*="option-input-container"]');
+                const row = section.querySelector(official ? '[class^="option-"]:has(> [class^="heading-"]):has(> [class^="content-"])' :
+                    ':scope > [class*="option-container"]:has([class*="option-name-container"] [class*="label"]):has([class*="option-input-container"])');
+                const name = row?.querySelector(official ? ':scope > [class^="heading-"]' : '[class*="option-name-container"]');
+                const input = row?.querySelector(official ? ':scope > [class^="content-"]' : '[class*="option-input-container"]');
                 const label = name?.querySelector('[class*="label"]');
                 if (!row || !name || !input || !label) continue;
                 group = document.createElement('div');
                 group.id = 'stremio-fork-animation-setting';
-                const category = section.querySelector(':scope > [class*="section-category-container"]');
-                if (category) {
-                    const heading = document.createElement('div'); heading.className = category.className;
-                    const title = document.createElement('div');
-                    title.className = category.querySelector('[class*="label"]')?.className || label.className;
-                    title.textContent = 'Controls'; heading.append(title); group.append(heading);
-                }
+                const category = section.querySelector(official ? ':scope > [class^="category-"] > [class^="heading-"]' : ':scope > [class*="section-category-container"]');
+                const heading = document.createElement('div'); heading.className = category?.className ?? '';
+                const headingTitle = document.createElement('div');
+                headingTitle.className = category?.querySelector('[class*="label"]')?.className || label.className;
+                headingTitle.textContent = 'Controls'; heading.append(headingTitle); group.append(heading);
                 const entry = document.createElement('div'); entry.className = row.className;
                 const description = document.createElement('div'); description.className = name.className;
                 const title = document.createElement('label'); title.className = label.className;
@@ -367,7 +405,7 @@
                 help.textContent = 'Choose how quickly player controls slide in and out, in seconds. Off shows and hides them instantly. Reduced motion follows your system preference.';
                 description.append(title, help);
                 const controls = document.createElement('div');
-                controls.className = input.className.split(/\s+/).filter(value => value.includes('option-input-container')).join(' ');
+                controls.className = official ? input.className : input.className.split(/\s+/).filter(value => value.includes('option-input-container')).join(' ');
                 const select = document.createElement('select'); select.id = title.htmlFor;
                 select.setAttribute('aria-describedby', help.id);
                 animationDurations.forEach((value, index) => {
@@ -418,20 +456,25 @@
                 const lookupName = document.createElement('div'); lookupName.className = name.className;
                 const lookupLabel = document.createElement('label'); lookupLabel.className = label.className;
                 lookupLabel.htmlFor = 'stremio-fork-skip-lookup'; lookupLabel.textContent = 'Look up skip timestamps';
+                lookupLabel.id = 'stremio-fork-skip-label';
                 const lookupHelp = document.createElement('p'); lookupHelp.className = help.className;
                 lookupHelp.id = 'stremio-fork-skip-help';
                 lookupHelp.textContent = 'Use TheIntroDB when the video has no labeled intro or outro chapter. Shares the title ID, episode number and runtime with TheIntroDB.';
                 lookupName.append(lookupLabel, lookupHelp);
                 const lookupControls = document.createElement('div'); lookupControls.className = controls.className;
                 const lookup = document.createElement('input'); lookup.type = 'checkbox'; lookup.id = lookupLabel.htmlFor;
+                lookup.setAttribute('role', 'switch');
+                lookup.setAttribute('aria-labelledby', lookupLabel.id);
                 lookup.setAttribute('aria-describedby', lookupHelp.id);
+                const lookupState = document.createElement('label'); lookupState.htmlFor = lookup.id;
+                lookupState.id = 'stremio-fork-skip-state'; lookupState.setAttribute('aria-hidden', 'true');
                 lookup.addEventListener('change', () => {
                     try { localStorage.setItem(skipLookupKey, String(lookup.checked)); } catch {}
                     updateSkipLookup(lookup.checked);
                 });
-                lookupControls.append(lookup); lookupEntry.append(lookupName, lookupControls); group.append(lookupEntry);
+                lookupControls.append(lookup, lookupState); lookupEntry.append(lookupName, lookupControls); group.append(lookupEntry);
                 // Append only fork-owned nodes; React retains all native rows.
-                section.querySelector(':scope > [class*="section-title"]').after(group);
+                titleNode.after(group);
             }
             const select = group.querySelector('select');
             if (select.value !== animationDuration) select.value = animationDuration;
@@ -444,6 +487,9 @@
             if (timeoutNote.textContent !== timeoutStatus) timeoutNote.textContent = timeoutStatus;
             timeoutNote.hidden = !timeoutStatus;
             group.querySelector('#stremio-fork-skip-lookup').checked = skipLookupEnabled;
+            const lookupState = group.querySelector('#stremio-fork-skip-state');
+            const lookupText = skipLookupEnabled ? 'On' : 'Off';
+            if (lookupState.textContent !== lookupText) lookupState.textContent = lookupText;
         }
     }
 
@@ -794,8 +840,19 @@
             #stremio-fork-animation-setting [class*="option-name-container"] {
                 flex-direction:column!important;align-items:stretch!important;
             }
+            #stremio-fork-skip-lookup {
+                appearance:none;display:inline-grid;place-items:center start;flex:none;
+                box-sizing:border-box;width:3.2rem;height:1.75rem;margin:0 .65rem 0 0;padding:.15rem;
+                border:1px solid #858b99;border-radius:1rem;background:#222635;cursor:pointer;
+            }
+            #stremio-fork-skip-lookup::before {
+                content:"";width:1.2rem;height:1.2rem;border-radius:50%;background:#fff;
+            }
+            #stremio-fork-skip-lookup:checked {background:#7272c2;border-color:#aaaaf0;justify-items:end}
+            #stremio-fork-skip-lookup:focus-visible {outline:2px solid #aaaaf0;outline-offset:3px}
+            #stremio-fork-skip-state {font-size:1rem;cursor:pointer}
             [class*="settings-container"] [class*="option-input-container"]:has(> select) {padding:0!important}
-            #stremio-fork-animation-duration,
+            #stremio-fork-animation-duration, #stremio-fork-control-timeout,
             [class*="settings-container"] [class*="option-input-container"] select,
             [class*="settings-container"] [class*="option-input-container"][class*="multiselect-container"] {
                 width:100%;max-width:20rem;min-height:3.25rem;padding:.65rem 1rem!important;
@@ -804,7 +861,7 @@
                 cursor:pointer;color-scheme:dark;appearance:auto;
                 box-sizing:border-box;height:auto;overflow:visible;
             }
-            #stremio-fork-animation-duration:focus-visible,
+            #stremio-fork-animation-duration:focus-visible, #stremio-fork-control-timeout:focus-visible,
             [class*="settings-container"] [class*="option-input-container"] select:focus-visible,
             [class*="settings-container"] [class*="option-input-container"][class*="multiselect-container"]:focus-visible {
                 outline:2px solid #7272c2;outline-offset:3px;
