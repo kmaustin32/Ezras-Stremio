@@ -23,7 +23,7 @@
 
 ## ✨ Made for your player
 
-Everything added to this fork, from the first mpv upgrade through **2.1.1**.
+Everything added to this fork, from the first mpv upgrade through **2.1.2**.
 
 | Feature | What you get |
 | --- | --- |
@@ -69,11 +69,13 @@ Everything added to this fork, from the first mpv upgrade through **2.1.1**.
 
 The fork version appears alongside the other version numbers in Settings. Windows preserves Unicode filenames when opening local videos. [2.1.1 release notes](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.1.1)
 
+**2.1.2** makes **Home → Continue Watching** posters 1.35× their original width and height, with horizontal scrolling. Poster hover borders are 1 px thicker throughout the app in both themes. [2.1.2 release notes](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.1.2)
+
 | Download | How to use it |
 | --- | --- |
-| 📥 [**2.1.1 installer — recommended**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.1/Ezras-Stremio-2.1.1-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
-| 💼 [**2.1.1 portable ZIP**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.1/Ezras-Stremio-2.1.1-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
-| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.1/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
+| 📥 [**2.1.2 installer — recommended**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.2/Ezras-Stremio-2.1.2-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
+| 💼 [**2.1.2 portable ZIP**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.2/Ezras-Stremio-2.1.2-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
+| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.2/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
 
 Use files named **Ezras-Stremio** for this fork. Downloads marked **BUILD-ONLY** are archived build dependencies. Community package-manager listings install the upstream edition; use this fork's releases for these features.
 

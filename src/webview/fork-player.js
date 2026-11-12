@@ -17,6 +17,8 @@
     let maximum = 130;
     let pipEnabled = false;
     let scheduled = false;
+    let continueWatchingLayout;
+    const continueWatchingResize = new ResizeObserver(schedule);
     let button;
     let pipButton;
     let compatibility = null;
@@ -853,10 +855,13 @@
                 --stremio-poster-highlight:255 255 255;
             }
             ${poster} [class*="poster-image-layer-"] {transition:transform .18s ease-out}
+            [data-stremio-large-continue-watching] {overflow-x:auto!important;overflow-y:hidden!important;padding-block:.5rem}
+            [data-stremio-large-continue-watching] > [class*="meta-item-"] {box-sizing:border-box;flex:0 0 min(100%,var(--stremio-continue-card-width))!important}
+            [data-stremio-large-continue-watching] > :not(:has([class*="poster-container-"])) {display:none!important}
             @media (hover:hover) {
                 ${poster} {transition:box-shadow .18s ease-out}
                 [class*="meta-item-container-"]:hover:not(:focus-visible) [class*="poster-container-"] {
-                    box-shadow:0 0 0 .125rem rgb(var(--stremio-poster-highlight) / 70%),
+                    box-shadow:0 0 0 calc(.125rem + 1px) rgb(var(--stremio-poster-highlight) / 70%),
                         0 0 .9rem .15rem rgb(var(--stremio-poster-highlight) / 45%);
                 }
             }
@@ -972,8 +977,34 @@
         }
     }
 
+    function resizeContinueWatching() {
+        const row = document.querySelector('[class*="board-container-"] [class*="continue-watching-row-"] [class*="meta-items-container-"]');
+        const previous = continueWatchingLayout;
+        if (row !== (previous?.row ?? null)) {
+            continueWatchingResize.disconnect();
+            continueWatchingLayout = undefined;
+            if (row) continueWatchingResize.observe(row);
+        }
+        if (!row?.clientWidth) return;
+        const cards = Array.from(row.children);
+        const posters = cards.map(card => card.querySelector('[class*="poster-container-"]'));
+        const classes = cards.map(card => card.className).join('\n');
+        const width = row.clientWidth, viewport = window.innerWidth;
+        if (row === previous?.row && width === previous.width && viewport === previous.viewport &&
+            classes === previous.classes && cards.every((card, index) => card === previous.cards[index] && posters[index] === previous.posters[index])) return;
+        // Measure the hosted layout at this width so its responsive card sizes and poster ratios carry over.
+        const scroll = row.scrollLeft;
+        row.removeAttribute('data-stremio-large-continue-watching');
+        const widths = cards.map((card, index) => card.offsetWidth + (posters[index]?.offsetWidth ?? 0) * .35);
+        cards.forEach((card, index) => card.style.setProperty('--stremio-continue-card-width', widths[index] + 'px'));
+        row.setAttribute('data-stremio-large-continue-watching', '');
+        row.scrollLeft = scroll;
+        continueWatchingLayout = {row, width, viewport, cards, classes, posters};
+    }
+
     function update() {
         scheduled = false;
+        resizeContinueWatching();
         recolorLogos();
         updatePlayerShortcuts();
         updateControlSettings();
