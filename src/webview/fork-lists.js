@@ -18,7 +18,8 @@
     const newDefaults = () => defaults.map(list => ({...list, items: []}));
     const categoryIds = new Set(defaults.map(list => list.id));
     const reservedListIds = new Set(['all', 'most-watched', 'watched', 'not-watched']);
-    const sortLabels = new Map([['name', 'A–Z'], ['namereverse', 'Z–A'], ['lastwatched', 'Last Watched'],
+    // Keep the dash ASCII-escaped in the script embedded by the Windows compiler.
+    const sortLabels = new Map([['name', 'A\u2013Z'], ['namereverse', 'Z\u2013A'], ['lastwatched', 'Last Watched'],
         ['watched', 'Watched'], ['notwatched', 'Not Watched']]);
 
     function decodeLists(raw) {

@@ -23,7 +23,7 @@
 
 ## ✨ Made for your player
 
-Everything added to this fork, from the first mpv upgrade through **2.1.5 Beta 1**.
+Everything added to this fork, from the first mpv upgrade through **2.1.5 Beta 2**.
 
 | Feature | What you get |
 | --- | --- |
