@@ -366,6 +366,7 @@ test('Live Library creates lists, adds multiple titles to multiple lists, and pl
         await toolbar.locator('[data-value="#/library?forkList=anime"][class*="active-"]').waitFor();
         await type.click();
         await page.getByRole('listbox').getByText('All', {exact: true}).click();
+        await page.getByTitle('Older Movie', {exact: true}).waitFor();
         assert.deepEqual(await titles(), ['Another Show', 'Fixture Show', 'Older Movie']);
         await select.click();
         await page.getByRole('listbox').getByText('A–Z', {exact: true}).click();
@@ -494,6 +495,7 @@ test('Library combines list, sort, watched status, and content type through its 
         await waitForHighlight('Anime');
         await chooseType('Movie');
         await page.waitForURL('**/#/library/movie?sort=lastwatched&forkList=anime');
+        await page.getByTitle('Older Movie', {exact: true}).waitFor();
         assert.deepEqual(await titles(), ['Older Movie']);
         await chooseSort('Not Watched');
         await page.getByText('No matching titles.', {exact: true}).waitFor();
