@@ -23,7 +23,7 @@
 
 ## ✨ Made for your player
 
-Everything added to this fork, from the first mpv upgrade through **2.1.4**.
+Everything added to this fork, from the first mpv upgrade through **2.1.5 Beta 1**.
 
 | Feature | What you get |
 | --- | --- |
@@ -44,10 +44,10 @@ Everything added to this fork, from the first mpv upgrade through **2.1.4**.
 | 🎬 **Skip Intro & Skip Outro** | A translucent button fades in above the seek bar during a recognized intro or outro. It uses labeled chapters and supports the numbered opening, two acts, credits, and preview layout used by some anime releases. Turn on **Settings → Player → Controls → Look up skip timestamps** for optional [TheIntroDB](https://theintrodb.org/) coverage. A skip that ends the episode follows your autoplay preference. |
 | 🙈 **Consistent spoiler protection** | Unwatched episode thumbnails stay blurred on show pages, in the episode drawer and in the next-episode popup, including alternate images and anime using absolute episode numbers. Watched-state and setting changes update existing images. |
 | ✅ **Custom watched colors** | **Settings → General → Secondary color** offers purple, amber, teal, dusty rose and sage. Amber is the default. The choice applies to watched tags and checkmark badges in both modes. |
-| ✨ **Poster hover and Library polish** | Show and movie covers zoom in a little more slowly, with a soft white glow in Light Mode and **#858B99** in Dark Mode. Library search, filters and sort chips share the squared corners of Settings dropdowns, and the selected sort uses the main purple. |
+| ✨ **Poster hover and Library polish** | Show and movie covers zoom in a little more slowly, with a soft white glow in Light Mode and **#858B99** in Dark Mode. Library search, dropdowns and list chips share the squared corners of Settings dropdowns, and the selected list uses the main purple. |
 | 🎟️ **Library shows open details** | Selecting a show in **Library** opens its episode details instead of immediately resuming a cached stream, so you can choose an episode and playback source. Movies, Continue Watching and explicit Play actions keep their behavior. |
 | 🗂️ **Custom Library lists** | Create lists, add a title to multiple lists, and **Ctrl+click** to select titles for a bulk edit. Manage list names, order, and visibility on Home from the Library toolbar. |
-| 🧭 **Automatic categories and separate sorting** | Anime and Live Action fill from the saved Library and remember your manual moves. Watched and Unwatched filter titles, and each list can be sorted independently. |
+| 🧭 **Automatic categories and separate sorting** | Anime and Live Action fill from the saved Library and remember your manual moves. Apply a sort or watched filter within any list and narrow it to movies or series. |
 | 📚 **Readable library & add-on backup** | Export a dated ZIP with an offline HTML report, CSV lists and structured JSON. Preview and merge custom list memberships and manual category assignments from a backup. |
 | 🎨 **Picture and playback panel** | Confirm shader changes, adjust border blur and framing, save per-series preferences, change sources with optional resume, and copy playback diagnostics. |
 | ⚙️ **Clearer settings & shortcuts** | Long labels wrap, options have more breathing room, narrow windows stack controls, and Player Shortcuts lists every shipped input.conf binding plus the fork controls. |
@@ -135,11 +135,12 @@ Picture-in-Picture is beside fullscreen at the top of the player and in the tray
 
 ### Library lists
 
-- Choose **Create list** in the Library toolbar, name it, then find it in the **All / Movie / Series** dropdown.
+- Choose **Create list** in the Library toolbar, name it, then find it in the **Custom lists** menu.
 - Use **Manage lists** to rename, reorder, or delete lists and choose which ones appear on Home.
 - Open a title's three-dot menu and choose **Add to list**. A title can belong to several custom lists and one automatic category.
 - **Ctrl+click** posters to select several titles. Use the toolbar's **Add to list** button or open the three-dot menu on one of the selected titles.
-- **All** is between **Z–A** and **Anime**. Select one Library view at a time and use **Last Watched**, **A–Z**, or **Z–A** within it. **Most Watched** starts ranked by watch count. **Watched** and **Unwatched** filter the Library.
+- The list bar contains **All**, **Anime**, **Live Action**, and **Most Watched**. The sorting dropdown offers **A–Z**, **Z–A**, **Last Watched**, **Watched**, and **Not Watched**. **Most Watched** starts ranked by watch count.
+- Use the content-type dropdown within any list. For example, select **Anime**, choose **Movie**, then select **Watched** to see the anime movies you’ve watched.
 - **Anime** and **Live Action** fill from your saved Library, including older titles, at startup and as the Library changes. Anime IDs and a [public IMDb mapping index](https://github.com/Fribb/anime-lists) identify anime. **Live Action** is the catch-all for other titles, including unmatched titles and Western animation.
 - Use **Move to Anime** or **Move to Live Action** in the three-dot menu to save a correction. In-place updates keep existing custom lists and category choices. Home shows the lists after **Featured Movies**.
 - Automatic categories rebuild from your Stremio Library on a new computer. Custom lists and manual moves are saved per account on each device.

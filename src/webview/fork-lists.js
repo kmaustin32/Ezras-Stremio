@@ -17,8 +17,9 @@
     const storageKey = uid => storagePrefix + encodeURIComponent(uid);
     const newDefaults = () => defaults.map(list => ({...list, items: []}));
     const categoryIds = new Set(defaults.map(list => list.id));
-    const smartLists = new Map([['most-watched', 'timeswatched'], ['watched', 'watched'], ['not-watched', 'notwatched']]);
-    const sorts = new Set(['lastwatched', 'name', 'namereverse']);
+    const reservedListIds = new Set(['all', 'most-watched', 'watched', 'not-watched']);
+    const sortLabels = new Map([['name', 'A–Z'], ['namereverse', 'Z–A'], ['lastwatched', 'Last Watched'],
+        ['watched', 'Watched'], ['notwatched', 'Not Watched']]);
 
     function decodeLists(raw) {
         if (raw === null) return newDefaults();
@@ -44,7 +45,7 @@
         const result = current.map(list => ({...list, items: [...list.items]}));
         const rows = [];
         for (const list of incoming) {
-            if (list.id === 'all' || smartLists.has(list.id)) throw new Error('A list ID is reserved.');
+            if (reservedListIds.has(list.id)) throw new Error('A list ID is reserved.');
             if (!categoryIds.has(list.id) && list.name.trim().length > 60) throw new Error('A list name is too long.');
             const target = result.find(item => item.id === list.id || (!categoryIds.has(item.id) &&
                 !categoryIds.has(list.id) && item.name.trim().toLowerCase() === list.name.trim().toLowerCase()));
@@ -289,10 +290,17 @@
         return routeParams(value).get('sort')?.toLowerCase();
     }
 
-    function viewId(hash) {
-        const sort = sortValue(hash);
-        return routeParams(hash).get('forkList') ?? (sort === 'unwatched' ? 'not-watched'
-            : [...smartLists].find(([, legacySort]) => legacySort === sort)?.[0]);
+    function libraryView(hash) {
+        const path = hash.split('?')[0];
+        let list = routeParams(hash).get('forkList');
+        let sort = sortValue(hash);
+        // Keep links and browser history from earlier versions usable.
+        if (list === 'watched' || list === 'not-watched') {
+            sort = list === 'watched' ? 'watched' : 'notwatched';
+            list = 'all';
+        } else if (!list && sort === 'timeswatched') list = 'most-watched';
+        if (sort === 'unwatched') sort = 'notwatched';
+        return {path, list: list ?? 'all', sort: sortLabels.has(sort) ? sort : null};
     }
 
     function libraryRoute(path, list, sort) {
@@ -425,20 +433,19 @@
             return () => window.removeEventListener('hashchange', changed);
         }, []);
         const lists = data?.lists ?? newDefaults();
-        const requestedSort = sortValue(hash);
-        const activeId = viewId(hash) ?? 'all';
+        const {path, list: activeId, sort} = libraryView(hash);
         const active = lists.find(list => list.id === activeId);
-        const smart = smartLists.has(activeId);
-        const sort = sorts.has(requestedSort) ? requestedSort : null;
-        const watchFilter = smart ? activeId !== 'not-watched' : null;
+        const mostWatched = activeId === 'most-watched';
+        const watchFilter = sort === 'notwatched' ? false : sort === 'watched' ? true : null;
+        const typeFilter = parseType(path.split('/')[2] ?? '');
         const [toolbar, content] = body.props.children;
         const [dropdown, sorting] = toolbar.props.children;
         const cards = Array.isArray(content?.props.children) ?
             content.props.children.filter(card => card?.type === LibItem && typeof card.props._id === 'string') : [];
         const liveCards = new Map(cards.map(card => [card.props._id, card]));
-        const localMode = Boolean(active || smart);
+        const localMode = Boolean(active || mostWatched || watchFilter !== null);
         const canEdit = data?.editable === true;
-        const selectionKey = hash.split('?')[0] + '|' + activeId;
+        const selectionKey = path + '|' + activeId + '|' + watchFilter;
         React.useEffect(() => {
             setSelection(previous => previous.key === selectionKey ? previous : {key: selectionKey, ids: new Set()});
             setDialog(null);
@@ -491,41 +498,40 @@
                     } else card.props.onClick?.(event);
                 }});
         };
-        const options = lists.map(list => ({value: listLink(list.id), label: list.name}));
+        const customOptions = lists.filter(list => !categoryIds.has(list.id))
+            .map(list => ({value: listLink(list.id), label: list.name}));
         const nativeLabel = (value, fallback) => sorting.props.options.find(option => sortValue(option.value) === value)?.label ?? fallback;
-        const orderOptions = [['lastwatched', 'Last Watched'], ['name', 'A–Z'], ['namereverse', 'Z–A']]
-            .map(([value, fallback]) => ({value: '#/library?sort=' + value, label: nativeLabel(value, fallback)}));
-        const quick = [{value: listLink('all'), label: 'All'}, ...options.filter(option => categoryIds.has(routeParams(option.value).get('forkList'))),
-            {value: listLink('most-watched'), label: nativeLabel('timeswatched', 'Most Watched')},
-            {value: listLink('watched'), label: nativeLabel('watched', 'Watched')},
-            {value: listLink('not-watched'), label: nativeLabel('notwatched', 'Unwatched')}];
-        const selectList = value => {
-            if (routeParams(value).has('forkList')) location.hash = libraryRoute('#/library', routeParams(value).get('forkList'), sort);
-            else {
-                const targetPath = value.split('?')[0];
-                dropdown.props.onSelect(libraryRoute(targetPath, smart ? activeId : null, sort));
-            }
-        };
-        // The hosted chip retains its initial handler. Read the current route
-        // so sorting keeps the view and type that are active at click time.
-        const selectChip = React.useCallback(value => {
-            const query = routeParams(value);
-            const list = query.get('forkList');
-            const currentPath = location.hash.split('?')[0];
-            const currentSort = sortValue(location.hash);
-            if (list) {
-                const targetPath = smartLists.has(list) ? currentPath : '#/library';
-                const keepSort = list !== 'most-watched' && sorts.has(currentSort);
-                location.hash = libraryRoute(targetPath, list, keepSort ? currentSort : null);
-            } else location.hash = libraryRoute(currentPath, viewId(location.hash), query.get('sort'));
+        const orderOptions = Array.from(sortLabels, ([value, label]) => ({value, label}));
+        const quick = [{value: listLink('all'), label: 'All'},
+            ...defaults.map(list => ({value: listLink(list.id), label: list.name})),
+            {value: listLink('most-watched'), label: nativeLabel('timeswatched', 'Most Watched')}];
+        const typeOptions = dropdown.props.options.map(option => ({...option, value: option.value.split('?')[0]}));
+        // The hosted chip retains its initial handler, so read the current route on selection.
+        const selectList = React.useCallback(value => {
+            const current = libraryView(location.hash);
+            const list = routeParams(value).get('forkList');
+            const sort = list === 'most-watched' && current.list !== list &&
+                current.sort !== 'watched' && current.sort !== 'notwatched' ? null : current.sort;
+            location.hash = libraryRoute(current.path, list, sort);
         }, []);
-        const selectedChips = [];
-        if (sort || activeId !== 'most-watched') selectedChips.push('#/library?sort=' + (sort ?? 'lastwatched'));
-        selectedChips.push(listLink(activeId));
-        const header = React.cloneElement(toolbar, null,
-            React.cloneElement(dropdown, {options: [...dropdown.props.options, ...options],
-                value: active ? listLink(active.id) : dropdown.props.value, onSelect: selectList}),
-            React.cloneElement(sorting, {options: [...orderOptions, ...quick], selected: selectedChips, onSelect: selectChip}),
+        const customValue = customOptions.find(option => option.value === listLink(activeId))?.value;
+        const dropdownClass = dropdown.props.className;
+        const header = React.cloneElement(toolbar, {'data-fork-library-toolbar': ''},
+            React.cloneElement(dropdown, {className: dropdownClass + ' fork-library-sort',
+                options: orderOptions, value: sort ?? (mostWatched ? undefined : 'lastwatched'),
+                title: mostWatched && !sort ? 'Sort by' : undefined, onSelect: value => {
+                    const current = libraryView(location.hash);
+                    location.hash = libraryRoute(current.path, current.list, value);
+                }}),
+            React.cloneElement(dropdown, {className: dropdownClass + ' fork-library-type',
+                options: typeOptions, value: path, onSelect: value => {
+                const current = libraryView(location.hash);
+                location.hash = libraryRoute(value, current.list, current.sort);
+            }}),
+            React.cloneElement(sorting, {options: quick, selected: [listLink(activeId)], onSelect: selectList}),
+            customOptions.length > 0 && React.cloneElement(dropdown, {className: dropdownClass + ' fork-library-custom',
+                options: customOptions, value: customValue,
+                title: customValue ? undefined : 'Custom lists', onSelect: selectList}),
             h('div', {className: 'fork-list-toolbar-actions'},
                 selected.size > 0 && h('button', {type: 'button', onClick: () => add(selected)}, 'Add to list (' + selected.size + ')'),
                 h('button', {type: 'button', disabled: !canEdit, onClick: () => {setNotice(''); setDialog({mode: 'create'});}}, 'Create list'),
@@ -535,24 +541,23 @@
         let view = content;
         if (localMode) {
             const items = data?.byId ?? new Map();
-            const type = hash.split('?')[0].split('/')[2];
-            const typeFilter = type ? parseType(type) : '';
             const ids = active ? active.items : [...new Set([...items.keys(), ...liveCards.keys()])];
             const matches = ids.map(id => {
                 const original = liveCards.get(id);
                 const saved = items.get(id);
                 return original || (saved ? h(LibItem, {...itemProps(saved), notifications, removable: true}) : null);
-            }).filter(card => card && (active || !typeFilter || card.props.type === typeFilter) &&
+            }).filter(card => card && (!typeFilter || card.props.type === typeFilter) &&
+                (!mostWatched || Boolean(card.props.watched)) &&
                 (watchFilter === null || Boolean(card.props.watched) === watchFilter));
             const date = card => Date.parse(items.get(card.props._id)?.state?.lastWatched) || 0;
             const times = card => Number(items.get(card.props._id)?.state?.timesWatched) || 0;
             const name = (a, b) => a.props.name.localeCompare(b.props.name);
             if (sort === 'namereverse') matches.sort((a, b) => name(b, a));
             else if (sort === 'name') matches.sort(name);
-            else if (activeId === 'most-watched' && !sort) matches.sort((a, b) => times(b) - times(a) || name(a, b));
+            else if (mostWatched && sort !== 'lastwatched') matches.sort((a, b) => times(b) - times(a) || name(a, b));
             else matches.sort((a, b) => date(b) - date(a) || name(a, b));
             view = matches.length ? h('div', {key: hash, className: styles['meta-items-container']}, matches.map(decorate))
-                : h('p', {className: 'fork-list-notice', role: 'status'}, active ? 'This list is empty.' :
+                : h('p', {className: 'fork-list-notice', role: 'status'}, active && !active.items.length ? 'This list is empty.' :
                     data?.available || liveCards.size ? 'No matching titles.' : 'Waiting for the saved Library…');
         } else if (cards.length) view = React.cloneElement(content, null, cards.map(decorate));
 
@@ -578,7 +583,7 @@
                         current.splice(0, current.length, ...ordered);
                     });
                     if (active && !draft.some(list => list.id === active.id))
-                        location.hash = libraryRoute('#/library', 'all', sort);
+                        location.hash = libraryRoute(path, 'all', sort);
                 }}),
             dialog && dialog.mode !== 'manage' && h(ListDialog, {React, mode: dialog.mode, lists, count: dialog.ids?.length,
                 close: () => setDialog(null), save: async value => {
@@ -596,7 +601,7 @@
                                 list.items = [...new Set([...list.items, ...dialog.ids])];
                         }
                     });
-                    if (created) location.hash = listLink(created.id);
+                    if (created) location.hash = libraryRoute(path, created.id, sort);
                     else setSelection({key: selectionKey, ids: new Set()});
                 }})));
     }
@@ -668,7 +673,9 @@
             })};
         },
         hasListRoute() {
-            return /^#\/library(?:\/[^/?]*)?\?/.test(location.hash) && routeParams().has('forkList');
+            const params = routeParams();
+            return /^#\/library(?:\/[^/?]*)?\?/.test(location.hash) &&
+                (params.has('forkList') || ['watched', 'notwatched', 'unwatched', 'timeswatched'].includes(sortValue(location.hash)));
         },
         library(React, Nav, LibItem, notifications, styles, profile, navProps, body) {
             const uid = accountId(profile);
@@ -752,11 +759,17 @@
             border:1px solid #e6ae60;border-radius:.75rem;background:#222635;color:#fff}
         [data-fork-list-selected] [class*="poster-container-"] {outline:3px solid #aaaaf0;outline-offset:2px}
         [data-fork-home-lists] {overflow:visible}
-        @media (max-width:700px) {
-            [class*="library-container-"] [class*="selectable-inputs-container-"]:has(.fork-list-toolbar-actions) {
-                flex-wrap:wrap;row-gap:.65rem
-            }
-        }`;
+        [data-fork-library-toolbar] {flex-wrap:wrap;gap:.65rem}
+        [class*="library-container-"] [class*="library-content-"] [data-fork-library-toolbar][class] > [class*="select-input-container-"] {
+            margin-right:0
+        }
+        [class*="library-container-"] [class*="library-content-"] [data-fork-library-toolbar][class] > [class*="multiselect-menu-"] {
+            flex:0 1 auto;min-width:8.5rem;max-width:100%
+        }
+        [class*="library-container-"] [class*="library-content-"] [data-fork-library-toolbar][class] > [class*="chips-"] {
+            flex:0 1 auto;width:auto;min-width:0;height:auto;flex-wrap:wrap
+        }
+        .fork-list-toolbar-actions {flex-wrap:wrap;padding-left:0;max-width:100%}`;
     if (document.head) document.head.append(style);
     else document.addEventListener('DOMContentLoaded', () => document.head.append(style), {once: true});
 })();

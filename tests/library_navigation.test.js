@@ -321,18 +321,20 @@ test('Only the matching account and video can resume the exact saved source', as
 test('Live Library creates lists, adds multiple titles to multiple lists, and places them after Featured Movies', async () => {
     const {browser, page, errors, card} = await setup(false, true);
     try {
-        const select = page.locator('[class*="select-input-container-"] [aria-haspopup="listbox"]');
+        const select = page.locator('.fork-library-sort [aria-haspopup="listbox"]');
+        const type = page.locator('.fork-library-type [aria-haspopup="listbox"]');
+        const custom = page.locator('.fork-library-custom [aria-haspopup="listbox"]');
         const create = page.getByRole('button', {name: 'Create list'});
         const toolbar = page.locator('[class*="selectable-inputs-container-"]');
         const titles = () => page.locator('[class*="meta-item-container-"] [class*="title-label-"]').allTextContents();
         const openList = async name => {
-            await select.click();
+            await custom.click();
             await page.getByRole('listbox').getByText(name, {exact: true}).click();
         };
         const chip = name => toolbar.locator('[data-value]').getByText(name, {exact: true});
         const other = page.locator('[class*="meta-item-container-"]').filter({hasText: 'Another Show'});
         assert.deepEqual(await toolbar.locator('[data-value]').allTextContents(),
-            ['Last Watched', 'A–Z', 'Z–A', 'All', 'Anime', 'Live Action', 'Most Watched', 'Watched', 'Unwatched']);
+            ['All', 'Anime', 'Live Action', 'Most Watched']);
         const createBox = await create.boundingBox(), selectBox = await select.boundingBox();
         assert.ok(createBox.x > selectBox.x && Math.abs(createBox.y - selectBox.y) < selectBox.height);
         await create.click();
@@ -344,7 +346,7 @@ test('Live Library creates lists, adds multiple titles to multiple lists, and pl
         await dialog.getByRole('button', {name: 'Create', exact: true}).click();
         await page.getByText('This list is empty.').waitFor();
         assert.match(new URL(page.url()).hash, /forkList=[a-z0-9-]+/);
-        await openList('All');
+        await chip('All').click();
         await card.waitFor();
         await page.keyboard.down('Control');
         await card.locator('[class*="poster-image-layer"]').click();
@@ -361,13 +363,16 @@ test('Live Library creates lists, adds multiple titles to multiple lists, and pl
         assert.equal(await page.locator('[data-fork-list-selected]').count(), 0);
         await chip('Anime').click();
         await page.waitForURL(url => new URLSearchParams(url.hash.split('?')[1]).get('forkList') === 'anime');
-        await select.getByText('Anime', {exact: true}).waitFor();
+        await toolbar.locator('[data-value="#/library?forkList=anime"][class*="active-"]').waitFor();
+        await type.click();
+        await page.getByRole('listbox').getByText('All', {exact: true}).click();
         assert.deepEqual(await titles(), ['Another Show', 'Fixture Show', 'Older Movie']);
-        await chip('A–Z').click();
+        await select.click();
+        await page.getByRole('listbox').getByText('A–Z', {exact: true}).click();
         await page.waitForURL('**/#/library?sort=name&forkList=anime');
         await page.waitForFunction(() => document.querySelector('[class*="meta-item-container-"]').title === 'Another Show');
         await openList('Weekend <Picks>');
-        await select.getByText('Weekend <Picks>', {exact: true}).waitFor();
+        await custom.getByText('Weekend <Picks>', {exact: true}).waitFor();
         await page.getByTitle('Older Movie', {exact: true}).waitFor({state: 'detached'});
         assert.deepEqual(await titles(), ['Another Show', 'Fixture Show']);
         const menu = card.locator('[class*="menu-label-container"]');
@@ -407,18 +412,24 @@ test('Live Library creates lists, adds multiple titles to multiple lists, and pl
     } finally {await browser.close();}
 });
 
-test('Watched and Unwatched exclude each other beyond the first page and custom lists stay with their account', async () => {
+test('Watched and Not Watched filter beyond the first page and custom lists stay with their account', async () => {
     const {browser, page, errors} = await setup(false, true);
     try {
-        const type = page.locator('[class*="select-input-container-"] [aria-haspopup="listbox"]');
+        const toolbar = page.locator('[data-fork-library-toolbar]');
+        const sort = toolbar.locator('.fork-library-sort [aria-haspopup="listbox"]');
+        const type = toolbar.locator('.fork-library-type [aria-haspopup="listbox"]');
+        const privateLabel = toolbar.locator('.fork-library-custom [aria-haspopup="listbox"]').getByText('Private list', {exact: true});
         await type.click();
         await page.getByRole('listbox').getByText('All', {exact: true}).click();
         const titles = () => page.locator('[class*="meta-item-container-"] [class*="title-label-"]').allTextContents();
-        const chip = name => page.locator('[class*="selectable-inputs-container-"] [data-value]').getByText(name, {exact: true});
-        await chip('Watched').click();
+        const chooseSort = async label => {
+            await sort.click();
+            await page.getByRole('listbox').getByText(label, {exact: true}).click();
+        };
+        await chooseSort('Watched');
         await page.locator('a[title="Older Movie"]').waitFor();
         assert.deepEqual(await titles(), ['Another Show', 'Older Movie']);
-        await chip('Unwatched').click();
+        await chooseSort('Not Watched');
         await page.locator('a[title="Older Unwatched"]').waitFor();
         assert.deepEqual(await titles(), ['Fixture Show', 'Older Unwatched']);
         await type.click();
@@ -432,45 +443,71 @@ test('Watched and Unwatched exclude each other beyond the first page and custom 
         await dialog.waitFor({state: 'hidden'});
         const privateRoute = new URL(page.url()).hash;
         await page.evaluate(() => {window.setFixtureAccount('other'); window.rerenderItems([]);});
-        await page.waitForFunction(() => !document.querySelector('[aria-haspopup="listbox"]').textContent.includes('Private list'));
+        await privateLabel.waitFor({state: 'detached'});
         await page.evaluate(() => {location.hash = '#/';});
         await page.locator('[data-fork-home-lists]').getByText('Anime', {exact: true}).waitFor();
         assert.equal(await page.getByText('Private list', {exact: true}).count(), 0);
         await page.evaluate(route => {window.setFixtureAccount('test'); location.hash = route;}, privateRoute);
-        await type.getByText('Private list', {exact: true}).waitFor();
+        await privateLabel.waitFor();
         assert.deepEqual(errors, []);
     } finally {await browser.close();}
 });
 
-test('Library chooses one list and one independent sort while cycling through built-in views', async () => {
+test('Library combines list, sort, watched status, and content type through its controls', async () => {
     const {browser, page, errors} = await setup(false, true);
     try {
         const toolbar = page.locator('[class*="selectable-inputs-container-"]');
         const chip = name => toolbar.locator('[data-value]').getByText(name, {exact: true});
-        const highlighted = type => toolbar.locator(`[data-value*="${type}"][class*="active-"]`).allTextContents();
-        const waitForHighlight = (type, label) => toolbar.locator(`[data-value*="${type}"][class*="active-"]`)
+        const sort = toolbar.locator('.fork-library-sort [aria-haspopup="listbox"]');
+        const highlighted = () => toolbar.locator('[data-value*="forkList="][class*="active-"]').allTextContents();
+        const waitForHighlight = label => toolbar.locator('[data-value*="forkList="][class*="active-"]')
             .filter({hasText: label}).waitFor();
         const titles = () => page.locator('[class*="meta-item-container-"] [class*="title-label-"]').allTextContents();
-        for (const list of ['Anime', 'Live Action', 'Watched', 'Unwatched', 'All', 'Most Watched']) {
+        const chooseSort = async label => {
+            await sort.click();
+            await page.getByRole('listbox').getByText(label, {exact: true}).click();
+        };
+        const chooseType = async next => {
+            await toolbar.locator('.fork-library-type [aria-haspopup="listbox"]').click();
+            await page.getByRole('listbox').getByText(next, {exact: true}).click();
+        };
+        await chooseType('All');
+        for (const list of ['Anime', 'Live Action', 'All', 'Most Watched']) {
             await chip(list).click();
-            await waitForHighlight('forkList=', list);
-            assert.deepEqual(await highlighted('forkList='), [list]);
+            await waitForHighlight(list);
+            assert.deepEqual(await highlighted(), [list]);
         }
         await page.locator('a[title="Older Movie"]').waitFor();
         assert.deepEqual(await titles(), ['Older Movie', 'Another Show']);
-        assert.deepEqual(await highlighted('sort='), []);
+        await sort.click();
+        assert.deepEqual(await page.getByRole('listbox').locator('[aria-selected]').allTextContents(),
+            ['A–Z', 'Z–A', 'Last Watched', 'Watched', 'Not Watched']);
+        await page.getByRole('listbox').getByText('A–Z', {exact: true}).click();
         for (const [label, expected] of [['A–Z', ['Another Show', 'Older Movie']], ['Z–A', ['Older Movie', 'Another Show']],
             ['Last Watched', ['Another Show', 'Older Movie']]]) {
-            await chip(label).click();
-            await waitForHighlight('sort=', label);
-            assert.deepEqual(await highlighted('sort='), [label]);
-            assert.deepEqual(await highlighted('forkList='), ['Most Watched']);
+            if (label !== 'A–Z') await chooseSort(label);
+            await sort.getByText(label, {exact: true}).waitFor();
+            assert.deepEqual(await highlighted(), ['Most Watched']);
             assert.deepEqual(await titles(), expected);
         }
-        await chip('All').click();
-        await waitForHighlight('forkList=', 'All');
-        assert.deepEqual(await highlighted('forkList='), ['All']);
-        assert.deepEqual(await highlighted('sort='), ['Last Watched']);
+        await chip('Anime').click();
+        await waitForHighlight('Anime');
+        await chooseType('Movie');
+        await page.waitForURL('**/#/library/movie?sort=lastwatched&forkList=anime');
+        assert.deepEqual(await titles(), ['Older Movie']);
+        await chooseSort('Not Watched');
+        await page.getByText('No matching titles.', {exact: true}).waitFor();
+        await chooseSort('Watched');
+        await page.getByTitle('Older Movie', {exact: true}).waitFor();
+        assert.deepEqual(await titles(), ['Older Movie']);
+        assert.deepEqual(await highlighted(), ['Anime']);
+        await page.goBack();
+        await sort.getByText('Not Watched', {exact: true}).waitFor();
+        assert.deepEqual(await titles(), []);
+        await page.evaluate(() => {location.hash = '#/library?forkList=not-watched';});
+        await waitForHighlight('All');
+        await page.getByTitle('Older Unwatched', {exact: true}).waitFor();
+        assert.deepEqual(await titles(), ['Fixture Show', 'Older Unwatched']);
         assert.deepEqual(errors, []);
     } finally {await browser.close();}
 });
@@ -480,6 +517,8 @@ test('Switching lists clears hidden selection, and older cards resume their cach
     try {
         await page.getByRole('button', {name: 'Create list'}).waitFor();
         await page.waitForFunction(() => !document.querySelector('.fork-list-toolbar-actions button').disabled);
+        await page.locator('.fork-library-type [aria-haspopup="listbox"]').click();
+        await page.getByRole('listbox').getByText('All', {exact: true}).click();
         await page.keyboard.down('Control');
         await card.locator('[class*="poster-image-layer"]').click();
         await page.keyboard.up('Control');
@@ -620,11 +659,11 @@ test('Automatic lists use the full synced Library, update as records arrive, and
         const library = page.locator('.fixture-page[class*="library-container-"]');
         const chip = name => library.locator('[class*="selectable-inputs-container-"] [data-value]').getByText(name, {exact: true});
         const title = name => library.locator(`a[class*="meta-item-container-"][title="${name}"]`);
-        const dropdown = library.locator('[class*="select-input-container-"] [aria-haspopup="listbox"]');
+        const dropdown = library.locator('.fork-library-custom [aria-haspopup="listbox"]');
         const row = page.locator('[data-fork-home-lists] [class*="meta-row-container-"]').filter({hasText: 'Anime'});
         await row.getByTitle('Older Movie', {exact: true}).waitFor();
         await row.getByText('BUTTON_SEE_ALL', {exact: true}).click();
-        await dropdown.getByText('Anime', {exact: true}).waitFor();
+        await library.locator('[data-value="#/library?forkList=anime"][class*="active-"]').waitFor();
         await title('Older Movie').waitFor();
         await title('Fixture Show').waitFor();
         assert.deepEqual(load(), {...options.seed, revision: 1});

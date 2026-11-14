@@ -1,12 +1,13 @@
-## Ezra's Stremio 2.1.4
+## Ezra's Stremio 2.1.5 Beta 1
 
-- **Skip Intro** and **Skip Outro** recognize the numbered chapter layout used by some anime releases, including the tested Inuyasha source. The credits skip stops at the preview.
-- **Look up skip timestamps** has a visible On/Off switch under **Settings → Player → Controls** in the community and official web interfaces. Online lookup is optional.
+- The Library list bar contains **All**, **Anime**, **Live Action**, and **Most Watched**. Saved custom lists have their own dropdown.
+- The sorting dropdown offers **A–Z**, **Z–A**, **Last Watched**, **Watched**, and **Not Watched** within the selected list.
+- Choose **Movie** or **Series** in the content-type dropdown to narrow any list. For example, choose **Anime**, **Movie**, and **Watched** to see anime movies you’ve watched.
 
 ### Windows downloads
 
-- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.4/Ezras-Stremio-2.1.4-x64.exe)
-- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.4/Ezras-Stremio-2.1.4-x64.zip)
-- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.4/SHA256SUMS.txt)
+- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.5-beta.1/Ezras-Stremio-2.1.5-beta.1-x64.exe)
+- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.5-beta.1/Ezras-Stremio-2.1.5-beta.1-x64.zip)
+- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.5-beta.1/SHA256SUMS.txt)
 
 Use Windows 10 or 11 x64. If upgrading with the installer, retain your configuration to keep your custom mpv settings.
