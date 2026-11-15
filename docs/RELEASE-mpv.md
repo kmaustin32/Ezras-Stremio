@@ -1,13 +1,12 @@
-## Ezra's Stremio 2.2.0
+## Ezra's Stremio 2.2.1
 
-- **Check for updates** appears next to the version number in Settings. **Stable** is the default. Choose **Beta** to also see newer prereleases.
-- On installed copies, **Update** downloads and verifies the Windows installer from this fork's GitHub release. Confirm to close Stremio and open the installer. The update keeps your configuration and custom lists.
-- Portable copies can download the new ZIP directly so they can be updated as portable apps.
+- The update channel, buttons, and status messages match the gray version labels in Settings.
+- **Look up skip timestamps** uses the same green switch as the other settings, with no separate On or Off label.
 
 ### Windows downloads
 
-- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.2.0/Ezras-Stremio-2.2.0-x64.exe)
-- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.2.0/Ezras-Stremio-2.2.0-x64.zip)
-- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.2.0/SHA256SUMS.txt)
+- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.2.1/Ezras-Stremio-2.2.1-x64.exe)
+- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.2.1/Ezras-Stremio-2.2.1-x64.zip)
+- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.2.1/SHA256SUMS.txt)
 
-Install 2.2.0 once to get the in-app updater for subsequent releases.
+If you're on 2.2.0, you can also install this release using **Check for updates** in Settings.

@@ -1,6 +1,6 @@
 (() => {
     'use strict';
-    const version = '2.2.0';
+    const version = '2.2.1';
     const shaderNames = {'1': 'Anime4K A', '2': 'Anime4K B', '3': 'Anime4K C', '4': 'Anime4K A+A',
         '5': 'Anime4K B+B', '6': 'Anime4K C+A', '7': 'FSR', '8': 'Off', custom: 'Custom shaders'};
     const modes = {fit: 'Fit', crop: 'Crop', stretch: 'Stretch'};
@@ -393,11 +393,13 @@
             .ezras-picture-dialog select,.ezras-picture-dialog textarea {font:inherit;color:inherit;background:#222635;border:1px solid #7272c2;border-radius:.4rem;padding:.35rem}
             .ezras-picture-dialog button {margin:.35rem .35rem .35rem 0}
             .ezras-picture-dialog textarea {display:block;width:100%;min-height:7rem}
-            #ezras-update-controls {margin:.5rem 0 1rem}
+            #ezras-update-controls {margin:.5rem 0 1rem;
+                color:color-mix(in srgb,var(--primary-foreground-color,#fff) 30%,transparent)}
             #ezras-update-controls > div {display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}
             #ezras-update-controls :is(select,button) {font:inherit;color:inherit;background:var(--modal-background-color,#222635);
                 border:1px solid #7272c2;border-radius:.75rem;padding:.45rem .65rem}
-            #ezras-update-controls :is(select,button):disabled {opacity:.6}
+            #ezras-update-controls option {color:inherit;background:var(--modal-background-color,#222635)}
+            #ezras-update-controls :is(select,button):disabled {border-color:#7272c280;cursor:default}
             #ezras-update-controls :focus-visible {outline:2px solid #aaaaf0;outline-offset:2px}
             #ezras-update-controls p {margin:.35rem 0 0}
             #ezras-update-controls [hidden] {display:none}

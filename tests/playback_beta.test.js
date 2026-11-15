@@ -43,7 +43,11 @@ test('The panel shows the fork version, confirms shaders, saves series preferenc
     t.after(() => browser.close());
     const page = await browser.newPage();
     page.setDefaultTimeout(10000);
-    const html = `<div class="settings-container-fixture"><div id="versions"><div class="version-info-label-fixture">Shell Version: 5.0.22</div></div></div>
+    const html = `<style>
+        :root {--primary-foreground-color:rgba(255,255,255,.9);--modal-background-color:#161a26}
+        .version-info-label-fixture {color:var(--primary-foreground-color);opacity:.3}
+        body {background:#10151e;color:black}
+    </style><div class="settings-container-fixture"><div id="versions"><div class="version-info-label-fixture">Shell Version: 5.0.22</div></div></div>
         <div id="player"><div class="control-bar-buttons-menu-container-fixture"></div></div>`;
     await page.route('https://stremio.zarg.me/**', route => route.fulfill({contentType: 'text/html', body: html}));
     await page.goto('https://stremio.zarg.me/#/player/old/provider/meta/series/tt100/tt100%3A1%3A2');
@@ -63,7 +67,7 @@ test('The panel shows the fork version, confirms shaders, saves series preferenc
         for (const [name, data] of Object.entries({'time-pos': 93.5, seekable: true, 'current-vo': 'gpu-next'}))
             window.native('mpv-prop-change', {name, data});
     });
-    assert.equal(await page.locator('#ezras-stremio-version').innerText(), "Ezra's Stremio 2.2.0");
+    assert.equal(await page.locator('#ezras-stremio-version').innerText(), "Ezra's Stremio 2.2.1");
     assert.match(await page.locator('#versions').innerText(), /Shell Version/);
     const updateControls = page.locator('#ezras-update-controls');
     const check = updateControls.getByRole('button', {name: 'Check for updates'});
@@ -85,6 +89,20 @@ test('The panel shows the fork version, confirms shaders, saves series preferenc
     assert.equal(await check.isEnabled(), true);
     await updateState('available', {portable: true});
     assert.equal(await updateControls.getByRole('button', {name: 'Download portable ZIP'}).isVisible(), true);
+    const colors = await updateControls.evaluate(container => {
+        const context = document.createElement('canvas').getContext('2d');
+        const swatch = element => {
+            const style = getComputedStyle(element);
+            context.clearRect(0, 0, 1, 1);
+            context.globalAlpha = Number(style.opacity);
+            context.fillStyle = style.color;
+            context.fillRect(0, 0, 1, 1);
+            return [...context.getImageData(0, 0, 1, 1).data];
+        };
+        const native = container.nextElementSibling;
+        return {native: swatch(native), controls: [...container.querySelectorAll('label, select, option, button, p')].map(swatch)};
+    });
+    for (const color of colors.controls) assert.deepEqual(color, colors.native);
     assert.deepEqual(await page.evaluate(() => window.sent.filter(message => typeof message === 'string')),
         ['fork-update:state', 'fork-update:beta', 'fork-update:check', 'fork-update:install']);
     await page.getByRole('button', {name: 'Picture', exact: true}).click();

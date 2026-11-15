@@ -23,7 +23,7 @@
 
 ## ✨ Made for your player
 
-Everything added to this fork, from the first mpv upgrade through **2.2.0**.
+Everything added to this fork, from the first mpv upgrade through **2.2.1**.
 
 | Feature | What you get |
 | --- | --- |
@@ -79,11 +79,13 @@ The fork version appears alongside the other version numbers in Settings. Window
 
 **2.2.0** adds **Check for updates** next to the version number in Settings. Choose **Stable** for final releases or **Beta** to also see newer previews, then select **Update** to download and verify the installer. Confirm when prompted to close Stremio and open the installer. In-place updates keep your configuration and custom lists. Portable builds offer a **Download portable ZIP** button.
 
+**2.2.1** matches the update controls and status messages to the gray version labels in Settings. **Look up skip timestamps** now uses the same green switch as other settings, with no separate On or Off label. [2.2.1 release notes](https://github.com/kmaustin32/Ezras-Stremio/releases/tag/v2.2.1)
+
 | Download | How to use it |
 | --- | --- |
-| 📥 [**2.2.0 installer — recommended**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.2.0/Ezras-Stremio-2.2.0-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading manually, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
-| 💼 [**2.2.0 portable ZIP**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.2.0/Ezras-Stremio-2.2.0-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
-| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.2.0/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
+| 📥 [**2.2.1 installer — recommended**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.2.1/Ezras-Stremio-2.2.1-x64.exe) | Run the EXE. The installer sets up WebView2 if needed. When upgrading manually, choose to retain your configuration to keep custom mpv.conf, input.conf and scripts. |
+| 💼 [**2.2.1 portable ZIP**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.2.1/Ezras-Stremio-2.2.1-x64.zip) | Extract into its own folder and run `stremio.exe`. The portable build requires an installed [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/). |
+| ✅ [**SHA256 checksums**](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.2.1/SHA256SUMS.txt) | Verify the downloads against the release's checksum file. |
 
 Use files named **Ezras-Stremio** for this fork. Downloads marked **BUILD-ONLY** are archived build dependencies. Community package-manager listings install the upstream edition; use this fork's releases for these features.
 

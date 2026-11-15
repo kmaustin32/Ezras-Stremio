@@ -70,22 +70,41 @@ async function setup(saved, savedTimeout, useClock = false) {
     return {browser, page, select, boot, show, overlay, settled, errors};
 }
 
-test('Skip timestamp lookup has a visible On/Off switch in Player Controls and retains its choice', async () => {
+test('Skip timestamp lookup matches the native switch colors, uses no state text, and retains its choice', async () => {
     const {browser, page, boot, errors} = await setup();
     try {
         const player = page.locator('#player-section');
         const lookup = player.getByRole('switch', {name: 'Look up skip timestamps', exact: true});
-        const state = player.locator('#stremio-fork-skip-state');
         await lookup.waitFor({state: 'visible'});
         assert.ok((await lookup.boundingBox()).width > 25);
-        assert.equal(await state.innerText(), 'Off');
+        assert.equal(await lookup.isChecked(), false);
+        assert.equal(await lookup.evaluate(element => element.parentElement.textContent.trim()), '');
+        const nativeColors = await lookup.evaluate(element => {
+            const sheet = [...document.styleSheets].flatMap(sheet => [...sheet.cssRules]);
+            const rule = sheet.find(rule => /^\.[\w-]*toggle-container-[\w-]+\.checked \.toggle-/.test(rule.selectorText));
+            const [, containerClass, toggleClass] = rule.selectorText.match(/^\.([^ .]+)\.checked \.([^ .]+)/);
+            const container = document.createElement('div');
+            container.className = containerClass;
+            const toggle = document.createElement('div');
+            toggle.className = toggleClass;
+            toggle.style.transition = 'none';
+            container.append(toggle);
+            element.parentElement.append(container);
+            const off = getComputedStyle(toggle).backgroundColor;
+            container.classList.add('checked');
+            const on = getComputedStyle(toggle).backgroundColor;
+            container.remove();
+            return {off, on};
+        });
+        assert.equal(await lookup.evaluate(element => getComputedStyle(element).backgroundColor), nativeColors.off);
         await lookup.press('Space');
-        await state.filter({hasText: 'On'}).waitFor();
         assert.ok(await lookup.isChecked());
+        assert.equal(await lookup.evaluate(element => getComputedStyle(element).backgroundColor), nativeColors.on);
+        assert.equal(await lookup.evaluate(element => element.parentElement.textContent.trim()), '');
         await page.reload(); await boot();
         assert.ok(await lookup.isChecked());
-        await state.click();
-        await state.filter({hasText: 'Off'}).waitFor();
+        await player.locator('label[for="stremio-fork-skip-lookup"]').click();
+        assert.equal(await lookup.isChecked(), false);
         assert.equal(await page.evaluate(() => localStorage.getItem('stremio-fork-skip-lookup')), 'false');
         assert.deepEqual(errors, []);
     } finally {await browser.close();}

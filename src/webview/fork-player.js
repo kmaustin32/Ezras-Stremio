@@ -466,13 +466,11 @@
                 lookup.setAttribute('role', 'switch');
                 lookup.setAttribute('aria-labelledby', lookupLabel.id);
                 lookup.setAttribute('aria-describedby', lookupHelp.id);
-                const lookupState = document.createElement('label'); lookupState.htmlFor = lookup.id;
-                lookupState.id = 'stremio-fork-skip-state'; lookupState.setAttribute('aria-hidden', 'true');
                 lookup.addEventListener('change', () => {
                     try { localStorage.setItem(skipLookupKey, String(lookup.checked)); } catch {}
                     updateSkipLookup(lookup.checked);
                 });
-                lookupControls.append(lookup, lookupState); lookupEntry.append(lookupName, lookupControls); group.append(lookupEntry);
+                lookupControls.append(lookup); lookupEntry.append(lookupName, lookupControls); group.append(lookupEntry);
                 // Append only fork-owned nodes; React retains all native rows.
                 titleNode.after(group);
             }
@@ -487,9 +485,6 @@
             if (timeoutNote.textContent !== timeoutStatus) timeoutNote.textContent = timeoutStatus;
             timeoutNote.hidden = !timeoutStatus;
             group.querySelector('#stremio-fork-skip-lookup').checked = skipLookupEnabled;
-            const lookupState = group.querySelector('#stremio-fork-skip-state');
-            const lookupText = skipLookupEnabled ? 'On' : 'Off';
-            if (lookupState.textContent !== lookupText) lookupState.textContent = lookupText;
         }
     }
 
@@ -842,15 +837,14 @@
             }
             #stremio-fork-skip-lookup {
                 appearance:none;display:inline-grid;place-items:center start;flex:none;
-                box-sizing:border-box;width:3.2rem;height:1.75rem;margin:0 .65rem 0 0;padding:.15rem;
-                border:1px solid #858b99;border-radius:1rem;background:#222635;cursor:pointer;
+                box-sizing:border-box;width:3.2rem;height:1.7rem;margin:0;padding:.25rem;
+                border:0;border-radius:1rem;background:var(--overlay-color,#ffffff26);cursor:pointer;
             }
             #stremio-fork-skip-lookup::before {
-                content:"";width:1.2rem;height:1.2rem;border-radius:50%;background:#fff;
+                content:"";width:1.2rem;height:1.2rem;border-radius:50%;background:var(--primary-foreground-color,#fff);
             }
-            #stremio-fork-skip-lookup:checked {background:#7272c2;border-color:#aaaaf0;justify-items:end}
+            #stremio-fork-skip-lookup:checked {background:var(--secondary-accent-color,#22b365);justify-items:end}
             #stremio-fork-skip-lookup:focus-visible {outline:2px solid #aaaaf0;outline-offset:3px}
-            #stremio-fork-skip-state {font-size:1rem;cursor:pointer}
             [class*="settings-container"] [class*="option-input-container"]:has(> select) {padding:0!important}
             #stremio-fork-animation-duration, #stremio-fork-control-timeout,
             [class*="settings-container"] [class*="option-input-container"] select,
