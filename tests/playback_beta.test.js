@@ -51,7 +51,7 @@ test('The panel shows the fork version, confirms shaders, saves series preferenc
         window.__stremioForkControls = true;
         window.sent = []; window.diagnostics = '';
         const transport = new EventTarget();
-        transport.postMessage = message => window.sent.push(JSON.parse(message).args);
+        transport.postMessage = message => window.sent.push(message.startsWith('fork-update:') ? message : JSON.parse(message).args);
         window.chrome.webview = transport;
         window.native = (name, data) => transport.dispatchEvent(new MessageEvent('message', {data: {args: [name, data]}}));
         Object.defineProperty(navigator, 'clipboard', {value: {writeText: async data => {window.diagnostics = data;}}});
@@ -63,8 +63,30 @@ test('The panel shows the fork version, confirms shaders, saves series preferenc
         for (const [name, data] of Object.entries({'time-pos': 93.5, seekable: true, 'current-vo': 'gpu-next'}))
             window.native('mpv-prop-change', {name, data});
     });
-    assert.equal(await page.locator('#ezras-stremio-version').innerText(), "Ezra's Stremio 2.1.5");
+    assert.equal(await page.locator('#ezras-stremio-version').innerText(), "Ezra's Stremio 2.2.0");
     assert.match(await page.locator('#versions').innerText(), /Shell Version/);
+    const updateControls = page.locator('#ezras-update-controls');
+    const check = updateControls.getByRole('button', {name: 'Check for updates'});
+    const install = updateControls.getByRole('button', {name: 'Update', exact: true});
+    const channel = updateControls.getByLabel('Update channel');
+    const updateState = (status, extra = {}) => page.evaluate(([status, extra]) => window.native('fork-update-status',
+        {channel: 'beta', status, version: '2.2.1-beta.1', ...extra}), [status, extra]);
+    assert.equal(await channel.inputValue(), 'stable');
+    await channel.selectOption('beta');
+    await updateState('idle');
+    await check.click();
+    await updateState('checking');
+    assert.equal(await check.isDisabled(), true);
+    await updateState('available');
+    await install.click();
+    await updateState('downloading');
+    assert.match(await updateControls.getByRole('status').innerText(), /Downloading and verifying/);
+    await updateState('error', {error: 'Could not reach GitHub.'});
+    assert.equal(await check.isEnabled(), true);
+    await updateState('available', {portable: true});
+    assert.equal(await updateControls.getByRole('button', {name: 'Download portable ZIP'}).isVisible(), true);
+    assert.deepEqual(await page.evaluate(() => window.sent.filter(message => typeof message === 'string')),
+        ['fork-update:state', 'fork-update:beta', 'fork-update:check', 'fork-update:install']);
     await page.getByRole('button', {name: 'Picture', exact: true}).click();
     await page.getByLabel('Shaders', {exact: true}).selectOption('7');
     await page.getByText('Applying FSR…').waitFor();

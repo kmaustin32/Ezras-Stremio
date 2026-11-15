@@ -592,6 +592,9 @@ Section ; App Files
     SetDetailsPrint None
 
     ; *** Prompt the user whether to delete all user data ***
+    ClearErrors
+    ${GetOptions} $Parameters "/keepconfig" $R1
+    IfErrors 0 SkipDataDeletion
     IfSilent +3
       MessageBox MB_YESNO|MB_ICONQUESTION "Install latest portable configuration? A backup of your portable_config folder will be created if it has been modified. Continue?" IDNO SkipDataDeletion
       Call BackupPortableConfig

@@ -214,11 +214,16 @@ resource mappings, `src/mpv/playback_defaults.*`, `src/webview/player_bundle_pat
 `src/webview/player_resources.*`, the integration calls, `cmake/ForkDefaults.cmake`, and the fork's workflow. Run the release
 checks before publishing. Source updates cannot be guaranteed conflict-free.
 
-Automatic application updates are disabled by default because the original
-project's signed installers would replace this fork. Update using this fork's
-releases until it has its own signing key and signed feed. A trusted signed
-feed can be provided through `STREMIO_UPDATE_URL` at build time or the existing
-`--autoupdater-endpoint` argument; signatures are still verified.
+**Check for updates** in Settings uses Ezra's Stremio releases on GitHub.
+Stable is the default. Beta can also offer previews published since the latest
+stable release. The checker compares fork versions and never offers a downgrade.
+For installed copies it verifies the installer against the SHA-256 digest
+provided by GitHub, then asks before closing the app and opening the installer.
+Portable builds get a ZIP download instead.
+
+The inherited automatic updater stays disabled by default. Its existing
+signed-feed overrides are available through `STREMIO_UPDATE_URL` or
+`--autoupdater-endpoint`.
 
 ## Build and verify
 

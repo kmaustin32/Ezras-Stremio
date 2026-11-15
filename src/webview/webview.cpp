@@ -17,6 +17,7 @@
 #include "ForkWebAssets.h"
 #include "player_resources.h"
 #include "library_store.h"
+#include "../updater/fork_updater.h"
 
 static std::wstring EmbeddedBrandImage(int resourceId)
 {
@@ -553,6 +554,13 @@ static void SetupWebMessageHandler()
             if(!msgRaw) return S_OK;
             std::wstring wstr(msgRaw.get());
             std::string str = WStringToUtf8(wstr);
+            constexpr std::string_view updatePrefix = "fork-update:";
+            if (str.starts_with(updatePrefix)) {
+                wil::unique_cotaskmem_string source;
+                if (SUCCEEDED(args->get_Source(&source)) && source && IsForkUpdateSource(source.get()))
+                    HandleForkUpdateRequest(std::string_view(str).substr(updatePrefix.size()));
+                return S_OK;
+            }
             constexpr std::string_view listPrefix = "fork-library-store:";
             if (str.starts_with(listPrefix)) {
                 // This narrow bridge is only for the two Library front ends.

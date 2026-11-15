@@ -57,9 +57,26 @@ Set-Content -LiteralPath $record -Value '{"version":1,"revision":1,"lists":[],"m
 Set-Content -LiteralPath $temporaryRecord -Value 'test interrupted write'
 Set-Content -LiteralPath $neighbor -Value 'test unrelated data'
 $installerPath = (Resolve-Path -LiteralPath $Installer).Path
-$install = Join-Path $probeRoot 'installation'
+$install = Join-Path $probeRoot 'installation with spaces'
 $uninstaller = Join-Path $install 'Uninstall.exe'
 Run-TestProcess $installerPath "/S /nodesktopicon /D=$install"
+$upgradedConfig = Join-Path $install 'portable_config/stremio-settings.ini'
+Add-Content -LiteralPath $upgradedConfig -Value "`n[Updates]`nBeta=1"
+$upgradedConfigHash = (Get-FileHash -LiteralPath $upgradedConfig).Hash
+$installedExe = Join-Path $install 'stremio.exe'
+Set-Content -LiteralPath $installedExe -Value 'replace this old executable'
+$expectedExeHash = (Get-FileHash -LiteralPath (Join-Path $app 'stremio.exe')).Hash
+$profile = Join-Path $install 'stremio.exe.WebView2/EBWebView/Default'
+New-Item -ItemType Directory -Path $profile -Force | Out-Null
+$profileMarker = Join-Path $profile 'upgrade-test.txt'
+Set-Content -LiteralPath $profileMarker -Value 'keep this WebView profile'
+Run-TestProcess $installerPath "/S /nodesktopicon /keepconfig /overrideInstallDir=`"$install`""
+if ((Get-FileHash -LiteralPath $upgradedConfig).Hash -ne $upgradedConfigHash -or
+    (Get-FileHash -LiteralPath $installedExe).Hash -ne $expectedExeHash -or
+    -not (Test-Path -LiteralPath $profileMarker) -or
+    -not (Test-Path -LiteralPath $record)) {
+    throw 'The in-place update did not preserve settings and Library data.'
+}
 Run-TestProcess $uninstaller "/S /keepdata _?=$install"
 if (-not (Test-Path -LiteralPath $record) -or -not (Test-Path -LiteralPath $temporaryRecord)) {
     throw 'The keep-data uninstall removed saved Library data.'
@@ -70,4 +87,4 @@ if ((Test-Path -LiteralPath $library) -or -not (Test-Path -LiteralPath $neighbor
     throw 'The remove-data uninstall did not clear just the Library store.'
 }
 
-Write-Host 'PASS: a second launch preserves settings, and both uninstall choices honor Library data.'
+Write-Host 'PASS: second launch and in-place update preserve settings, and both uninstall choices honor Library data.'

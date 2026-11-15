@@ -1,6 +1,6 @@
 (() => {
     'use strict';
-    const version = '2.1.5';
+    const version = '2.2.0';
     const shaderNames = {'1': 'Anime4K A', '2': 'Anime4K B', '3': 'Anime4K C', '4': 'Anime4K A+A',
         '5': 'Anime4K B+B', '6': 'Anime4K C+A', '7': 'FSR', '8': 'Off', custom: 'Custom shaders'};
     const modes = {fit: 'Fit', crop: 'Crop', stretch: 'Stretch'};
@@ -238,6 +238,62 @@
         renderStatus();
     }
 
+    let updateControls;
+    let updateState = {channel: 'stable', status: 'idle'};
+
+    function renderUpdateState() {
+        if (!updateControls) return;
+        const {channel, status, version: nextVersion, error, portable} = updateState;
+        const {select, check, install, message} = updateControls;
+        const busy = ['checking', 'downloading', 'installing'].includes(status);
+        select.value = channel;
+        select.disabled = check.disabled = busy;
+        install.hidden = status !== 'available';
+        install.textContent = portable ? 'Download portable ZIP' : 'Update';
+        const messages = {
+            checking: 'Checking for updates\u2026',
+            current: 'You are up to date on this channel.',
+            available: 'Version ' + nextVersion + ' is available.',
+            downloading: 'Downloading and verifying the installer\u2026',
+            installing: 'Ready to start the installer.',
+            error
+        };
+        message.textContent = messages[status] ?? '';
+        message.hidden = !message.textContent;
+    }
+
+    function mountUpdateControls(label) {
+        if (updateControls?.container.previousElementSibling === label) return;
+        const request = action => window.chrome.webview.postMessage('fork-update:' + action);
+        const container = document.createElement('div');
+        container.id = 'ezras-update-controls';
+        const row = document.createElement('div');
+        const channelLabel = document.createElement('label');
+        const select = document.createElement('select');
+        select.id = 'ezras-update-channel';
+        channelLabel.htmlFor = select.id;
+        channelLabel.textContent = 'Update channel';
+        select.add(new Option('Stable', 'stable'));
+        select.add(new Option('Beta', 'beta'));
+        select.addEventListener('change', () => request(select.value));
+        const check = document.createElement('button');
+        check.type = 'button';
+        check.textContent = 'Check for updates';
+        check.addEventListener('click', () => request('check'));
+        const install = document.createElement('button');
+        install.type = 'button';
+        install.addEventListener('click', () => request('install'));
+        const message = document.createElement('p');
+        message.setAttribute('role', 'status');
+        row.append(channelLabel, select, check, install);
+        container.append(row, message);
+        updateControls?.container.remove();
+        updateControls = {container, select, check, install, message};
+        label.after(container);
+        renderUpdateState();
+        request('state');
+    }
+
     function updateVersion() {
         const settings = document.querySelector('[class*="settings-container"]');
         if (!settings) return;
@@ -255,6 +311,7 @@
             if (other) other.before(label);
             else target.prepend(label);
         }
+        mountUpdateControls(label);
     }
 
     window.__ezrasPlayback = {update(player, isActive) {
@@ -286,7 +343,10 @@
         let payload;
         try {payload = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;} catch {return;}
         const [name, data] = Array.isArray(payload?.args) ? payload.args : [];
-        if (name === 'mpv-prop-change' && properties.includes(data?.name)) {
+        if (name === 'fork-update-status' && ['stable', 'beta'].includes(data?.channel)) {
+            updateState = data;
+            renderUpdateState();
+        } else if (name === 'mpv-prop-change' && properties.includes(data?.name)) {
             info[data.name] = data.data;
             if (data.name === 'glsl-shaders') {
                 shader = shaderMode(data.data);
@@ -333,6 +393,14 @@
             .ezras-picture-dialog select,.ezras-picture-dialog textarea {font:inherit;color:inherit;background:#222635;border:1px solid #7272c2;border-radius:.4rem;padding:.35rem}
             .ezras-picture-dialog button {margin:.35rem .35rem .35rem 0}
             .ezras-picture-dialog textarea {display:block;width:100%;min-height:7rem}
+            #ezras-update-controls {margin:.5rem 0 1rem}
+            #ezras-update-controls > div {display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}
+            #ezras-update-controls :is(select,button) {font:inherit;color:inherit;background:var(--modal-background-color,#222635);
+                border:1px solid #7272c2;border-radius:.75rem;padding:.45rem .65rem}
+            #ezras-update-controls :is(select,button):disabled {opacity:.6}
+            #ezras-update-controls :focus-visible {outline:2px solid #aaaaf0;outline-offset:2px}
+            #ezras-update-controls p {margin:.35rem 0 0}
+            #ezras-update-controls [hidden] {display:none}
             .fork-list-management > div {padding:.65rem 0;border-bottom:1px solid #7272c255}
             .fork-list-management .fork-list-dialog-actions {flex-wrap:wrap;margin-top:.4rem}`;
         document.head.append(style);

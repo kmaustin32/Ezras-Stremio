@@ -21,6 +21,7 @@
 #include "../ui/splash.h"
 #include "../webview/webview.h"
 #include "../updater/updater.h"
+#include "../updater/fork_updater.h"
 #include "../utils/discord.h"
 
 // Single-instance
@@ -688,8 +689,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_FORK_PLAYER_RESOURCE:
         CompletePlayerResource(lParam);
         break;
+    case WM_FORK_UPDATE_READY:
+        CompleteForkUpdate();
+        break;
     case WM_DESTROY:
     {
+        ShutdownForkUpdate();
         ShutdownPlayerResources();
         // release mutex
         if(g_hMutex) { CloseHandle(g_hMutex); g_hMutex=nullptr; }

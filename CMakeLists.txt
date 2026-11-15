@@ -16,6 +16,11 @@ file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-player.js" FORK_PLAYER_S
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-backup.js" FORK_BACKUP_SCRIPT)
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-lists.js" FORK_LISTS_SCRIPT)
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/webview/fork-playback.js" FORK_PLAYBACK_SCRIPT)
+string(REGEX MATCH "const version = '([0-9]+\\.[0-9]+\\.[0-9]+(-[a-z0-9.]+)?)';" FORK_VERSION_DECLARATION "${FORK_PLAYBACK_SCRIPT}")
+if(NOT FORK_VERSION_DECLARATION)
+    message(FATAL_ERROR "Could not read Ezra's Stremio version from fork-playback.js")
+endif()
+set(EZRAS_STREMIO_VERSION "${CMAKE_MATCH_1}")
 string(APPEND FORK_PLAYER_SCRIPT "\n${FORK_BACKUP_SCRIPT}\n${FORK_LISTS_SCRIPT}\n${FORK_PLAYBACK_SCRIPT}")
 foreach(mode fit crop stretch)
     set(icon "${CMAKE_CURRENT_SOURCE_DIR}/images/player/video-scale-${mode}.svg")
@@ -98,6 +103,8 @@ set(SOURCES
         src/ui/splash.cpp
         src/updater/updater.cpp
         src/updater/updater.h
+        src/updater/fork_updater.cpp
+        src/updater/release_update.cpp
         src/webview/webview.h
         src/webview/webview.cpp
         src/webview/player_bundle_patch.cpp
@@ -123,6 +130,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         Msimg32.lib
         winhttp.lib
         shlwapi.lib
+        ole32.lib
         nlohmann_json::nlohmann_json
         unofficial::webview2::webview2
         OpenSSL::SSL
@@ -133,11 +141,15 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE DEBUG_LOG)
+target_compile_definitions(${PROJECT_NAME} PRIVATE EZRAS_STREMIO_VERSION="${EZRAS_STREMIO_VERSION}")
 target_compile_definitions(${PROJECT_NAME} PRIVATE STREMIO_DEFAULT_UPDATE_URL="${STREMIO_UPDATE_URL}")
 target_compile_definitions(${PROJECT_NAME} PRIVATE STREMIO_PLAYER_PATCH_REVISION="${PLAYER_PATCH_REVISION}")
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(release-update-tests tests/release_update_test.cpp src/updater/release_update.cpp)
+    target_link_libraries(release-update-tests PRIVATE nlohmann_json::nlohmann_json)
+    add_test(NAME fork-release-selection COMMAND release-update-tests)
     add_executable(config-tests tests/config_test.cpp src/utils/config.cpp src/core/globals.cpp)
     target_link_libraries(config-tests PRIVATE nlohmann_json::nlohmann_json unofficial::webview2::webview2 ole32.lib)
     add_test(NAME theme-default-and-preferences COMMAND config-tests)

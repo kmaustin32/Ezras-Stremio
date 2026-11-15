@@ -1,14 +1,13 @@
-## Ezra's Stremio 2.1.5
+## Ezra's Stremio 2.2.0
 
-- The Library list bar contains **All**, **Anime**, **Live Action**, and **Most Watched**. Saved custom lists have their own dropdown.
-- The sorting dropdown offers **A–Z**, **Z–A**, **Last Watched**, **Watched**, and **Not Watched** within the selected list.
-- Choose **Movie** or **Series** in the content-type dropdown to narrow any list. For example, choose **Anime**, **Movie**, and **Watched** to see anime movies you’ve watched.
-- The Windows sorting dropdown displays the **A–Z** and **Z–A** labels correctly.
+- **Check for updates** appears next to the version number in Settings. **Stable** is the default. Choose **Beta** to also see newer prereleases.
+- On installed copies, **Update** downloads and verifies the Windows installer from this fork's GitHub release. Confirm to close Stremio and open the installer. The update keeps your configuration and custom lists.
+- Portable copies can download the new ZIP directly so they can be updated as portable apps.
 
 ### Windows downloads
 
-- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.5/Ezras-Stremio-2.1.5-x64.exe)
-- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.5/Ezras-Stremio-2.1.5-x64.zip)
-- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.1.5/SHA256SUMS.txt)
+- [Windows x64 installer](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.2.0/Ezras-Stremio-2.2.0-x64.exe)
+- [Portable Windows x64 ZIP](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.2.0/Ezras-Stremio-2.2.0-x64.zip)
+- [SHA256 checksums](https://github.com/kmaustin32/Ezras-Stremio/releases/download/v2.2.0/SHA256SUMS.txt)
 
-Use Windows 10 or 11 x64. If upgrading with the installer, retain your configuration to keep your custom mpv settings.
+Install 2.2.0 once to get the in-app updater for subsequent releases.
