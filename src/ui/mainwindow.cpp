@@ -20,6 +20,7 @@
 #include "../tray/tray.h"
 #include "../ui/splash.h"
 #include "../webview/webview.h"
+#include "../webview/youtube.h"
 #include "../updater/updater.h"
 #include "../updater/fork_updater.h"
 #include "../utils/discord.h"
@@ -575,6 +576,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         if (pcds && pcds->dwData == 1 && pcds->lpData) {
             const auto decoded = DecodeNativeLaunchText(pcds->lpData, pcds->cbData);
             if (!decoded) return 0;
+            CloseYouTubeTab();
             const std::wstring& receivedUrl = *decoded;
             std::wcout << L"Received URL in main instance: " << receivedUrl << std::endl;
 
@@ -647,6 +649,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         if(g_closeOnExit) {
             DestroyWindow(hWnd);
         } else {
+            CloseYouTubeTab();
             ShowWindow(hWnd, SW_HIDE);
             pauseMPV(g_pauseOnMinimize);
             g_showWindow=false;
@@ -661,7 +664,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         if (LOWORD(wParam) != WA_INACTIVE)
         {
             SetFocus(hWnd);
-            if (g_webview && g_webviewController) {
+            if (!FocusYouTubeTab() && g_webview && g_webviewController) {
                 g_webviewController->MoveFocus(COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC);
             }
         }
@@ -676,6 +679,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             RECT rc; GetClientRect(hWnd,&rc);
             g_webviewController->put_Bounds(rc);
         }
+        ResizeYouTubeTab();
         if(g_hSplash){
             int w = LOWORD(lParam);
             int h = HIWORD(lParam);
@@ -694,6 +698,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     case WM_DESTROY:
     {
+        ShutdownYouTubeTab();
         ShutdownForkUpdate();
         ShutdownPlayerResources();
         // release mutex

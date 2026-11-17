@@ -107,6 +107,7 @@ set(SOURCES
         src/updater/release_update.cpp
         src/webview/webview.h
         src/webview/webview.cpp
+        src/webview/youtube.cpp
         src/webview/player_bundle_patch.cpp
         src/webview/player_resources.cpp
         src/webview/library_store.cpp

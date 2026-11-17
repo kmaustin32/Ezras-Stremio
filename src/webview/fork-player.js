@@ -1059,6 +1059,32 @@
         continueWatchingLayout = {row, width, viewport, cards, classes, posters};
     }
 
+    function updateYouTubeTab() {
+        const bridge = window.chrome?.webview;
+        if (!bridge || !['stremio.zarg.me', 'zaarrg.github.io', 'web.stremio.com'].includes(location.hostname)) return;
+        const nav = document.querySelector('[class*="vertical-nav-bar-container"]');
+        if (!nav || nav.querySelector('#stremio-fork-youtube')) return;
+        const neighbor = nav.querySelector('[class*="nav-tab-button-container"]');
+        if (!neighbor?.parentElement) return;
+
+        const tab = document.createElement('button');
+        tab.id = 'stremio-fork-youtube';
+        tab.type = 'button';
+        tab.title = 'YouTube';
+        tab.setAttribute('aria-label', 'YouTube');
+        tab.className = [...neighbor.classList].filter(name => name.startsWith('nav-tab-button-container')).join(' ');
+        tab.style.cssText = 'background:transparent;border:0;font:inherit;color:inherit;cursor:pointer';
+        tab.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2.5" y="5" width="19" height="14" rx="4"/><path d="m10 9 5 3-5 3z" fill="currentColor" stroke="none"/></svg><span>YouTube</span>';
+        const iconClass = neighbor.querySelector('svg')?.getAttribute('class');
+        const labelClass = [...neighbor.querySelectorAll('[class]')].find(element =>
+            [...element.classList].some(name => name.startsWith('label-')))?.className;
+        if (iconClass) tab.firstElementChild.setAttribute('class', iconClass);
+        else tab.firstElementChild.style.width = '1.5em';
+        if (labelClass) tab.lastElementChild.className = labelClass;
+        tab.addEventListener('click', () => bridge.postMessage('fork-open-youtube'));
+        neighbor.parentElement.append(tab);
+    }
+
     function update() {
         scheduled = false;
         resizeContinueWatching();
@@ -1066,6 +1092,7 @@
         updatePlayerShortcuts();
         updateControlSettings();
         updateAppearanceSettings();
+        updateYouTubeTab();
         const player = document.querySelector('[class*="player-container"]');
         updateControls(player);
         updateVolume(player);

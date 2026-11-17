@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 env:
-  FORK_RELEASE_VERSION: 2.2.1
+  FORK_RELEASE_VERSION: 3.5.0-beta.1
 
 jobs:
   build:
@@ -70,6 +70,8 @@ jobs:
           if ($LASTEXITCODE) { throw 'Manual black-bar detection tests failed' }
           node --test tests/shortcut.test.js tests/server_patch.test.js
           if ($LASTEXITCODE) { throw 'Shortcut tests failed' }
+          node --test tests/youtube.test.js
+          if ($LASTEXITCODE) { throw 'YouTube integration tests failed' }
           node --test tests/backup.test.js
           if ($LASTEXITCODE) { throw 'Backup data and archive tests failed' }
       - name: Test player button in Edge

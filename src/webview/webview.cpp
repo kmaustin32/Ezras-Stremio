@@ -1,4 +1,5 @@
 #include "webview.h"
+#include "youtube.h"
 #include <string>
 #include <thread>
 #include <cmath>
@@ -322,6 +323,7 @@ void InitWebView2(HWND hWnd)
                     g_webview->get_Profile(&webView2Profile);
                     g_webviewProfile = webView2Profile.try_query<ICoreWebView2Profile8>();
                     if (!g_webviewProfile) return E_FAIL;
+                    SetYouTubeEnvironment(hWnd, environment.get());
 
                     wil::com_ptr<ICoreWebView2Settings> webView2Settings;
                     g_webview->get_Settings(&webView2Settings);
@@ -553,6 +555,12 @@ static void SetupWebMessageHandler()
             args->TryGetWebMessageAsString(&msgRaw);
             if(!msgRaw) return S_OK;
             std::wstring wstr(msgRaw.get());
+            if (wstr == L"fork-open-youtube") {
+                wil::unique_cotaskmem_string source;
+                if (SUCCEEDED(args->get_Source(&source)) && source && IsForkUpdateSource(source.get()))
+                    OpenYouTubeTab();
+                return S_OK;
+            }
             std::string str = WStringToUtf8(wstr);
             constexpr std::string_view updatePrefix = "fork-update:";
             if (str.starts_with(updatePrefix)) {
