@@ -15,6 +15,7 @@
 #include "../core/globals.h"
 #include "../mpv/player.h"
 #include "../ui/mainwindow.h"
+#include "../utils/helpers.h"
 
 namespace {
 using Microsoft::WRL::Callback;
@@ -36,7 +37,7 @@ struct YouTubeTab {
 
 // The popup is a separate WebView. Its active-tab lookup must resolve to
 // YouTube, while other tab queries retain their normal behavior.
-constexpr wchar_t popupTabAdapter[] = LR"JS(
+constexpr char popupTabAdapter[] = R"JS(
 (() => {
     const tabs = globalThis.chrome?.tabs;
     if (!tabs?.query) return;
@@ -48,12 +49,36 @@ constexpr wchar_t popupTabAdapter[] = LR"JS(
         const result = query({}).then(items => items.filter(item => {
             try {
                 const url = new URL(item.url);
-                return url.protocol === 'https:' && url.hostname === 'www.youtube.com';
+                return url.protocol === 'https:' &&
+                    ['www.youtube.com', 'youtube.com', 'm.youtube.com'].includes(url.hostname);
             } catch { return false; }
         }).slice(0, 1));
         if (!callback) return result;
         result.then(callback, () => callback([]));
     };
+})();
+)JS";
+
+// Chrome's toolbar popup has no sender.tab. WebView2 opens it as a tab,
+// so make messages from that exact extension page use the toolbar behavior.
+constexpr char extensionSenderAdapter[] = R"JS(
+(() => {
+    const runtime = chrome.runtime;
+    const popup = runtime.getURL('popup.html');
+    const event = runtime.onMessage;
+    const add = event.addListener.bind(event);
+    const remove = event.removeListener.bind(event);
+    const has = event.hasListener.bind(event);
+    const wrappers = new WeakMap();
+    event.addListener = listener => {
+        if (!wrappers.has(listener)) {
+            wrappers.set(listener, (message, sender, reply) => listener(message,
+                sender.url === popup && sender.id === runtime.id ? {...sender, tab: undefined} : sender, reply));
+        }
+        add(wrappers.get(listener));
+    };
+    event.removeListener = listener => remove(wrappers.get(listener) ?? listener);
+    event.hasListener = listener => has(wrappers.get(listener) ?? listener);
 })();
 )JS";
 
@@ -172,7 +197,8 @@ void OpenBlurSettings()
                     PostMessageW(window, WM_CLOSE, 0, 0);
                     return S_OK;
                 }).Get(), &token);
-            const HRESULT added = popup->AddScriptToExecuteOnDocumentCreated(popupTabAdapter,
+            const auto adapter = Utf8ToWstring(popupTabAdapter);
+            const HRESULT added = popup->AddScriptToExecuteOnDocumentCreated(adapter.c_str(),
                 Callback<ICoreWebView2AddScriptToExecuteOnDocumentCreatedCompletedHandler>(
                     [window, popup, url](HRESULT scriptResult, LPCWSTR) -> HRESULT {
                         if (window != tab.settingsWindow) return S_OK;
@@ -210,9 +236,10 @@ void FindInstalledExtension()
                 if (SUCCEEDED(result) && extensions) extensions->get_Count(&count);
                 for (UINT32 index = 0; index < count; ++index) {
                     wil::com_ptr<ICoreWebView2BrowserExtension> extension;
-                    wil::unique_cotaskmem_string id;
+                    wil::unique_cotaskmem_string id, name;
                     BOOL enabled = FALSE;
                     if (SUCCEEDED(extensions->GetValueAtIndex(index, &extension)) && extension &&
+                        SUCCEEDED(extension->get_Name(&name)) && name && std::wstring_view(name.get()) == L"UltraWideoVideo" &&
                         SUCCEEDED(extension->get_IsEnabled(&enabled)) && enabled &&
                         SUCCEEDED(extension->get_Id(&id)) && id && IsExtensionId(id.get())) {
                         tab.extensionId = id.get();
@@ -229,11 +256,46 @@ void FindInstalledExtension()
     }
 }
 
+std::filesystem::path StageExtension(const std::filesystem::path& source, nlohmann::json manifest)
+{
+    wil::unique_cotaskmem_string dataFolder;
+    GUID unique{};
+    wchar_t suffix[40]{};
+    if (FAILED(tab.environment->get_UserDataFolder(&dataFolder)) || !dataFolder ||
+        FAILED(CoCreateGuid(&unique)) || !StringFromGUID2(unique, suffix, ARRAYSIZE(suffix))) return {};
+
+    // WebView2 keeps the unpacked path across runs. Place the adapted copy
+    // in app-owned storage so the original download can be moved or deleted.
+    const auto dest = std::filesystem::path(dataFolder.get()) / L"EzrasYouTubeExtensions" / suffix;
+    std::error_code error;
+    if (!std::filesystem::create_directories(dest, error) || error) return {};
+    std::filesystem::copy(source, dest, std::filesystem::copy_options::recursive |
+        std::filesystem::copy_options::skip_symlinks, error);
+    if (error) return {};
+
+    manifest["background"]["service_worker"] = "ezra-youtube-worker.js";
+    std::ofstream manifestFile(dest / L"manifest.json", std::ios::binary | std::ios::trunc);
+    std::ofstream worker(dest / L"ezra-youtube-worker.js", std::ios::binary | std::ios::trunc);
+    manifestFile << manifest.dump(2);
+    worker << popupTabAdapter << extensionSenderAdapter << "\nimportScripts('background.js');\n";
+    manifestFile.close();
+    worker.close();
+    return manifestFile && worker ? dest : std::filesystem::path{};
+}
+
 void InstallBlurExtension()
 {
     if (!tab.profile || tab.extensionBusy || !tab.extensionId.empty()) return;
+    if (FAILED(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED))) {
+        Report(L"Could not open the Windows folder picker.");
+        return;
+    }
+    const auto uninitialize = wil::scope_exit([] { CoUninitialize(); });
     wil::com_ptr<IFileOpenDialog> picker;
-    if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&picker)))) return;
+    if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&picker)))) {
+        Report(L"Could not open the Windows folder picker.");
+        return;
+    }
     picker->SetOptions(FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST);
     picker->SetTitle(L"Select the unpacked UltraWideoVideo folder");
     if (FAILED(picker->Show(tab.owner))) return;
@@ -242,18 +304,29 @@ void InstallBlurExtension()
     if (FAILED(picker->GetResult(&folder)) || FAILED(folder->GetDisplayName(SIGDN_FILESYSPATH, &path)) || !path) return;
     const std::filesystem::path root(path.get());
     std::ifstream manifest(root / L"manifest.json");
-    const auto data = manifest ? nlohmann::json::parse(manifest, nullptr, false) : nlohmann::json{};
+    auto data = manifest ? nlohmann::json::parse(manifest, nullptr, false) : nlohmann::json{};
+    manifest.close();
     std::error_code fileError;
-    if (!data.is_object() || !data.contains("action") || !data["action"].is_object() ||
+    if (!data.is_object() || !data.contains("background") || !data["background"].is_object() ||
+        !data["background"].contains("service_worker") || data["background"]["service_worker"] != "background.js" ||
+        (data["background"].contains("type") && data["background"]["type"] != "classic") ||
+        !data.contains("action") || !data["action"].is_object() ||
+        !data["action"].contains("default_title") || data["action"]["default_title"] != "UltraWideoVideo" ||
         !data["action"].contains("default_popup") || data["action"]["default_popup"] != "popup.html" ||
+        !std::filesystem::is_regular_file(root / L"background.js", fileError) ||
         !std::filesystem::is_regular_file(root / L"popup.html", fileError)) {
-        Report(L"Unzip the extension and select the folder that contains its manifest.json and popup.html.");
+        Report(L"Select the folder containing the unpacked UltraWideoVideo extension and its manifest.json.");
+        return;
+    }
+    const auto installed = StageExtension(root, std::move(data));
+    if (installed.empty()) {
+        Report(L"Could not save the extension in the YouTube profile.");
         return;
     }
 
     tab.extensionBusy = true;
     UpdateExtensionButtons();
-    const HRESULT started = tab.profile->AddBrowserExtension(path.get(),
+    const HRESULT started = tab.profile->AddBrowserExtension(installed.c_str(),
         Callback<ICoreWebView2ProfileAddBrowserExtensionCompletedHandler>(
             [](HRESULT result, ICoreWebView2BrowserExtension* extension) -> HRESULT {
                 if (!tab.host) return S_OK;

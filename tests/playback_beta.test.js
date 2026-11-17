@@ -5,6 +5,7 @@ const {chromium} = require('playwright');
 const {shaderMode, matchingTrack} = require('../src/webview/fork-playback');
 const {readListBackup, zip} = require('../src/webview/fork-backup');
 const {decodeLists, previewListImport} = require('../src/webview/fork-lists');
+const forkVersion = fs.readFileSync('src/webview/fork-playback.js', 'utf8').match(/const version = '([^']+)'/)[1];
 
 test('Every shipped shader binding is recognized and subtitle/audio aliases match across sources', () => {
     const input = fs.readFileSync('utils/mpv/anime4k/portable_config/input.conf', 'utf8');
@@ -67,7 +68,7 @@ test('The panel shows the fork version, confirms shaders, saves series preferenc
         for (const [name, data] of Object.entries({'time-pos': 93.5, seekable: true, 'current-vo': 'gpu-next'}))
             window.native('mpv-prop-change', {name, data});
     });
-    assert.equal(await page.locator('#ezras-stremio-version').innerText(), "Ezra's Stremio 2.2.1");
+    assert.equal(await page.locator('#ezras-stremio-version').innerText(), "Ezra's Stremio " + forkVersion);
     assert.match(await page.locator('#versions').innerText(), /Shell Version/);
     const updateControls = page.locator('#ezras-update-controls');
     const check = updateControls.getByRole('button', {name: 'Check for updates'});
