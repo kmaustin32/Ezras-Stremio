@@ -368,7 +368,7 @@ bool RegisterWindowClass(const wchar_t* name, WNDPROC procedure, HBRUSH backgrou
     wc.hInstance = GetModuleHandleW(nullptr);
     wc.lpfnWndProc = procedure;
     wc.lpszClassName = name;
-    wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     wc.hbrBackground = background;
     return RegisterClassW(&wc) || GetLastError() == ERROR_CLASS_ALREADY_EXISTS;
 }
